@@ -52,7 +52,8 @@ your computer and is shared by the Citrello app, Claude and Word:
 2. **Start** `Citrello.exe`. Your browser opens Citrello's window.
    - *Windows may say "Windows protected your PC" for new downloads: click **More info → Run
      anyway**.*
-3. **Settings → Claude → Install in Claude Desktop**, then click **Install** in Claude.
+3. **Settings → Claude → Connect to Claude Desktop.** Citrello shows `Citrello.mcpb` in File Explorer;
+   drag it onto **Claude Desktop → Settings → Extensions** and click **Install**.
 4. **Settings → Word → Install Word button**, then restart Word.
 5. **Settings → Browser button:** drag **＋ Add to Citrello** onto your bookmarks bar.
 

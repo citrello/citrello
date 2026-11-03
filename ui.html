@@ -250,28 +250,18 @@
         <button class="primary" id="claudeInstall">Connect to Claude Desktop</button>
       </div>
       <div class="panel hidden" id="claudeChoice">
-        <strong>Windows doesn't know that .mcpb files belong to Claude, so here are two ways:</strong>
-        <div class="grid2" style="margin-top:8px">
-          <div>
-            <h3>Connect automatically (easiest)</h3>
-            <p class="small muted" style="margin:0">Citrello closes Claude Desktop, adds itself to Claude's settings and starts Claude again. Nothing to do by hand.</p>
-            <div class="row"><button class="primary" id="claudeAuto">Connect automatically</button></div>
-          </div>
-          <div>
-            <h3>Or install the extension yourself</h3>
-            <ol class="small" style="margin:4px 0 0; padding-left:18px">
-              <li>Open Claude Desktop → <strong>Settings → Extensions</strong>.</li>
-              <li><button class="link" id="claudeShowFile">Show Citrello.mcpb in File Explorer</button></li>
-              <li>Drag the file onto Claude's Extensions page (or use <strong>Advanced settings → Install Extension…</strong>) and click <strong>Install</strong>.</li>
-            </ol>
-          </div>
-        </div>
+        <strong>Three quick steps</strong> <span class="muted small">(File Explorer is now showing Citrello.mcpb)</span>
+        <ol style="margin:8px 0 0; padding-left:20px">
+          <li>In Claude Desktop, open <strong>Settings → Extensions</strong>.</li>
+          <li><strong>Drag Citrello.mcpb</strong> from File Explorer onto that page. <button class="link" id="claudeShowFile">Show the file again</button></li>
+          <li>Click <strong>Install</strong>. Then ask Claude in a new chat: <em>“What's in my Citrello library?”</em></li>
+        </ol>
       </div>
       <p class="muted small">Used <strong>Refcite</strong> (Citrello's earlier name) before? Your library and settings were copied over automatically. In Claude Desktop, remove the old <strong>Refcite</strong> extension under <strong>Settings → Extensions</strong>, so Claude doesn't see two libraries.</p>
             <details><summary>Other ways to connect (advanced)</summary>
         <p class="small muted">If the install window doesn't appear: in Claude Desktop open <strong>Settings → Extensions</strong> and drag <code id="mcpbPath">Citrello.mcpb</code> (next to Citrello.exe) onto it, or double-click that file.</p>
-        <div class="row"><button id="claudeConnect">Add Citrello to Claude's settings file instead</button>
-          <span class="muted small">(close Claude Desktop first)</span></div>
+        <div class="row"><button id="claudeAuto">Connect through Claude's settings file instead</button>
+          <span class="muted small">(fallback: closes and restarts Claude Desktop; doesn't work with every Claude version)</span></div>
       </details>
       <details><summary>Set it up by hand / for Claude Code</summary>
         <p class="small muted">In Claude Desktop open <strong>Settings → Developer → Edit Config</strong>. That opens the exact file Claude uses (probably <span id="claudePath"></span>). Add the lines below, save, then fully quit Claude (tray icon → Quit) and open it again:</p>
@@ -477,7 +467,7 @@ async function loadClaude() {
   if (c.extension_file) $("mcpbPath").textContent = c.extension_file;
   let html;
   if (c.extension_installed) html = `<div class="notice ok">Citrello is installed in Claude Desktop. Its tools are available in every chat.</div>`;
-  else if (c.connected && c.up_to_date) html = `<div class="notice ok">Connected through Claude's settings file. For a cleaner setup, click Install in Claude Desktop.</div>`;
+  else if (c.connected && c.up_to_date) html = `<div class="notice ok">Connected through Claude's settings file. For a cleaner setup, click Connect to Claude Desktop and install the extension.</div>`;
   else if (!c.claude_installed) html = `<div class="notice warn">Claude Desktop doesn't seem to be installed on this computer (get it from claude.ai/download).</div>`;
   else html = `<div class="notice warn">Not connected yet.</div>`;
   if (!c.extension_file) html += `<div class="notice err">Citrello.mcpb was not found next to Citrello.exe. Run build_windows.bat again; it creates it in the dist folder.</div>`;
@@ -487,9 +477,8 @@ async function loadClaude() {
 $("claudeInstall").onclick = async () => {
   try {
     const r = await post("/api/claude/install-extension");
-    if (r.manual) { show("claudeChoice"); return; }
-    $("claudeStatus").innerHTML = `<div class="notice ok">Claude Desktop should now show <strong>Install Citrello</strong>: click <strong>Install</strong>. If it doesn't, use the options below.</div>`;
     show("claudeChoice");
+    if (!r.manual) $("claudeStatus").innerHTML = `<div class="notice ok">Claude Desktop should show <strong>Install Citrello</strong>: click <strong>Install</strong>. If it doesn't, follow the steps below.</div>`;
   } catch (e) { $("claudeStatus").innerHTML = `<div class="notice err">${esc(e.message)}</div>`; }
 };
 $("claudeAuto").onclick = async () => {
@@ -506,14 +495,6 @@ $("claudeAuto").onclick = async () => {
   $("claudeAuto").disabled = false;
 };
 $("claudeShowFile").onclick = () => post("/api/claude/show-extension").catch(() => {});
-$("claudeConnect").onclick = async () => {
-  try {
-    const c = await api("/api/claude");
-    if (c.claude_running && !confirm("Claude Desktop is running and may overwrite its settings file when it closes. Close Claude Desktop first, then click OK.")) return;
-    await post("/api/claude/connect"); await loadClaude(); toast("Connected: now start Claude Desktop");
-  }
-  catch (e) { $("claudeStatus").innerHTML = `<div class="notice err">${esc(e.message)}</div>`; }
-};
 
 // ---------- library ----------
 async function loadLibrary() {

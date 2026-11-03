@@ -397,14 +397,33 @@ def show_in_explorer(path):
         subprocess.Popen(["open", "-R", path])
 
 
+def start_claude():
+    """Start Claude Desktop if it isn't running (normal and Microsoft Store installs). Best effort."""
+    if not sys.platform.startswith("win") or claude_running():
+        return claude_running()
+    exe = os.path.join(os.environ.get("LOCALAPPDATA", ""), "AnthropicClaude", "claude.exe")
+    if os.path.exists(exe):
+        try:
+            subprocess.Popen([exe])
+            return True
+        except OSError:
+            pass
+    return bool(_ps(
+        "$p = Get-AppxPackage -Name '*Claude*' | Select-Object -First 1; "
+        "if ($p) { $id = (Get-AppxPackageManifest $p).Package.Applications.Application.Id | Select-Object -First 1; "
+        "Start-Process ('shell:AppsFolder\\' + $p.PackageFamilyName + '!' + $id); 'ok' }"))
+
+
 def install_extension():
-    """Open Citrello.mcpb with Claude Desktop - only if Windows knows that file type; otherwise the
-    caller offers the automatic connection or the manual extension steps (no confusing 'Open with')."""
+    """Help install Citrello.mcpb in Claude Desktop. If Windows links .mcpb files to Claude, open it
+    (Claude shows its install window); otherwise show the file in File Explorer and start Claude, so the
+    user can drag it onto Claude's Settings -> Extensions page (no confusing 'Open with' prompt)."""
     path = extension_path()
     if not path:
         raise ValueError("Citrello.mcpb was not found next to Citrello.exe. Keep the files from the download together.")
     if not mcpb_associated():
-        return {"manual": True, "path": path}
+        show_in_explorer(path)
+        return {"manual": True, "path": path, "claude_started": start_claude()}
     if sys.platform.startswith("win"):
         os.startfile(path)  # Claude Desktop shows its install window
     else:
