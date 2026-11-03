@@ -1,0 +1,11 @@
+__pycache__/
+*.pyc
+build/
+dist/
+*.spec
+.venv/
+venv/
+# holds a Mendeley app secret when building locally; never commit it
+app_config.json
+*.mcpb
+.pytest_cache/

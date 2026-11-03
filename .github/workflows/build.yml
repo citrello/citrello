@@ -1,0 +1,54 @@
+name: Test and build
+
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: write   # needed to attach the built files to a release
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install python-docx citeproc-py pytest
+      - run: pytest -q
+
+  windows:
+    needs: test
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install python-docx citeproc-py pyinstaller
+      - name: Build Citrello.exe (the app)
+        run: python -m PyInstaller --noconfirm --onefile --noconsole --name Citrello --add-data "ui.html;." --add-data "clip.html;." --add-data "styles;styles" --collect-data docx --collect-data citeproc app.py
+      - name: Build CitrelloMCP.exe (the Claude connector)
+        run: python -m PyInstaller --noconfirm --onefile --console --name CitrelloMCP --add-data "styles;styles" --collect-data docx --collect-data citeproc mcp_server.py
+      - name: Build Citrello.mcpb (one-click Claude Desktop extension)
+        run: python make_mcpb.py dist\CitrelloMCP.exe dist\Citrello.mcpb
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Citrello-windows
+          path: |
+            dist/Citrello.exe
+            dist/CitrelloMCP.exe
+            dist/Citrello.mcpb
+      - name: Attach to the release (version tags only)
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            dist/Citrello.exe
+            dist/CitrelloMCP.exe
+            dist/Citrello.mcpb
+          generate_release_notes: true

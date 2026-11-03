@@ -1,0 +1,719 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Citrello</title>
+<style>
+  :root {
+    --bg: #f6f5f2; --card: #ffffff; --ink: #1d1d1f; --muted: #6b6b70; --line: #e4e2dc;
+    --accent: #9b1c31; --accent-ink: #ffffff; --accent-soft: #f6e8ea;
+    --ok: #1f7a4d; --ok-soft: #e5f3ec; --warn: #9a6200; --warn-soft: #fbf1de; --err: #b3261e; --err-soft: #fbe9e7;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #161618; --card: #1f1f22; --ink: #ececee; --muted: #9a9aa1; --line: #33333a;
+      --accent: #e0627a; --accent-ink: #1a0b0f; --accent-soft: #3a1f26;
+      --ok: #5cc392; --ok-soft: #173126; --warn: #e2b04f; --warn-soft: #362a12; --err: #f08a80; --err-soft: #3b1d1a;
+    }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink);
+         font: 15px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  main { max-width: 1040px; margin: 0 auto; padding: 24px 16px 64px; }
+  header { display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; margin-bottom: 18px; }
+  h1 { font-size: 24px; margin: 0; letter-spacing: -0.02em; }
+  header p { margin: 2px 0 0; color: var(--muted); font-size: 14px; }
+  nav { display: flex; gap: 4px; background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 4px; }
+  nav button { border: none; background: none; padding: 7px 16px; border-radius: 9px; font-weight: 600; color: var(--muted); }
+  nav button.active { background: var(--accent-soft); color: var(--accent); }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 20px 22px; margin-bottom: 16px; }
+  h2 { font-size: 17px; margin: 0 0 6px; }
+  h3 { font-size: 15px; margin: 16px 0 4px; }
+  .muted { color: var(--muted); }
+  .small { font-size: 13px; }
+  button, .btn { font: inherit; font-weight: 600; border: 1px solid var(--line); background: var(--card); color: var(--ink);
+                 padding: 8px 14px; border-radius: 10px; cursor: pointer; text-decoration: none; display: inline-block; }
+  button.primary, .btn.primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+  button:disabled { opacity: .5; cursor: default; }
+  button.link { border: none; background: none; color: var(--muted); padding: 0; font-weight: 500; text-decoration: underline; }
+  button.icon { padding: 2px 8px; font-weight: 500; color: var(--muted); }
+  .row { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin-top: 10px; }
+  input[type=text], input[type=password], input[type=email], input[type=search], select, textarea {
+    font: inherit; padding: 8px 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--bg); color: var(--ink); }
+  textarea { width: 100%; min-height: 84px; resize: vertical; }
+  .grow { flex: 1; min-width: 180px; }
+  label.field { display: block; margin-top: 10px; font-size: 13px; color: var(--muted); }
+  label.field input, label.field select { display: block; width: 100%; margin-top: 3px; }
+  .drop { display: block; border: 2px dashed var(--line); border-radius: 12px; padding: 22px 16px; text-align: center; cursor: pointer; margin-top: 10px; }
+  .drop.over, .drop:hover { border-color: var(--accent); background: var(--accent-soft); }
+  .drop strong { color: var(--accent); }
+  .bar { height: 8px; background: var(--line); border-radius: 99px; overflow: hidden; margin-top: 10px; }
+  .bar > div { height: 100%; width: 0; background: var(--accent); transition: width .3s; }
+  .chips { display: flex; flex-wrap: wrap; gap: 8px; margin: 10px 0 4px; }
+  .chip { font-size: 13px; padding: 3px 10px; border-radius: 99px; background: var(--bg); border: 1px solid var(--line); }
+  .chip.ok, .tag.ok { background: var(--ok-soft); color: var(--ok); border-color: transparent; }
+  .chip.new, .tag.new { background: var(--accent-soft); color: var(--accent); border-color: transparent; }
+  .chip.warn, .tag.warn { background: var(--warn-soft); color: var(--warn); border-color: transparent; }
+  .chip.bad, .tag.bad { background: var(--err-soft); color: var(--err); border-color: transparent; }
+  .tag { display: inline-block; font-size: 12px; padding: 1px 8px; border-radius: 99px; white-space: nowrap; margin: 1px 2px 1px 0; background: var(--bg); border: 1px solid var(--line); }
+  .table-wrap { max-height: 560px; overflow: auto; border: 1px solid var(--line); border-radius: 10px; margin-top: 10px; }
+  table { width: 100%; border-collapse: collapse; font-size: 13.5px; }
+  th { position: sticky; top: 0; background: var(--card); text-align: left; font-weight: 600; color: var(--muted); padding: 8px 10px; border-bottom: 1px solid var(--line); z-index: 1; }
+  td { padding: 8px 10px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  tr:last-child td { border-bottom: none; }
+  td.n { color: var(--muted); width: 36px; font-variant-numeric: tabular-nums; }
+  td .t { font-weight: 600; }
+  td .meta { color: var(--muted); font-size: 12.5px; }
+  code.key { font-size: 12.5px; background: var(--bg); border: 1px solid var(--line); padding: 1px 6px; border-radius: 6px; cursor: pointer; white-space: nowrap; }
+  ul.issues { margin: 4px 0 0; padding-left: 16px; font-size: 12.5px; }
+  ul.issues li.problem { color: var(--err); }
+  ul.issues li.check { color: var(--warn); }
+  tr.problem td:first-child { box-shadow: inset 3px 0 0 var(--err); }
+  tr.check td:first-child { box-shadow: inset 3px 0 0 var(--warn); }
+  .notice { padding: 10px 14px; border-radius: 10px; margin-top: 12px; font-size: 14px; }
+  .notice.err { background: var(--err-soft); color: var(--err); }
+  .notice.warn { background: var(--warn-soft); color: var(--warn); }
+  .notice.ok { background: var(--ok-soft); color: var(--ok); }
+  .panel { border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px; margin-top: 12px; background: var(--bg); }
+  .opts { display: flex; flex-wrap: wrap; gap: 16px; margin-top: 10px; font-size: 14px; align-items: center; }
+  ol.next { margin: 8px 0 0; padding-left: 20px; }
+  details summary { cursor: pointer; color: var(--muted); font-size: 14px; margin-top: 10px; }
+  pre { background: var(--bg); border: 1px solid var(--line); border-radius: 8px; padding: 10px; font-size: 12.5px; overflow: auto; }
+  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  footer { display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; color: var(--muted); font-size: 13px; margin-top: 24px; }
+  .toast { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); background: var(--ink); color: var(--bg); padding: 8px 16px; border-radius: 10px; font-size: 14px; opacity: 0; transition: opacity .2s; pointer-events: none; }
+  .toast.show { opacity: 1; }
+  .hidden { display: none !important; }
+  @media (max-width: 700px) { .hide-sm { display: none; } .grid2 { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <div>
+      <h1>Citrello</h1>
+      <p>References, the sweet part. Shared with Claude in every chat, live in your Word documents.</p>
+    </div>
+    <nav>
+      <button data-tab="library" class="active">Library</button>
+      <button data-tab="documents">Documents</button>
+      <button data-tab="settings">Settings</button>
+    </nav>
+  </header>
+
+  <!-- ================= LIBRARY ================= -->
+  <section id="tab-library">
+    <div class="card">
+      <div class="row" style="margin-top:0">
+        <input type="search" id="q" class="grow" placeholder="Search author, title, year, DOI or key…">
+        <select id="projectFilter"><option value="*">All projects</option></select>
+        <button class="primary" id="openAdd">+ Add references</button>
+        <button id="openImport">Import</button>
+        <button id="openExport">Export</button>
+        <button id="verifyBtn" title="Check the references shown against Crossref">Verify online</button>
+      </div>
+
+      <div class="panel hidden" id="verifyPanel">
+        <strong>Verify online</strong>
+        <p class="muted small" style="margin:2px 0 6px" id="verifyMsg"></p>
+        <div class="bar"><div id="verifyBar"></div></div>
+        <div id="verifyResult"></div>
+      </div>
+
+      <div class="panel hidden" id="addPanel">
+        <strong>Add references</strong>
+        <p class="muted small" style="margin:2px 0 8px">One per line: a DOI (best), a link to the paper or web page, or a full reference as typed in a paper. Citrello looks each one up, checks it and skips duplicates.</p>
+        <textarea id="addText" placeholder="10.1016/j.renene.2016.10.066&#10;https://www.nature.com/articles/s41565-017-0052-4&#10;Vetters, J., Thomassen, G. and Van Passel, S. (2024) 'Sailing through end-of-life challenges…'"></textarea>
+        <div class="row">
+          <input type="text" id="addProject" list="projectList" placeholder="Project (optional)">
+          <button class="primary" id="addGo">Add</button>
+          <span class="muted small" id="addMsg"></span>
+        </div>
+        <div id="addResults"></div>
+      </div>
+
+      <div class="panel hidden" id="importPanel">
+        <strong>Import</strong>
+        <div class="grid2">
+          <div>
+            <h3>From a file</h3>
+            <p class="muted small" style="margin:0">RIS, BibTeX or CSL-JSON, exported from Mendeley (File → Export), Zotero (right-click a collection → Export), EndNote or another tool.</p>
+            <div class="row"><input type="file" id="importFile" accept=".ris,.bib,.json,.txt"></div>
+          </div>
+          <div>
+            <h3>From an account</h3>
+            <div class="row"><button id="impMendeley">Import my Mendeley library</button></div>
+            <div class="row"><button id="impZotero">Import my Zotero library</button></div>
+            <p class="muted small" style="margin:6px 0 0">Connect the accounts under Settings first.</p>
+          </div>
+        </div>
+        <div class="row"><input type="text" id="importProject" list="projectList" placeholder="Put into project (optional)"></div>
+        <div id="importMsg"></div>
+      </div>
+
+      <div class="panel hidden" id="exportPanel">
+        <strong>Export</strong> <span class="muted small">(what is shown: current search and project)</span>
+        <div class="row">
+          <a class="btn" id="expRis">RIS (Mendeley, EndNote, Zotero)</a>
+          <a class="btn" id="expBib">BibTeX (LaTeX, Zotero)</a>
+          <a class="btn" id="expJson">CSL-JSON (Zotero, pandoc)</a>
+          <button id="expMendeley">Send to my Mendeley account</button>
+        </div>
+        <div id="exportMsg"></div>
+      </div>
+
+      <div class="chips" id="libChips"></div>
+      <div class="row" style="margin-top:4px">
+        <label class="small"><input type="checkbox" id="libOnlyIssues"> Only references that need attention</label>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Key</th><th>Reference</th><th>Reliability</th><th class="hide-sm">Projects</th><th></th></tr></thead>
+          <tbody id="libRows"></tbody>
+        </table>
+      </div>
+      <p class="muted small" id="libEmpty" style="display:none">Your library is empty. Add references above, import your Mendeley or Zotero library, or convert a document (Documents tab).</p>
+      <p class="muted small">Click a key to copy its citation marker, e.g. <code class="key">[@Topham2017]</code>. Claude uses the same markers.</p>
+    </div>
+  </section>
+
+  <!-- ================= DOCUMENTS ================= -->
+  <section id="tab-documents" class="hidden">
+    <div class="card">
+      <h2>Update or restyle a document</h2>
+      <p class="muted">For documents that contain <code class="key">[@Key]</code> markers (e.g. written with Claude) or live citations. Every citation and the bibliography are formatted in the style you choose; markers become live citations.</p>
+      <div class="row">
+        <label class="small">Style <select id="updStyle"></select></label>
+      </div>
+      <label class="drop" id="updDrop"><input type="file" id="updFile" accept=".docx" hidden>
+        <div><strong>Choose a Word file</strong> or drag it here</div></label>
+      <div id="updResult"></div>
+    </div>
+
+    <div class="card" id="convCard">
+      <h2>Convert a document with typed citations</h2>
+      <p class="muted">For papers whose citations were typed by hand, like [1], [2–5] or (Smith et al., 2020), with a typed reference list. The references are checked and added to your library, and the citations become live.</p>
+      <label class="drop" id="drop"><input type="file" id="file" accept=".docx" hidden>
+        <div id="dropText"><strong>Choose a Word file</strong> or drag it here</div></label>
+      <div id="uploadErr" class="notice err hidden"></div>
+
+      <div id="s3" class="hidden">
+        <div id="analysing"><p class="muted" id="aMsg">Reading the document…</p><div class="bar"><div id="aBar"></div></div></div>
+        <div id="review" class="hidden">
+          <div class="chips" id="chips"></div>
+          <div class="row" style="margin-top:4px">
+            <label class="small"><input type="checkbox" id="onlyIssues"> Only references that need attention</label>
+            <a id="checkCsv" class="hidden small" href="#">Download the reliability report (.csv)</a>
+          </div>
+          <div class="table-wrap"><table>
+            <thead><tr><th>#</th><th>Reference</th><th class="hide-sm">Details</th><th>Reliability</th><th>Library</th></tr></thead>
+            <tbody id="rows"></tbody>
+          </table></div>
+        </div>
+      </div>
+
+      <div id="s4" class="hidden">
+        <div id="convertBox">
+          <div class="opts">
+            <label>Project <input type="text" id="convProject" list="projectList"></label>
+            <label>Format as <select id="convStyle"></select></label>
+            <label id="pushOpt" class="hidden"><input type="checkbox" id="convPush"> Also add to my Mendeley account</label>
+          </div>
+          <div class="opts" id="numOpts">
+            <span class="muted">Numbered citation forms:</span>
+            <label><input type="checkbox" value="bracket" checked> [1], [2–4]</label>
+            <label><input type="checkbox" value="superscript" checked> superscript ¹˒²</label>
+            <label><input type="checkbox" value="paren"> (1), (2–4)</label>
+          </div>
+          <div class="row"><button class="primary" id="go">Convert</button></div>
+        </div>
+        <div id="converting" class="hidden"><p class="muted" id="cMsg"></p><div class="bar"><div id="cBar"></div></div></div>
+        <div id="done" class="hidden">
+          <div class="notice ok" id="doneMsg"></div>
+          <div class="row" id="downloads"></div>
+          <div id="warnings"></div>
+          <div class="row"><button class="link" id="again">Convert another document</button></div>
+        </div>
+        <div id="jobErr" class="notice err hidden"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= SETTINGS ================= -->
+  <section id="tab-settings" class="hidden">
+    <div class="card">
+      <h2>Claude</h2>
+      <p class="muted">Connect Citrello to the Claude desktop app. Claude can then search and add to your library in every chat, cite with <code class="key">[@Key]</code> markers, and write Word documents with live citations.</p>
+      <div id="claudeStatus"></div>
+      <div class="row">
+        <button class="primary" id="claudeInstall">Install in Claude Desktop</button>
+        <span class="muted small">Claude Desktop opens its own install window: click <strong>Install</strong>.</span>
+      </div>
+      <p class="muted small">Used <strong>Refcite</strong> (Citrello's earlier name) before? Your library and settings were copied over automatically. In Claude Desktop, remove the old <strong>Refcite</strong> extension under <strong>Settings → Extensions</strong>, so Claude doesn't see two libraries.</p>
+            <details><summary>Other ways to connect (advanced)</summary>
+        <p class="small muted">If the install window doesn't appear: in Claude Desktop open <strong>Settings → Extensions</strong> and drag <code id="mcpbPath">Citrello.mcpb</code> (next to Citrello.exe) onto it, or double-click that file.</p>
+        <div class="row"><button id="claudeConnect">Add Citrello to Claude's settings file instead</button>
+          <span class="muted small">(close Claude Desktop first)</span></div>
+      </details>
+      <details><summary>Set it up by hand / for Claude Code</summary>
+        <p class="small muted">In Claude Desktop open <strong>Settings → Developer → Edit Config</strong>. That opens the exact file Claude uses (probably <span id="claudePath"></span>). Add the lines below, save, then fully quit Claude (tray icon → Quit) and open it again:</p>
+        <pre id="claudeSnippet"></pre>
+      </details>
+      <details><summary>Things to ask Claude</summary>
+        <ul class="small">
+          <li>“Add 10.1016/j.renene.2016.10.066 to my Citrello library, project <em>Decommissioning review</em>.”</li>
+          <li>“Write the introduction with citations from my <em>Decommissioning review</em> project and give me a Word file in Elsevier Harvard style.”</li>
+          <li>“Edit this paragraph for clarity, but keep every [@…] marker.”</li>
+          <li>“Check that all citations in this text exist in my library.”</li>
+        </ul>
+      </details>
+    </div>
+
+    <div class="card">
+      <h2>Browser button</h2>
+      <p class="muted">Add the paper you're looking at, from any website, with one click. It reads the page in your own browser, so sites that block robots (ScienceDirect, IEEE…) and your university login work too.</p>
+      <ol class="small">
+        <li>Show your browser's bookmarks bar: <strong>Ctrl+Shift+B</strong> (Mac: Cmd+Shift+B).</li>
+        <li>Drag this button onto the bookmarks bar: <a class="btn primary" id="bookmarklet" href="#" title="Drag me to your bookmarks bar">＋ Add to Citrello</a></li>
+        <li>On a paper's page, click <strong>Add to Citrello</strong>. A small window shows what was found; click <strong>Add</strong>.</li>
+        <li>To add a paper the page <em>mentions</em> (e.g. one in its reference list): <strong>select that reference's title or whole entry</strong>, then click the button. Citrello adds the selected reference instead of the page's own paper.</li>
+      </ol>
+      <p class="muted small">Citrello must be running. Can't drag it? <button class="link" id="bmCopy">Copy the button's code</button>, create a new bookmark, and paste it as the address.</p>
+    </div>
+
+    <div class="card">
+      <h2>Word</h2>
+      <p class="muted">Adds a <strong>Citrello</strong> tab to Word:</p>
+      <ul class="small">
+        <li><strong>Insert / Edit citation:</strong> a search dialog with your library (results update as you type); collect several references, add a page or a prefix (“see”), or “year only” for <em>Smith et al. (2020)</em>. With the cursor in a citation, the same button edits it.</li>
+        <li><strong>Update citations:</strong> renumbers and reformats every citation and the bibliography, turns <code class="key">[@Key]</code> markers into citations, and drops citations whose text you deleted.</li>
+        <li><strong>Citation style:</strong> pick the style for this document.</li>
+      </ul>
+      <p class="muted small">Everything happens inside the open document, so each action can be undone with Ctrl+Z.</p>
+      <div id="wordStatus"></div>
+      <div class="row">
+        <button class="primary" id="wordInstall">Install Word button</button>
+        <button id="wordRemove" class="hidden">Remove Word button</button>
+      </div>
+      <details><summary>Install by hand (if the button can't be installed automatically)</summary>
+        <ol class="small">
+          <li><a href="/api/word/Citrello.bas">Download Citrello.bas</a>.</li>
+          <li>In Word press <strong>Alt+F11</strong>. In the left panel select <strong>Normal</strong>, then <strong>File → Import File…</strong> and choose Citrello.bas. Close the editor.</li>
+          <li>In Word: <strong>File → Options → Quick Access Toolbar</strong>, choose <strong>Macros</strong>, add <strong>CitrelloInsertNow</strong>, <strong>CitrelloUpdateNow</strong> and <strong>CitrelloStyleNow</strong>, OK.</li>
+          <li>Click the new toolbar buttons to insert citations or update the open document. (The manual version uses simple input boxes instead of the search dialog.)</li>
+        </ol>
+      </details>
+    </div>
+
+    <div class="card grid2">
+      <div>
+        <h2>Citation style</h2>
+        <label class="field">Default style <select id="defStyle"></select></label>
+        <label class="field">Use another journal's style (its id from <a href="https://www.zotero.org/styles" target="_blank" rel="noopener">zotero.org/styles</a>)
+          <input type="text" id="styleId" placeholder="e.g. elsevier-harvard or renewable-energy"></label>
+        <div class="row"><button id="styleAdd">Add style</button><span class="small muted" id="styleMsg"></span></div>
+      </div>
+      <div>
+        <h2>Library</h2>
+        <p class="small muted" style="margin:0">Stored on this computer in</p>
+        <p class="small"><code id="libPath"></code></p>
+        <p class="small muted">To use it on several computers, keep this folder in OneDrive or Dropbox. Back it up with Library → Export → CSL-JSON.</p>
+        <label class="field">Your email (optional, sent to Crossref for faster lookups)<input type="email" id="email"></label>
+        <div class="row"><button id="saveEmail">Save</button></div>
+      </div>
+    </div>
+
+    <div class="card grid2">
+      <div>
+        <h2>Mendeley</h2>
+        <div id="mSetup" class="hidden">
+          <p class="small muted">Enter your Mendeley app ID and secret (register a free app at <a href="https://dev.mendeley.com/myapps.html" target="_blank" rel="noopener">dev.mendeley.com</a> with the redirect URL <code>http://localhost:8585/callback</code>).</p>
+          <label class="field">Client ID<input type="text" id="cid" autocomplete="off"></label>
+          <label class="field">Client secret<input type="password" id="csec" autocomplete="off"></label>
+          <div class="row"><button id="saveCfg">Save</button></div>
+        </div>
+        <div id="mOut" class="hidden"><p class="small muted">Optional: import your Mendeley library, or send references to it.</p>
+          <a class="btn" href="/login">Connect to Mendeley</a></div>
+        <div id="mIn" class="hidden"><p>Connected as <strong id="who"></strong>. <button class="link" id="logout">Disconnect</button></p></div>
+        <div id="loginErr" class="notice err hidden"></div>
+      </div>
+      <div>
+        <h2>Zotero</h2>
+        <p class="small muted">To import your Zotero library: your user ID and a read-only API key from <a href="https://www.zotero.org/settings/keys" target="_blank" rel="noopener">zotero.org/settings/keys</a>.</p>
+        <label class="field">User ID<input type="text" id="zUser"></label>
+        <label class="field">API key<input type="password" id="zKey" placeholder=""></label>
+        <div class="row"><button id="zSave">Save</button><span class="small muted" id="zMsg"></span></div>
+      </div>
+    </div>
+  </section>
+
+  <datalist id="projectList"></datalist>
+  <footer>
+    <span>Citrello <span id="ver"></span> · runs on this computer only</span>
+    <button class="link" id="quit">Quit Citrello</button>
+  </footer>
+</main>
+<div class="toast" id="toast"></div>
+
+<script>
+const $ = (id) => document.getElementById(id);
+const show = (el, on = true) => (typeof el === "string" ? $(el) : el).classList.toggle("hidden", !on);
+const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+let status = {}, styles = [], lib = {items: [], projects: []}, job = null, timer = null;
+
+async function api(path, opts = {}) {
+  const r = await fetch(path, opts);
+  const data = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(data.error || r.statusText);
+  return data;
+}
+const post = (path, body) => api(path, {method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify(body || {})});
+function toast(msg) { const t = $("toast"); t.textContent = msg; t.classList.add("show"); setTimeout(() => t.classList.remove("show"), 1800); }
+function notice(el, kind, html) { $(el).innerHTML = `<div class="notice ${kind}">${html}</div>`; }
+
+// ---------- tabs ----------
+document.querySelectorAll("nav button").forEach((b) => b.onclick = () => {
+  document.querySelectorAll("nav button").forEach((x) => x.classList.toggle("active", x === b));
+  ["library", "documents", "settings"].forEach((t) => show("tab-" + t, t === b.dataset.tab));
+  if (b.dataset.tab === "library") loadLibrary();
+  if (b.dataset.tab === "settings") { loadClaude(); loadWord(); }
+});
+
+const relTag = (r) => ({verified: '<span class="tag ok" title="Found by DOI; matches the publisher record">✓ Verified</span>',
+                        complete: '<span class="tag" title="Details look complete; not checked online">Complete</span>',
+                        check: '<span class="tag warn">Check</span>',
+                        problem: '<span class="tag bad">Problem</span>'}[r] || '<span class="tag">–</span>');
+const issuesList = (checks) => checks && checks.length ? `<ul class="issues">${checks.map((c) => `<li class="${c.level}">${esc(c.text)}</li>`).join("")}</ul>` : "";
+
+// ---------- status & settings ----------
+async function loadStatus() {
+  status = await api("/api/status");
+  $("ver").textContent = "v" + status.version;
+  show("mSetup", !status.configured); show("mOut", status.configured && !status.connected); show("mIn", status.connected);
+  $("who").textContent = status.name || "";
+  show("pushOpt", status.connected);
+  $("email").value = status.email || "";
+  $("zUser").value = status.zotero_user || "";
+  $("zKey").placeholder = status.has_zotero_key ? "saved" : "";
+}
+async function loadStyles() {
+  const r = await api("/api/styles"); styles = r.styles;
+  const opts = (sel) => styles.map((s) => `<option value="${s.id}" ${s.id === sel ? "selected" : ""}>${esc(s.title)}</option>`).join("");
+  $("defStyle").innerHTML = opts(r.default);
+  $("updStyle").innerHTML = opts(r.default);
+  $("convStyle").innerHTML = `<option value="keep">Keep citations as typed</option>` + opts("");
+}
+$("defStyle").onchange = async () => { await post("/api/config", {style: $("defStyle").value}); loadStyles(); toast("Default style saved"); };
+$("styleAdd").onclick = async () => {
+  const id = $("styleId").value.trim(); if (!id) return;
+  $("styleMsg").textContent = "Downloading…";
+  try { const info = await post("/api/styles/add", {id}); await loadStyles();
+        $("styleMsg").textContent = `Added “${info.title}” and made it the default.`; $("styleId").value = ""; }
+  catch (e) { $("styleMsg").textContent = e.message; }
+};
+$("saveEmail").onclick = async () => { await post("/api/config", {email: $("email").value}); toast("Saved"); };
+$("saveCfg").onclick = async () => { await post("/api/config", {client_id: $("cid").value, client_secret: $("csec").value}); loadStatus(); };
+$("logout").onclick = async () => { await post("/api/logout"); loadStatus(); };
+$("zSave").onclick = async () => { await post("/api/config", {zotero_user: $("zUser").value, zotero_key: $("zKey").value}); $("zKey").value = ""; loadStatus(); $("zMsg").textContent = "Saved."; };
+$("quit").onclick = async () => {
+  await post("/api/quit").catch(() => {});
+  document.body.innerHTML = '<main><h1>Citrello has closed.</h1><p class="muted">You can close this tab. The Claude connector keeps working.</p></main>';
+};
+
+// ---------- browser button (bookmarklet) ----------
+const BOOKMARKLET_CODE = "(function(){var m={},n=0;document.querySelectorAll('meta[name],meta[property]').forEach(function(e){" +
+  "var k=(e.getAttribute('name')||e.getAttribute('property')||'').toLowerCase();" +
+  "if(/^(citation_|dc\\.|prism\\.|og:|bepress_|article:published_time$)/.test(k)&&k!=='citation_reference'){" +
+  "m[k]=m[k]||[];if(m[k].length<30&&n<400){m[k].push((e.content||'').slice(0,400));n++;}}});" +
+  "var d={url:location.href,title:document.title.slice(0,300),meta:m,sel:String(window.getSelection()).slice(0,2000)};" +
+  "var w=window.open('http://localhost:8585/clip#'+encodeURIComponent(JSON.stringify(d)),'citrello','width=560,height=660');" +
+  "if(!w){alert('Citrello: please allow pop-ups for this site, then click again.');}})();";
+const BOOKMARKLET = "javascript:" + encodeURIComponent(BOOKMARKLET_CODE);
+$("bookmarklet").href = BOOKMARKLET;
+$("bookmarklet").onclick = (e) => { e.preventDefault(); toast("Drag this button to your bookmarks bar"); };
+$("bmCopy").onclick = async () => { await navigator.clipboard.writeText(BOOKMARKLET).catch(() => {}); toast("Copied: paste it as a bookmark's address"); };
+
+async function loadWord() {
+  const w = await api("/api/word");
+  if (!w.windows) { $("wordStatus").innerHTML = `<div class="notice warn">The Word button is available on Windows.</div>`; $("wordInstall").disabled = true; return; }
+  $("wordStatus").innerHTML = w.installed ? `<div class="notice ok">Installed. Restart Word: a <strong>Citrello</strong> tab appears in the ribbon.</div>`
+                                          : `<div class="notice warn">Not installed.</div>`;
+  $("wordInstall").textContent = w.installed ? "Reinstall Word button" : "Install Word button";
+  show("wordRemove", w.installed);
+}
+$("wordInstall").onclick = async () => {
+  $("wordInstall").disabled = true;
+  $("wordStatus").innerHTML = `<div class="notice warn">Installing… Word is used in the background to build the button; this takes up to a minute.</div>`;
+  try { await post("/api/word/install"); await loadWord(); toast("Installed: restart Word"); }
+  catch (e) { $("wordStatus").innerHTML = `<div class="notice err">${esc(e.message)}</div>`; }
+  $("wordInstall").disabled = false;
+};
+$("wordRemove").onclick = async () => {
+  try { await post("/api/word/remove"); await loadWord(); toast("Removed"); }
+  catch (e) { $("wordStatus").innerHTML = `<div class="notice err">${esc(e.message)}</div>`; }
+};
+
+async function loadClaude() {
+  const c = await api("/api/claude");
+  $("claudePath").textContent = c.config_path; $("claudeSnippet").textContent = c.snippet;
+  if (c.extension_file) $("mcpbPath").textContent = c.extension_file;
+  let html;
+  if (c.extension_installed) html = `<div class="notice ok">Citrello is installed in Claude Desktop. Its tools are available in every chat.</div>`;
+  else if (c.connected && c.up_to_date) html = `<div class="notice ok">Connected through Claude's settings file. For a cleaner setup, click Install in Claude Desktop.</div>`;
+  else if (!c.claude_installed) html = `<div class="notice warn">Claude Desktop doesn't seem to be installed on this computer (get it from claude.ai/download).</div>`;
+  else html = `<div class="notice warn">Not connected yet.</div>`;
+  if (!c.extension_file) html += `<div class="notice err">Citrello.mcpb was not found next to Citrello.exe. Run build_windows.bat again; it creates it in the dist folder.</div>`;
+  $("claudeStatus").innerHTML = html;
+  $("claudeInstall").disabled = !c.extension_file;
+}
+$("claudeInstall").onclick = async () => {
+  try {
+    const r = await post("/api/claude/install-extension");
+    $("claudeStatus").innerHTML = `<div class="notice ok">Claude Desktop should now show <strong>Install Citrello</strong>: click <strong>Install</strong>.` +
+      (r.removed_manual ? " (The old manual connection was removed so Citrello isn't connected twice.)" : "") +
+      ` If nothing appears, open Claude Desktop and try again, or drag the file onto <strong>Settings → Extensions</strong>.</div>`;
+  } catch (e) { $("claudeStatus").innerHTML = `<div class="notice err">${esc(e.message)}</div>`; }
+};
+$("claudeConnect").onclick = async () => {
+  try {
+    const c = await api("/api/claude");
+    if (c.claude_running && !confirm("Claude Desktop is running and may overwrite its settings file when it closes. Close Claude Desktop first, then click OK.")) return;
+    await post("/api/claude/connect"); await loadClaude(); toast("Connected: now start Claude Desktop");
+  }
+  catch (e) { $("claudeStatus").innerHTML = `<div class="notice err">${esc(e.message)}</div>`; }
+};
+
+// ---------- library ----------
+async function loadLibrary() {
+  const q = encodeURIComponent($("q").value), p = encodeURIComponent($("projectFilter").value);
+  lib = await api(`/api/library?q=${q}&project=${p}`);
+  const sel = $("projectFilter").value;
+  $("projectFilter").innerHTML = `<option value="*">All projects</option>` +
+    lib.projects.map((x) => `<option ${x === sel ? "selected" : ""}>${esc(x)}</option>`).join("") +
+    `<option value="-" ${sel === "-" ? "selected" : ""}>No project</option>`;
+  $("projectList").innerHTML = lib.projects.map((x) => `<option value="${esc(x)}">`).join("");
+  $("libPath").textContent = lib.path;
+  const count = (k) => lib.items.filter((i) => i.reliability === k).length;
+  $("libChips").innerHTML = `<span class="chip">${lib.items.length}${lib.items.length !== lib.total ? " of " + lib.total : ""} references</span>` +
+    (count("verified") ? `<span class="chip ok">${count("verified")} verified</span>` : "") +
+    (count("complete") ? `<span class="chip">${count("complete")} complete</span>` : "") +
+    (count("check") ? `<span class="chip warn">${count("check")} to check</span>` : "") +
+    (count("problem") ? `<span class="chip bad">${count("problem")} problem${count("problem") > 1 ? "s" : ""}</span>` : "");
+  const only = $("libOnlyIssues").checked;
+  const items = lib.items.filter((i) => !only || ["check", "problem"].includes(i.reliability));
+  $("libEmpty").style.display = lib.total ? "none" : "block";
+  $("libRows").innerHTML = items.map((i) => `<tr class="${i.reliability || ""}">
+      <td><code class="key" data-key="${esc(i.key)}" title="Copy [@${esc(i.key)}]">${esc(i.key)}</code></td>
+      <td><div class="t">${esc(i.title)}</div><div class="meta">${esc(i.authors)}${i.year ? " · " + esc(i.year) : ""}${i.container ? " · " + esc(i.container) : ""}${i.doi ? " · " + esc(i.doi) : ""}</div>${issuesList(i.checks)}</td>
+      <td>${relTag(i.reliability)}</td>
+      <td class="hide-sm">${i.projects.map((p) => `<span class="tag">${esc(p)}</span>`).join("")}
+        <button class="icon" data-proj="${esc(i.key)}" title="Change projects">✎</button></td>
+      <td><button class="icon" data-del="${esc(i.key)}" title="Delete">✕</button></td></tr>`).join("");
+  setExportLinks();
+}
+let qTimer; $("q").oninput = () => { clearTimeout(qTimer); qTimer = setTimeout(loadLibrary, 200); };
+$("projectFilter").onchange = loadLibrary; $("libOnlyIssues").onchange = loadLibrary;
+$("libRows").onclick = async (ev) => {
+  const t = ev.target;
+  if (t.dataset.key) { await navigator.clipboard.writeText(`[@${t.dataset.key}]`).catch(() => {}); toast(`Copied [@${t.dataset.key}]`); }
+  if (t.dataset.del && confirm(`Delete ${t.dataset.del} from your library?`)) { await post("/api/library/delete", {keys: [t.dataset.del]}); loadLibrary(); }
+  if (t.dataset.proj) {
+    const it = lib.items.find((i) => i.key === t.dataset.proj);
+    const v = prompt("Projects for " + it.key + " (comma-separated):", it.projects.join(", "));
+    if (v !== null) { await post("/api/library/projects", {key: it.key, projects: v.split(",").map((s) => s.trim()).filter(Boolean)}); loadLibrary(); }
+  }
+};
+const togglePanel = (id) => ["addPanel", "importPanel", "exportPanel", "verifyPanel"].forEach((p) => show(p, p === id && $(p).classList.contains("hidden")));
+$("openAdd").onclick = () => { togglePanel("addPanel"); $("addText").focus(); };
+$("openImport").onclick = () => togglePanel("importPanel");
+$("openExport").onclick = () => togglePanel("exportPanel");
+
+$("verifyBtn").onclick = async () => {
+  const todo = lib.items.filter((i) => i.reliability !== "verified").length;
+  let include = false;
+  if (!todo) {
+    if (!lib.items.length || !confirm("All references shown are already verified. Check them again?")) return;
+    include = true;
+  }
+  show("verifyPanel"); ["addPanel", "importPanel", "exportPanel"].forEach((p) => show(p, false));
+  $("verifyResult").innerHTML = ""; $("verifyBar").style.width = "0"; $("verifyBtn").disabled = true;
+  $("verifyMsg").textContent = "Starting…";
+  try {
+    const p = $("projectFilter").value;
+    const {id} = await post("/api/library/verify", {q: $("q").value, project: p, include_verified: include});
+    const tick = async () => {
+      const s = await api(`/api/verify/${id}`);
+      $("verifyMsg").textContent = s.n ? `Checking ${s.i} of ${s.n}: ${s.key}` : "Starting…";
+      $("verifyBar").style.width = s.n ? `${100 * s.i / s.n}%` : "3%";
+      if (!s.done) return setTimeout(tick, 700);
+      $("verifyBtn").disabled = false; loadLibrary();
+      if (s.error) { $("verifyMsg").textContent = ""; return notice("verifyResult", "err", esc(s.error)); }
+      const r = s.result;
+      $("verifyMsg").textContent = `${r.checked} checked: ${r.verified} verified, ${r.check} to check, ${r.problem} problem${r.problem === 1 ? "" : "s"}` +
+                                   (r.not_found ? ` (${r.not_found} not on Crossref)` : "") + ".";
+      $("verifyBar").style.width = "100%";
+      let html = r.stopped ? `<div class="notice err">${esc(r.stopped)}</div>` : "";
+      if (r.repaired) html += `<div class="notice ok">${r.repaired} reference${r.repaired > 1 ? "s" : ""} had details restored that an earlier version removed (article numbers, page ranges, journal names).</div>`;
+      if (r.problems.length) html += `<div class="notice err"><strong>Problems</strong><ul class="issues">${r.problems.map((p) =>
+          `<li class="problem"><code class="key">${esc(p.key)}</code> ${esc((p.issues || [p.error]).join("; "))}</li>`).join("")}</ul></div>`;
+      if (r.changed.length) html += `<details open><summary>${r.changed.length} reference${r.changed.length > 1 ? "s" : ""} corrected from the publisher record</summary>
+          <ul class="small">${r.changed.map((c) => `<li><code class="key">${esc(c.key)}</code> ${esc(c.changes.join(" · "))}</li>`).join("")}</ul></details>`;
+      $("verifyResult").innerHTML = html;
+    };
+    tick();
+  } catch (e) { $("verifyBtn").disabled = false; notice("verifyResult", "err", esc(e.message)); }
+};
+
+$("addGo").onclick = async () => {
+  const text = $("addText").value.trim(); if (!text) return;
+  $("addGo").disabled = true; $("addMsg").textContent = "Looking up…"; $("addResults").innerHTML = "";
+  try {
+    const r = await post("/api/library/add", {text, project: $("addProject").value});
+    $("addResults").innerHTML = r.results.map((x) => x.ok
+      ? `<div class="notice ${x.item.reliability === "problem" ? "err" : x.item.reliability === "check" ? "warn" : "ok"}">
+           ${x.created ? "Added" : "Already in your library"}: <code class="key">${esc(x.item.key)}</code> ${esc(x.item.authors)} (${esc(x.item.year || "n.d.")}) ${esc(x.item.title)}${issuesList(x.item.checks)}</div>`
+      : `<div class="notice err">${esc(x.text)}<br>${esc(x.error)}</div>`).join("");
+    if (r.results.every((x) => x.ok)) $("addText").value = "";
+    loadLibrary();
+  } catch (e) { $("addResults").innerHTML = `<div class="notice err">${esc(e.message)}</div>`; }
+  $("addGo").disabled = false; $("addMsg").textContent = "";
+};
+$("importFile").onchange = async (ev) => {
+  const f = ev.target.files[0]; if (!f) return;
+  notice("importMsg", "warn", "Importing…");
+  try {
+    const r = await api("/api/library/import", {method: "POST", body: await f.arrayBuffer(),
+      headers: {"X-Filename": encodeURIComponent(f.name), "X-Project": encodeURIComponent($("importProject").value)}});
+    notice("importMsg", "ok", `${r.added} added, ${r.skipped} skipped (already in the library or incomplete).`); loadLibrary();
+  } catch (e) { notice("importMsg", "err", esc(e.message)); }
+  ev.target.value = "";
+};
+async function accountImport(path) {
+  notice("importMsg", "warn", "Importing… (large libraries take a while)");
+  try { const r = await post(path, {project: $("importProject").value}); notice("importMsg", "ok", `${r.added} added, ${r.skipped} already in your library.`); loadLibrary(); }
+  catch (e) { notice("importMsg", "err", esc(e.message)); }
+}
+$("impMendeley").onclick = () => accountImport("/api/library/import-mendeley");
+$("impZotero").onclick = () => accountImport("/api/library/import-zotero");
+function setExportLinks() {
+  const q = encodeURIComponent($("q").value), p = encodeURIComponent($("projectFilter").value);
+  ["ris", "bib", "json"].forEach((f) => $("exp" + f[0].toUpperCase() + f.slice(1)).href = `/api/library/export?fmt=${f}&q=${q}&project=${p}`);
+}
+$("expMendeley").onclick = async () => {
+  notice("exportMsg", "warn", "Sending…");
+  const p = $("projectFilter").value;
+  try { const r = await post("/api/library/export-mendeley", {q: $("q").value, project: ["*", "-"].includes(p) ? "" : p});
+        notice("exportMsg", "ok", `${r.added} added to Mendeley, ${r.present} were already there.`); }
+  catch (e) { notice("exportMsg", "err", esc(e.message)); }
+};
+
+// ---------- documents: update / restyle ----------
+function dropZone(zone, input, onFile) {
+  ["dragenter", "dragover"].forEach((e) => zone.addEventListener(e, (ev) => { ev.preventDefault(); zone.classList.add("over"); }));
+  ["dragleave", "drop"].forEach((e) => zone.addEventListener(e, (ev) => { ev.preventDefault(); zone.classList.remove("over"); }));
+  zone.addEventListener("drop", (ev) => ev.dataTransfer.files[0] && onFile(ev.dataTransfer.files[0]));
+  input.onchange = (ev) => { ev.target.files[0] && onFile(ev.target.files[0]); ev.target.value = ""; };
+}
+dropZone($("updDrop"), $("updFile"), async (file) => {
+  if (!file.name.toLowerCase().endsWith(".docx")) return notice("updResult", "err", "Please choose a .docx file.");
+  notice("updResult", "warn", `Formatting ${esc(file.name)}…`);
+  try {
+    const r = await api("/api/doc/update", {method: "POST", body: await file.arrayBuffer(),
+      headers: {"X-Filename": encodeURIComponent(file.name), "X-Style": encodeURIComponent($("updStyle").value)}});
+    const x = r.result, href = `/api/job/${r.id}/file/${encodeURIComponent(x.files.docx)}`;
+    $("updResult").innerHTML = `<div class="notice ${x.report.length ? "warn" : "ok"}">${x.citations} citation${x.citations === 1 ? "" : "s"} formatted in ${esc(x.style)}${x.markers ? ` (${x.markers} marker${x.markers > 1 ? "s" : ""} made live)` : ""}, ${x.entries} bibliography entries.
+      ${x.report.length ? `<ul class="issues">${x.report.map((m) => `<li class="check">${esc(m)}</li>`).join("")}</ul>` : ""}</div>
+      <div class="row"><a class="btn primary" href="${href}">Download formatted document</a></div>`;
+  } catch (e) { notice("updResult", "err", esc(e.message)); }
+});
+
+// ---------- documents: convert typed citations ----------
+dropZone($("drop"), $("file"), upload);
+async function upload(file) {
+  show("uploadErr", false); show("jobErr", false);
+  if (!file.name.toLowerCase().endsWith(".docx")) { $("uploadErr").textContent = "Please choose a .docx file."; show("uploadErr"); return; }
+  $("dropText").innerHTML = `<strong>${esc(file.name)}</strong> · choose another file to start over`;
+  $("convProject").value = file.name.replace(/\.docx$/i, "").replace(/_/g, " ");
+  try {
+    const {id} = await api("/api/upload", {method: "POST", headers: {"X-Filename": encodeURIComponent(file.name)}, body: await file.arrayBuffer()});
+    show("s3"); show("analysing"); show("review", false); show("s4", false); show("convertBox"); show("converting", false); show("done", false);
+    $("aBar").style.width = "0"; poll(id);
+  } catch (e) { $("uploadErr").textContent = e.message; show("uploadErr"); }
+}
+function poll(id) {
+  clearTimeout(timer);
+  timer = setTimeout(async () => {
+    try { job = await api(`/api/job/${id}`); } catch (e) { return; }
+    render();
+    if (["analysing", "converting"].includes(job.state)) poll(id);
+  }, 600);
+}
+function render() {
+  if (job.state === "error") {
+    const el = job.refs.length ? "jobErr" : "uploadErr";
+    $(el).textContent = job.error; show(el); show("converting", false); show("convertBox"); if (!job.refs.length) show("s3", false);
+    return;
+  }
+  if (job.state === "analysing") { $("aMsg").textContent = job.message; $("aBar").style.width = job.total ? `${100 * job.progress / job.total}%` : "5%"; return; }
+  show("analysing", false); show("review"); show("s4");
+  renderTable();
+  if (job.state === "ready") { show("numOpts", job.mode !== "author-year"); show("convertBox"); }
+  if (job.state === "converting") { show("convertBox", false); show("converting"); $("cMsg").textContent = job.message;
+    $("cBar").style.width = job.total ? `${100 * job.progress / job.total}%` : "10%"; }
+  if (job.state === "done") renderDone();
+}
+function renderTable() {
+  const refs = job.refs, count = (k) => refs.filter((r) => r.reliability === k).length;
+  const inLib = refs.filter((r) => r.library && r.library.status === "existing").length;
+  const uncited = refs.filter((r) => !r.cited);
+  const style = job.mode === "author-year" ? "author-year citations" : "numbered citations";
+  $("chips").innerHTML = `<span class="chip">${refs.length} references</span><span class="chip">${job.found} ${style}</span>` +
+    `<span class="chip ok">${inLib} already in your library</span><span class="chip new">${refs.length - inLib} new</span>` +
+    `<span class="chip ok">${count("verified")} verified</span>` +
+    (count("check") ? `<span class="chip warn">${count("check")} to check</span>` : "") +
+    (count("problem") ? `<span class="chip bad">${count("problem")} problem${count("problem") > 1 ? "s" : ""}</span>` : "") +
+    (uncited.length ? `<span class="chip warn">not cited in the text: ${uncited.map((r) => r.number).join(", ")}</span>` : "");
+  if (job.check_csv) { $("checkCsv").href = `/api/job/${job.id}/file/${encodeURIComponent(job.check_csv)}`; show("checkCsv"); }
+  const only = $("onlyIssues").checked;
+  $("rows").innerHTML = refs.filter((r) => !only || r.reliability !== "verified").map((r) => {
+    const libTag = r.library ? (r.library.status === "existing" ? `<span class="tag ok" title="${esc(r.library.how)}">In library</span>`
+      : (r.library.first ? '<span class="tag new">New</span>' : '<span class="tag ok">Listed twice</span>')) : "";
+    return `<tr class="${r.reliability}"><td class="n">${r.number}</td>
+      <td><div class="t">${esc(r.title || r.raw)}</div><div class="meta">${esc(r.authors)}${r.year ? " · " + esc(r.year) : ""}</div>${issuesList(r.checks)}</td>
+      <td class="hide-sm"><div class="meta">${esc(r.container)}</div>${r.doi ? `<div class="meta">${esc(r.doi)}</div>` : ""}</td>
+      <td>${relTag(r.reliability)}</td>
+      <td>${libTag}${r.cited ? "" : '<br><span class="tag warn">Not cited</span>'}</td></tr>`;
+  }).join("");
+}
+$("onlyIssues").onchange = () => job && renderTable();
+$("go").onclick = async () => {
+  show("jobErr", false);
+  const forms = [...document.querySelectorAll("#numOpts input:checked")].map((c) => c.value);
+  await post(`/api/job/${job.id}/convert`, {push: $("convPush").checked, styles: forms, style: $("convStyle").value, project: $("convProject").value});
+  show("convertBox", false); show("converting"); $("cMsg").textContent = "Starting…"; poll(job.id);
+};
+function renderDone() {
+  const r = job.result;
+  show("convertBox", false); show("converting", false); show("done");
+  let msg = `${r.converted} citation${r.converted === 1 ? "" : "s"} are now live${r.style ? `, formatted in ${r.style}` : ""}. ` +
+            `${r.library_added} reference${r.library_added === 1 ? "" : "s"} added to your library (${r.library_existing} already there).`;
+  if (r.pushed) msg += ` Mendeley: ${r.added} added, ${r.existing} already there.`;
+  $("doneMsg").textContent = msg;
+  const f = (name) => `/api/job/${job.id}/file/${encodeURIComponent(name)}`;
+  $("downloads").innerHTML = `<a class="btn primary" href="${f(r.files.docx)}">Download the document</a>
+    <a class="btn" href="${f(r.files.ris)}">References (.ris)</a> <a class="btn" href="${f(r.files.bib)}">BibTeX (.bib)</a>`;
+  $("warnings").innerHTML = r.report.length ? `<details><summary>${r.report.length} possible citation(s) were left unchanged, see why</summary>
+    <ul>${r.report.map((x) => `<li class="muted small">${esc(x)}</li>`).join("")}</ul></details>` : "";
+}
+$("again").onclick = () => $("file").click();
+
+// ---------- start ----------
+const params = new URLSearchParams(location.search);
+if (params.get("login_error")) { $("loginErr").textContent = "Mendeley login failed: " + params.get("login_error"); show("loginErr"); }
+if (params.get("connected") || params.get("login_error")) document.querySelector('nav button[data-tab="settings"]').click();
+if (params.toString()) history.replaceState(null, "", "/");
+loadStatus(); loadStyles(); loadLibrary();
+</script>
+</body>
+</html>
