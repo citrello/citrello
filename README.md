@@ -46,7 +46,22 @@ your computer and is shared by the Citrello app, Claude and Word:
     author-year `(Smith et al., 2020)`, into live citations.
   - **Mendeley Cite compatible:** citations use the format of Mendeley's Word plugin, so Mendeley
     Cite can take a document over.
-- **Import / export:** RIS, BibTeX and CSL-JSON (Mendeley, Zotero, EndNote and others), plus a
+- **LaTeX and Overleaf**
+  - **Clean BibTeX and biblatex:** stable keys (the same as `[@Key]`), so `\cite{Key}` never breaks.
+    Acronyms are brace-protected (`{LiDAR}`), special characters are escaped, and page ranges use `--`.
+    Importing a `.bib` keeps its keys.
+  - **Check a paper:** a `.tex` file or an Overleaf project `.zip`. Citrello reports:
+    - cited keys missing from the `.bib`, which it can add from your library;
+    - unused entries;
+    - the same paper under two keys;
+    - retracted papers, wrong DOIs and missing DOIs.
+  - **Convert a hand-typed bibliography:** turns `\begin{thebibliography}` / `\bibitem` into `references.bib`
+    plus matching `\cite` keys. Each reference is checked on Crossref and added to your library.
+  - **Keep a `.bib` file up to date:** Citrello rewrites it whenever a project changes. Use it with local
+    LaTeX, or with Overleaf through Dropbox or Git sync.
+  - **Claude and ChatGPT:** they can write `\cite{Key}`, give you the `.bib` for a project, and check a LaTeX
+    project.
+- **Import / export:** RIS, BibTeX, biblatex and CSL-JSON (Mendeley, Zotero, EndNote and others), plus a
   Mendeley account (import and export) and a Zotero account (import).
 
 ## Install (Windows)
@@ -68,6 +83,7 @@ Once installed, Citrello's tools are available in every Claude Desktop chat. For
 - "Write the introduction using my *Decommissioning review* references and give me a Word file in
   Elsevier Harvard style."
 - "Edit this paragraph but keep every [@…] marker." Then use Word's **Update citations**.
+- "Write the related-work section in LaTeX with \citep from my *Thesis* project, and give me the biblatex file."
 
 ## Where your data is
 - **Library:** `%USERPROFILE%\Citrello\library.json` (or `$CITRELLO_HOME`). Keep the folder in

@@ -106,7 +106,7 @@ def test_end_to_end():
     assert st == 200 and json.loads(raw)["result"]["serverInfo"]["name"] == "citrello"
     assert rpc(access, "notifications/initialized", id=None)[0] == 202
     tools = json.loads(rpc(access, "tools/list")[2])["result"]["tools"]
-    assert len(tools) == 13
+    assert len(tools) == 15
     res = json.loads(rpc(access, "tools/call", {"name": "search_references", "arguments": {"query": "offshore"}})[2])["result"]
     assert not res["isError"] and "Topham2017" in res["content"][0]["text"]
     res = json.loads(rpc(access, "tools/call", {"name": "create_word_document",
@@ -120,6 +120,6 @@ def test_end_to_end():
 
     bc.sign_out()
     time.sleep(1)
-    assert len(json.loads(rpc(access, "tools/list")[2])["result"]["tools"]) == 13  # remembered while offline
+    assert len(json.loads(rpc(access, "tools/list")[2])["result"]["tools"]) == 15  # remembered while offline
     res = json.loads(rpc(access, "tools/call", {"name": "search_references", "arguments": {}})[2])["result"]
     assert res["isError"] and "isn't running" in res["content"][0]["text"]

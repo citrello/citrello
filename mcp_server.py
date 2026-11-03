@@ -25,6 +25,7 @@ _PROTOCOL_OUT = sys.stdout.buffer if hasattr(sys.stdout, "buffer") else None
 sys.stdout = sys.stderr
 
 import citeformat  # noqa: E402
+import latex  # noqa: E402
 import library  # noqa: E402
 import citrello_core as core  # noqa: E402
 
@@ -43,7 +44,14 @@ How to cite:
   (Mendeley-compatible) fields with a formatted bibliography. Use update_word_document to restyle or refresh a .docx.
 - When editing existing text, keep every citation marker exactly as it is unless asked to change citations.
 - Check add_reference's reliability result and tell the user about problems (retracted paper, wrong DOI, ...).
-- Use a project name (e.g. the paper's title) to keep references of one paper together."""
+- Use a project name (e.g. the paper's title) to keep references of one paper together.
+
+LaTeX / Overleaf:
+- Cite with the library keys: \\cite{Key}, \\citep{Key1,Key2}, \\citet{Key}, or the biblatex commands \\parencite / \\textcite.
+  Keys are the same as in [@Key] markers and never change.
+- Give the user the bibliography with get_bibtex (a project or keys; format bibtex or biblatex) to save as references.bib.
+- check_citations also checks \\cite commands. check_latex_project checks a .tex file, folder or Overleaf .zip on disk:
+  cited keys missing from the .bib, unused and duplicate entries, unreliable references, hand-typed bibliographies."""
 
 
 def _email():
@@ -205,6 +213,9 @@ def t_check_text(text):
         group = citeformat.parse_marker(m.group(1)) or []
         for g in group:
             (found if g["key"].lower() in keys else unknown).append(g["key"])
+    for k in latex.cited_keys(text):  # LaTeX: \cite{Key}, \citep{...}, \parencite{...}
+        if k != "*":
+            (found if k.lower() in keys else unknown).append(k)
     return {"markers": len(found) + len(unknown), "known_keys": sorted(set(found)),
             "unknown_keys": sorted(set(unknown)),
             "ok": not unknown}
@@ -232,6 +243,44 @@ def t_update_doc(path, style=None, output_path=None):
     res = citeformat.update_document(src, out, style)
     return {"saved_to": out, "citations": res["citations"], "markers_converted": res["markers"],
             "bibliography_entries": res["entries"], "style": res["style"]["title"], "problems": res["report"]}
+
+
+def t_bibtex(keys=None, project=None, format="bibtex", output_path=None):
+    data = library.load()
+    if keys:
+        items, missing = [], []
+        for k in keys:
+            it = library.get(data, k)
+            (items.append(it) if it else missing.append(k))
+    else:
+        items, missing = (library.search(data, project=project) if project else data["items"]), []
+    fmt = "biblatex" if str(format).lower() == "biblatex" else "bibtex"
+    text = latex.bibtex(items, fmt)
+    out = {"entries": len(items), "format": fmt, "unknown_keys": missing}
+    if output_path:
+        path = os.path.abspath(os.path.expanduser(output_path))
+        _check_remote_path(path, [".bib"], write=True)
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        with open(path, "w", encoding="utf-8", newline="\n") as f:
+            f.write(text)
+        out["saved_to"] = path
+    else:
+        out["bib"] = text
+    return out
+
+
+def t_check_latex(path):
+    src = os.path.abspath(os.path.expanduser(path))
+    if not os.path.isdir(src):
+        _check_remote_path(src, [".tex", ".zip", ".bib", ".ltx"])
+        if not os.path.exists(src):
+            raise ValueError(f"File not found: {src}")
+    elif _remote():
+        raise ValueError("From a web connector, give a .tex or .zip file, not a folder.")
+    rep = latex.check_project(latex.read_project(path=src), library.load())
+    rep["note"] = ("Missing keys that are in the Citrello library can be added with get_bibtex(keys=[...]). "
+                   "A hand-typed bibliography can be converted in the Citrello app (Documents → LaTeX).")
+    return rep
 
 
 def t_styles(query=""):
@@ -299,6 +348,17 @@ TOOLS = {
                              "and re-render every citation and the bibliography in a style. Overwrites the file unless "
                              "output_path is given.",
                              S({"path": STR, "style": STYLE, "output_path": STR}, ["path"])),
+    "get_bibtex": (t_bibtex, "BibTeX or biblatex entries for references (by keys, a project, or the whole library), "
+                   "with the same stable keys as [@Key] markers, for LaTeX / Overleaf (\\cite{Key}). Returns the .bib "
+                   "text, or saves it when output_path is given.",
+                   S({"keys": {"type": "array", "items": STR}, "project": PROJECT,
+                      "format": {"type": "string", "enum": ["bibtex", "biblatex"]},
+                      "output_path": {"type": "string", "description": "Absolute .bib path (optional)"}})),
+    "check_latex_project": (t_check_latex, "Check a LaTeX project on disk (a .tex file, a folder, or an Overleaf "
+                            "source .zip): cited keys missing from the .bib (and whether they are in the library), "
+                            "unused and duplicate entries, unreliable references (retracted, wrong DOI, no DOI...), "
+                            "and hand-typed bibliographies.",
+                            S({"path": STR}, ["path"])),
     "list_styles": (t_styles, "List citation styles available offline (search by name).", S({"query": STR})),
     "verify_references": (t_verify, "Check references online against Crossref (all not-yet-verified ones, or given keys "
                           "or a project): fixes their details from the publisher record and re-rates them as verified / "

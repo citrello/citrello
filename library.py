@@ -98,6 +98,11 @@ def _save(data):
     with open(tmp, "w", encoding="utf-8") as f:
         json.dump(data, f, ensure_ascii=False, indent=1)
     os.replace(tmp, library_path())
+    try:  # keep automatic .bib exports (LaTeX) up to date
+        import latex
+        latex.run_exports(data)
+    except Exception:
+        pass
 
 
 @contextlib.contextmanager
@@ -187,8 +192,12 @@ def _now():
     return datetime.now(timezone.utc).isoformat(timespec="seconds")
 
 
-def add_csl(data, csl, project=None, source="manual", raw=None, extra=None):
-    """Add one CSL item (or return the existing copy). Returns (item, created, how_matched)."""
+KEY_OK_RE = re.compile(r"^[A-Za-z0-9_][\w:.+\-/]{0,79}$")
+
+
+def add_csl(data, csl, project=None, source="manual", raw=None, extra=None, key=None):
+    """Add one CSL item (or return the existing copy). Returns (item, created, how_matched).
+    `key`: the key to use if it is free (e.g. the BibTeX key from an imported .bib)."""
     csl = core.trim_csl(dict(csl)) if csl else {}
     if not csl.get("title"):
         raise ValueError("A reference needs at least a title.")
@@ -199,7 +208,10 @@ def add_csl(data, csl, project=None, source="manual", raw=None, extra=None):
         for k, v in (extra or {}).items():  # e.g. remember the Mendeley/Zotero id
             existing.setdefault(k, v)
         return existing, False, how
-    it = {"id": str(uuid.uuid4()), "key": make_key(csl, {i["key"] for i in data["items"]}),
+    taken = {i["key"] for i in data["items"]}
+    if not (key and KEY_OK_RE.match(key) and key not in taken):
+        key = make_key(csl, taken)
+    it = {"id": str(uuid.uuid4()), "key": key,
           "csl": csl, "projects": [project] if project else [], "tags": [], "added": _now(),
           "source": source}
     if raw:
@@ -565,7 +577,9 @@ def parse_bibtex(text):
         y = re.search(r"\d{4}", fields.get("year") or fields.get("date") or "")
         if y:
             c["issued"] = {"date-parts": [[int(y.group(0))]]}
-        items.append({k: v for k, v in c.items() if v})
+        c = {k: v for k, v in c.items() if v}
+        c["_key"], c["_raw"] = m.group(2), text[m.start():pos]  # for LaTeX checks; dropped on import
+        items.append(c)
         i += 1
     return items
 
@@ -585,23 +599,27 @@ def parse_any(text, filename=""):
     raise ValueError("Unrecognised file. Use RIS (.ris), BibTeX (.bib) or CSL-JSON (.json).")
 
 
-def import_items(cslist, project=None, source="import", extra_key=None):
-    """Add many CSL items, skipping duplicates. Returns (added, skipped)."""
+def import_items(cslist, project=None, source="import", extra_key=None, keymap=None):
+    """Add many CSL items, skipping duplicates. Returns (added, skipped).
+    BibTeX keys are kept when free; `keymap` (a dict) collects {bib key: library key} where they differ."""
     added = skipped = 0
     with editing() as data:
         for c in cslist:
             extra = {}
             if extra_key and c.get("_id"):
                 extra[extra_key] = c["_id"]
+            want = c.get("_key")
             c = {k: v for k, v in c.items() if not k.startswith("_")}
             rec = {"number": 0, "raw": "", "source": source, "csl": c, "typed": {}}
             core.assess_references([rec])  # offline checks: DOI, date, author, web page, preprint
             extra.update(checks=rec["checks"], reliability=rec["reliability"])
             try:
-                _, created, _ = add_csl(data, c, project, source, extra=extra)
+                it, created, _ = add_csl(data, c, project, source, extra=extra, key=want)
             except ValueError:
                 skipped += 1
                 continue
+            if keymap is not None and want and it["key"] != want:
+                keymap[want] = it["key"]
             added += created
             skipped += not created
     return added, skipped
@@ -687,13 +705,10 @@ def export(items, fmt, path):
     recs = [{"number": i + 1, "csl": it["csl"]} for i, it in enumerate(items)]
     if fmt == "ris":
         core.write_ris(recs, path)
-    elif fmt == "bib":
-        core.write_bib(recs, path)
-        # keep Citrello's own keys so [@Key] works in pandoc too
-        txt = open(path, encoding="utf-8").read()
-        for r, it in zip(recs, items):
-            txt = txt.replace("{" + r["citekey"] + ",", "{" + it["key"] + ",", 1)
-        open(path, "w", encoding="utf-8").write(txt)
+    elif fmt in ("bib", "biblatex"):
+        import latex  # clean BibTeX/biblatex with Citrello's keys, so [@Key] and \cite{Key} both work
+        with open(path, "w", encoding="utf-8", newline="\n") as f:
+            f.write(latex.bibtex(items, "biblatex" if fmt == "biblatex" else "bibtex"))
     elif fmt == "json":
         out = []
         for it in items:
@@ -703,7 +718,7 @@ def export(items, fmt, path):
         with open(path, "w", encoding="utf-8") as f:
             json.dump(out, f, ensure_ascii=False, indent=1)
     else:
-        raise ValueError("Format must be ris, bib or json")
+        raise ValueError("Format must be ris, bib, biblatex or json")
     return path
 
 

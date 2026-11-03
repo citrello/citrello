@@ -28,6 +28,7 @@ import traceback
 import urllib.parse
 import urllib.request
 import webbrowser
+import zipfile
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 import docx
@@ -37,6 +38,7 @@ import library
 import bridge_client
 import citrello_core as core
 import codex_config
+import latex
 import word_addin
 
 VERSION = core.VERSION
@@ -95,6 +97,7 @@ def profile_name():
 
 JOBS = {}
 OAUTH_STATES = set()
+LATEX = {}   # LaTeX checks: id -> {"files", "report", "name", "convert": {...}}
 VERIFY = {}  # verification runs: id -> {"done", "i", "n", "key", "result", "error"}
 
 
@@ -114,6 +117,34 @@ def start_verify(keys, include_verified):
         state["done"] = True
     threading.Thread(target=run, daemon=True).start()
     return vid
+
+
+def latex_public(lid):
+    lj = LATEX[lid]
+    conv = dict(lj["convert"] or {})
+    res = conv.pop("result", None)
+    if res:
+        conv["summary"] = {k: res[k] for k in ("bib_name", "entries", "added", "unresolved")}
+        conv["summary"]["changed_files"] = sorted(res["files"])
+    return {"id": lid, "name": lj["name"], "report": lj["report"], "convert": conv or None}
+
+
+def start_latex_convert(lid, project, fmt):
+    lj = LATEX[lid]
+    state = lj["convert"] = {"done": False, "i": 0, "n": 0, "key": "", "result": None, "error": None}
+
+    def progress(i, n, key):
+        state.update(i=i, n=n, key=key)
+
+    def run():
+        try:
+            state["result"] = latex.convert_thebibliography(lj["files"], project, False, load_config().get("email"),
+                                                            progress, fmt)
+        except Exception as e:
+            traceback.print_exc()
+            state["error"] = str(e)
+        state["done"] = True
+    threading.Thread(target=run, daemon=True).start()
 
 
 class Job:
@@ -545,6 +576,42 @@ class Handler(BaseHTTPRequestHandler):
         return origin is None or origin in (f"http://localhost:{PORT}", f"http://127.0.0.1:{PORT}")
 
     # ---------------- GET ----------------
+    def latex_post(self, path):
+        try:
+            if path == "/api/latex/check":
+                name = urllib.parse.unquote(self.headers.get("X-Filename", "main.tex"))
+                files = latex.read_project(self.body(), name)
+                lid = secrets.token_hex(6)
+                LATEX[lid] = {"files": files, "name": os.path.basename(name), "convert": None,
+                              "report": latex.check_project(files, library.load())}
+                return self.send(200, latex_public(lid))
+            if path == "/api/bibexports/add":
+                b = self.json_body()
+                return self.send(200, {"exports": latex.add_export(b.get("project") or None, str(b.get("path", "")),
+                                                                   b.get("format") or "bibtex")})
+            if path == "/api/bibexports/remove":
+                return self.send(200, {"exports": latex.remove_export(str(self.json_body().get("path", "")))})
+            m = re.fullmatch(r"/api/latex/(\w+)/(import|convert)", path)
+            if not m or m.group(1) not in LATEX:
+                return self.send(404, {"error": "not found"})
+            lid, lj, b = m.group(1), LATEX[m.group(1)], self.json_body()
+            project = (b.get("project") or "").strip() or None
+            if m.group(2) == "import":
+                cs = [dict(c, _key=key) for _, key, c, _ in latex.bib_entries(lj["files"])]
+                keymap = {}
+                added, skipped = library.import_items(cs, project, "latex", keymap=keymap)
+                lj["report"] = latex.check_project(lj["files"], library.load())
+                # cited keys that are a different key in Citrello (the reference was already in the library)
+                lj["renamed"] = {old: new for old, new in keymap.items()}
+                return self.send(200, {**latex_public(lid), "imported": {"added": added, "skipped": skipped,
+                                                                          "renamed": lj["renamed"]}})
+            if lj.get("convert") and not lj["convert"].get("done"):
+                return self.send(409, {"error": "Already converting"})
+            start_latex_convert(lid, project, b.get("format") or "bibtex")
+            return self.send(200, latex_public(lid))
+        except (ValueError, zipfile.BadZipFile) as e:
+            return self.send(400, {"error": str(e)})
+
     def account_post(self, action):
         b = self.json_body()
         try:
@@ -671,6 +738,29 @@ class Handler(BaseHTTPRequestHandler):
             return self.send(200, codex_config.status(connector_command()))
         if path == "/api/account":
             return self.send(200, account_status())
+        if path == "/api/bibexports":
+            return self.send(200, {"exports": latex.list_exports()})
+        m = re.fullmatch(r"/api/latex/(\w+)", path)
+        if m and m.group(1) in LATEX:
+            return self.send(200, latex_public(m.group(1)))
+        m = re.fullmatch(r"/api/latex/(\w+)/(bib|converted|renamed)", path)
+        if m and m.group(1) in LATEX:
+            lj = LATEX[m.group(1)]
+            if m.group(2) == "bib":
+                name, text, _ = latex.fixed_bib(lj["files"], lj["report"], library.load(), qs.get("fmt", ["bibtex"])[0])
+                body, fname, ctype = text.encode("utf-8"), os.path.basename(name), "application/x-bibtex"
+            elif m.group(2) == "renamed":
+                files = {n: latex.replace_cite_keys(t, lj.get("renamed") or {}) for n, t in lj["files"]["tex"].items()}
+                body = latex.zip_files({n: t for n, t in files.items() if t != lj["files"]["tex"][n]})
+                fname, ctype = re.sub(r"\.zip$|\.tex$", "", lj["name"], flags=re.I) + "_keys.zip", "application/zip"
+            else:
+                conv = lj.get("convert") or {}
+                if not conv.get("result"):
+                    return self.send(404, {"error": "Not converted yet"})
+                body = latex.zip_files(conv["result"]["files"])
+                fname, ctype = re.sub(r"\.zip$|\.tex$", "", lj["name"], flags=re.I) + "_citrello.zip", "application/zip"
+            return self.send(200, body, ctype,
+                             {"Content-Disposition": "attachment; filename*=UTF-8''" + urllib.parse.quote(fname)})
         if path == "/api/claude":
             return self.send(200, claude_status())
         m = re.fullmatch(r"/api/job/(\w+)", path)
@@ -886,6 +976,8 @@ class Handler(BaseHTTPRequestHandler):
             return handled
         if path.startswith("/api/account/"):
             return self.account_post(path[len("/api/account/"):])
+        if path.startswith("/api/latex") or path.startswith("/api/bibexports/"):
+            return self.latex_post(path)
         if path == "/api/quit":
             self.send(200, {"ok": True})
             threading.Thread(target=self.server.shutdown, daemon=True).start()

@@ -157,6 +157,7 @@
         <div class="row">
           <a class="btn" id="expRis">RIS (Mendeley, EndNote, Zotero)</a>
           <a class="btn" id="expBib">BibTeX (LaTeX, Zotero)</a>
+          <a class="btn" id="expBiblatex">biblatex</a>
           <a class="btn" id="expJson">CSL-JSON (Zotero, pandoc)</a>
           <button id="expMendeley">Send to my Mendeley account</button>
         </div>
@@ -237,6 +238,24 @@
         </div>
         <div id="jobErr" class="notice err hidden"></div>
       </div>
+    </div>
+    <div class="card" id="latexCard">
+      <h2>LaTeX and Overleaf</h2>
+      <p class="muted">Check a LaTeX paper for cited keys missing from the .bib, unused and duplicate entries, unreliable references (retracted, wrong DOI…), and hand-typed bibliographies that can be converted. Choose a .tex file, or the whole project as a .zip (Overleaf: <strong>Menu → Download → Source</strong>).</p>
+      <label class="drop" id="texDrop"><input type="file" id="texFile" accept=".tex,.ltx,.zip,.bib" hidden>
+        <div id="texDropText"><strong>Choose a .tex or .zip file</strong> or drag it here</div></label>
+      <div id="texResult"></div>
+
+      <h3>Keep a .bib file up to date</h3>
+      <p class="muted small" style="margin:0">Citrello rewrites the file whenever the project's references change, with the same keys as always. For LaTeX on your computer (VS Code, TeXstudio…) or a folder synced with Overleaf through Dropbox or Git.</p>
+      <div id="bxList"></div>
+      <div class="row">
+        <input type="text" id="bxProject" list="projectList" placeholder="Project (empty = whole library)" style="max-width:220px">
+        <input type="text" id="bxPath" class="grow" placeholder="Folder or .bib file, e.g. C:\Users\you\Thesis\references.bib">
+        <select id="bxFormat"><option value="bibtex">BibTeX</option><option value="biblatex">biblatex</option></select>
+        <button class="primary" id="bxAdd">Keep updated</button>
+      </div>
+      <div id="bxMsg"></div>
     </div>
   </section>
 
@@ -444,6 +463,7 @@ document.querySelectorAll("nav button").forEach((b) => b.onclick = () => {
   document.querySelectorAll("nav button").forEach((x) => x.classList.toggle("active", x === b));
   ["library", "documents", "settings"].forEach((t) => show("tab-" + t, t === b.dataset.tab));
   if (b.dataset.tab === "library") loadLibrary();
+  if (b.dataset.tab === "documents") loadBibExports();
   if (b.dataset.tab === "settings") { loadAccount(); loadClaude(); loadCodex(); loadWord(); }
 });
 
@@ -749,7 +769,7 @@ $("impMendeley").onclick = () => accountImport("/api/library/import-mendeley");
 $("impZotero").onclick = () => accountImport("/api/library/import-zotero");
 function setExportLinks() {
   const q = encodeURIComponent($("q").value), p = encodeURIComponent($("projectFilter").value);
-  ["ris", "bib", "json"].forEach((f) => $("exp" + f[0].toUpperCase() + f.slice(1)).href = `/api/library/export?fmt=${f}&q=${q}&project=${p}`);
+  ["ris", "bib", "biblatex", "json"].forEach((f) => $("exp" + f[0].toUpperCase() + f.slice(1)).href = `/api/library/export?fmt=${f}&q=${q}&project=${p}`);
 }
 $("expMendeley").onclick = async () => {
   notice("exportMsg", "warn", "Sending…");
@@ -778,6 +798,98 @@ dropZone($("updDrop"), $("updFile"), async (file) => {
       <div class="row"><a class="btn primary" href="${href}">Download formatted document</a></div>`;
   } catch (e) { notice("updResult", "err", esc(e.message)); }
 });
+
+// ---------- documents: LaTeX ----------
+let texJob = null, texTimer = null;
+dropZone($("texDrop"), $("texFile"), async (file) => {
+  if (!/\.(tex|ltx|zip|bib)$/i.test(file.name)) return notice("texResult", "err", "Please choose a .tex, .zip or .bib file.");
+  $("texDropText").innerHTML = `<strong>${esc(file.name)}</strong> · choose another file to check it`;
+  notice("texResult", "warn", `Checking ${esc(file.name)}…`);
+  try {
+    texJob = await api("/api/latex/check", {method: "POST", body: await file.arrayBuffer(), headers: {"X-Filename": encodeURIComponent(file.name)}});
+    renderTex();
+  } catch (e) { notice("texResult", "err", esc(e.message)); }
+});
+function texList(items, fmt) { return `<ul class="issues">${items.map(fmt).join("")}</ul>`; }
+function renderTex() {
+  const r = texJob.report, c = texJob.convert, name = texJob.name.replace(/\.(zip|tex|ltx|bib)$/i, "");
+  const problems = r.issues.filter((i) => i.reliability === "problem"), checks = r.issues.filter((i) => i.reliability === "check");
+  const inLib = r.missing.filter((m) => m.in_library);
+  let h = `<div class="chips" style="margin-top:12px">
+    <span class="chip">${r.citations} citation${r.citations === 1 ? "" : "s"} · ${r.cited_keys} keys</span>
+    <span class="chip">${r.bib_entries} .bib entries</span>
+    ${r.missing.length ? `<span class="chip bad">${r.missing.length} missing</span>` : ""}
+    ${problems.length ? `<span class="chip bad">${problems.length} problem${problems.length > 1 ? "s" : ""}</span>` : ""}
+    ${r.duplicates.length + r.same_key_twice.length ? `<span class="chip warn">${r.duplicates.length + r.same_key_twice.length} duplicate${r.duplicates.length + r.same_key_twice.length > 1 ? "s" : ""}</span>` : ""}
+    ${r.unused.length ? `<span class="chip">${r.unused.length} unused</span>` : ""}</div>`;
+  if (r.typed_bibliography.length) {
+    const n = r.typed_bibliography.reduce((a, t) => a + t.entries, 0);
+    h += `<div class="notice warn"><strong>Hand-typed bibliography</strong> in ${r.typed_bibliography.map((t) => esc(t.file)).join(", ")} (${n} entries).
+      Citrello can look each one up, add it to your library, write <code>references.bib</code> and change the <code>\\cite</code> keys to match.</div>`;
+    if (!c) h += `<div class="row"><input type="text" id="texProject" list="projectList" value="${esc(name)}" placeholder="Project">
+      <select id="texFormat"><option value="bibtex">BibTeX</option><option value="biblatex">biblatex</option></select>
+      <button class="primary" id="texConvert">Convert to .bib and \\cite</button></div>`;
+    else if (!c.done) h += `<p class="muted small">Looking up ${c.i + 1 > c.n ? c.n : c.i + 1} of ${c.n}: ${esc(c.key)}</p><div class="bar"><div style="width:${c.n ? Math.round(100 * c.i / c.n) : 0}%"></div></div>`;
+    else if (c.error) h += `<div class="notice err">${esc(c.error)}</div>`;
+    else {
+      const sm = c.summary;
+      h += `<div class="notice ok">Converted ${sm.entries} references (${sm.added} new in your library). Changed files: ${sm.changed_files.map(esc).join(", ")}.
+        ${sm.unresolved.length ? `<br>Couldn't read ${sm.unresolved.length}: ${sm.unresolved.map(esc).join(", ")}. Check them in the Library tab.` : ""}
+        <br>Replace these files in your project (on Overleaf: upload them, overwriting the old ones).</div>
+        <div class="row"><a class="btn primary" href="/api/latex/${texJob.id}/converted">Download converted files (.zip)</a></div>`;
+    }
+  }
+  if (r.missing_bib_files.length) h += `<div class="notice warn">The document uses ${r.missing_bib_files.map((n) => `<code>${esc(n)}</code>`).join(", ")}, which isn't in what you chose. Choose the whole project as a .zip to check it too.</div>`;
+  if (r.missing.length) h += `<h3>Cited but not in the .bib</h3>` + texList(r.missing, (m) =>
+    `<li class="${m.in_library ? "check" : "problem"}"><code>${esc(m.key)}</code> ${m.in_library ? `· in your Citrello library: ${esc(m.reference)}` : "· not in your library either"}</li>`) +
+    (inLib.length ? `<div class="row"><a class="btn primary" href="/api/latex/${texJob.id}/bib">Download the .bib with ${inLib.length} added from your library</a>
+      <a class="btn" href="/api/latex/${texJob.id}/bib?fmt=biblatex">biblatex</a></div>` : "");
+  if (problems.length || checks.length) h += `<h3>References to check</h3>` + texList([...problems, ...checks], (i) =>
+    `<li class="${i.reliability}"><code>${esc(i.key)}</code> ${esc(i.title)}: ${i.checks.map(esc).join("; ")}</li>`) +
+    `<p class="small muted">${r.issues.some((i) => i.checked === "offline") ? "Some were only checked offline. Import them below, then use Library → Verify online to check them against Crossref." : ""}</p>`;
+  if (r.duplicates.length) h += `<h3>The same reference under different keys</h3>` + texList(r.duplicates, (ks) => `<li class="check">${ks.map((k) => `<code>${esc(k)}</code>`).join(" = ")}</li>`);
+  if (r.same_key_twice.length) h += `<h3>Keys used for two entries</h3>` + texList(r.same_key_twice, (k) => `<li class="problem"><code>${esc(k)}</code></li>`);
+  if (r.unused.length) h += `<details><summary>${r.unused.length} .bib entr${r.unused.length > 1 ? "ies" : "y"} never cited</summary><p class="small">${r.unused.map((k) => `<code>${esc(k)}</code>`).join(" ")}</p></details>`;
+  if (r.ok && !r.typed_bibliography.length && !r.issues.length) h += `<div class="notice ok">All citations are in the .bib, with no duplicates or problems.</div>`;
+  if (r.bib_entries) h += `<div class="row" style="margin-top:12px"><input type="text" id="texImpProject" list="projectList" value="${esc(name)}" placeholder="Project">
+    <button id="texImport">Import the .bib into Citrello</button><span class="muted small">Then Citrello keeps it clean and can keep a .bib file up to date (below).</span></div>`;
+  $("texResult").innerHTML = h;
+  if ($("texConvert")) $("texConvert").onclick = async () => {
+    try { texJob = await post(`/api/latex/${texJob.id}/convert`, {project: $("texProject").value, format: $("texFormat").value}); renderTex(); pollTex(); }
+    catch (e) { notice("texResult", "err", esc(e.message)); }
+  };
+  if ($("texImport")) $("texImport").onclick = async () => {
+    try { const x = await post(`/api/latex/${texJob.id}/import`, {project: $("texImpProject").value}); texJob = x; renderTex();
+          toast(`${x.imported.added} added, ${x.imported.skipped} already in your library`);
+          const ren = Object.entries(x.imported.renamed);
+          if (ren.length) $("texResult").insertAdjacentHTML("beforeend", `<div class="notice warn">${ren.length} reference${ren.length > 1 ? "s were" : " was"} already in your library under another key:
+            ${ren.map(([a, b]) => `<code>${esc(a)}</code> → <code>${esc(b)}</code>`).join(", ")}. Update your .tex so the citations match the .bib Citrello writes.</div>
+            <div class="row"><a class="btn" href="/api/latex/${texJob.id}/renamed">Download the .tex with the keys updated</a></div>`); }
+    catch (e) { notice("texResult", "err", esc(e.message)); }
+  };
+}
+function pollTex() {
+  clearTimeout(texTimer);
+  texTimer = setTimeout(async () => {
+    try { texJob = await api(`/api/latex/${texJob.id}`); } catch { return; }
+    renderTex();
+    if (texJob.convert && !texJob.convert.done) pollTex();
+  }, 700);
+}
+async function loadBibExports(list) {
+  const ex = list || (await api("/api/bibexports")).exports;
+  $("bxList").innerHTML = ex.length ? texList(ex, (e) => `<li class="${e.error ? "problem" : "ok"}"><strong>${esc(e.project || "Whole library")}</strong> → <code>${esc(e.path)}</code>
+    <span class="muted small">${e.format === "biblatex" ? "biblatex" : "BibTeX"}</span>${e.error ? ` · ${esc(e.error)}` : ""}
+    <button class="link" data-bx="${esc(e.path)}">Stop</button></li>`) : "";
+  $("bxList").querySelectorAll("[data-bx]").forEach((b) => b.onclick = async () => loadBibExports((await post("/api/bibexports/remove", {path: b.dataset.bx})).exports));
+}
+$("bxAdd").onclick = async () => {
+  if (!$("bxPath").value.trim()) return $("bxPath").focus();
+  try {
+    await loadBibExports((await post("/api/bibexports/add", {project: $("bxProject").value.trim(), path: $("bxPath").value, format: $("bxFormat").value})).exports);
+    $("bxPath").value = ""; $("bxMsg").innerHTML = ""; toast("The .bib file will stay up to date");
+  } catch (e) { notice("bxMsg", "err", esc(e.message)); }
+};
 
 // ---------- documents: convert typed citations ----------
 dropZone($("drop"), $("file"), upload);

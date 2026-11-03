@@ -125,7 +125,7 @@ def test_import_and_duplicates():
     assert library.import_items(library.parse_any(BIB, "b.bib")) == (1, 0)
     assert library.import_items(library.parse_any(RIS, "a.ris")) == (0, 1)   # same paper again
     keys = {it["key"] for it in library.load()["items"]}
-    assert {"Topham2017", "Vetters2024"} <= keys
+    assert {"Topham2017", "vetters2024"} <= keys   # BibTeX keys are kept, so \\cite{vetters2024} keeps working
 
 
 def test_export_roundtrip(tmp_path):
