@@ -12,10 +12,12 @@ Claude Desktop config (Citrello's Settings page can add this for you):
 or, without the .exe:
   {"mcpServers": {"citrello": {"command": "python", "args": ["C:\\\\path\\\\to\\\\mcp_server.py"]}}}
 """
+import contextlib
 import io
 import json
 import os
 import sys
+import threading
 import traceback
 
 # The protocol owns stdout; anything else that prints goes to stderr.
@@ -61,6 +63,47 @@ def _summary(it):
     if it.get("checks"):
         out["issues"] = [ch["text"] for ch in it["checks"]]
     return out
+
+
+# Requests relayed from ChatGPT / Claude on the web (through the Citrello bridge) can only write Word files in
+# Citrello's Documents folder and only read Word or reference files, as a safeguard against prompt injection.
+_REMOTE = threading.local()
+
+
+@contextlib.contextmanager
+def remote_call():
+    _REMOTE.active = True
+    try:
+        yield
+    finally:
+        _REMOTE.active = False
+
+
+def _remote():
+    return getattr(_REMOTE, "active", False)
+
+
+def _docs_folder():
+    return os.path.realpath(os.path.join(library.HOME, "Documents"))
+
+
+def _in_docs(path):
+    try:
+        return os.path.commonpath([os.path.realpath(path), _docs_folder()]) == _docs_folder()
+    except ValueError:  # different drives on Windows
+        return False
+
+
+def _check_remote_path(path, exts, write=False):
+    if not _remote():
+        return path
+    if os.path.splitext(path)[1].lower() not in exts:
+        raise ValueError(f"From a web connector, only {', '.join(exts)} files can be used.")
+    if write:
+        if not _in_docs(path):
+            raise ValueError(f"From a web connector, documents can only be saved in {_docs_folder()}. "
+                             "Leave output_path empty to save there.")
+    return path
 
 
 def _default_doc_path(title):
@@ -169,6 +212,7 @@ def t_check_text(text):
 
 def t_create_doc(text, output_path=None, style=None, title=None):
     out = os.path.abspath(os.path.expanduser(output_path)) if output_path else _default_doc_path(title)
+    _check_remote_path(out, [".docx"], write=True)
     os.makedirs(os.path.dirname(out), exist_ok=True)
     res = citeformat.create_document(text, out, style, title)
     return {"saved_to": out, "citations": res["citations"], "bibliography_entries": res["entries"],
@@ -178,10 +222,13 @@ def t_create_doc(text, output_path=None, style=None, title=None):
 
 
 def t_update_doc(path, style=None, output_path=None):
-    src = os.path.abspath(os.path.expanduser(path))
+    src = _check_remote_path(os.path.abspath(os.path.expanduser(path)), [".docx"])
     if not os.path.exists(src):
         raise ValueError(f"File not found: {src}")
     out = os.path.abspath(os.path.expanduser(output_path)) if output_path else src
+    if _remote() and not _in_docs(out):
+        out = os.path.join(_docs_folder(), os.path.basename(out))  # web connectors save a copy, never overwrite
+    _check_remote_path(out, [".docx"], write=True)
     res = citeformat.update_document(src, out, style)
     return {"saved_to": out, "citations": res["citations"], "markers_converted": res["markers"],
             "bibliography_entries": res["entries"], "style": res["style"]["title"], "problems": res["report"]}
@@ -206,7 +253,8 @@ def t_verify(keys=None, project=None, include_verified=False):
 
 
 def t_import(file_path, project=None):
-    path = os.path.abspath(os.path.expanduser(file_path))
+    path = _check_remote_path(os.path.abspath(os.path.expanduser(file_path)),
+                              [".ris", ".bib", ".bibtex", ".json", ".txt", ".nbib", ".enw"])
     text = open(path, encoding="utf-8-sig", errors="replace").read()
     added, skipped = library.import_items(library.parse_any(text, path), project, "import")
     return {"added": added, "skipped_duplicates_or_invalid": skipped}

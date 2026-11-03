@@ -243,6 +243,56 @@
   <!-- ================= SETTINGS ================= -->
   <section id="tab-settings" class="hidden">
     <div class="card">
+      <h2>Account</h2>
+      <div id="acctOut">
+        <p class="muted">Sign in to use your library from <strong>ChatGPT</strong> and <strong>Claude on the web and phone</strong>, and to use the same account on all your computers. Citrello works without an account; your library always stays on your computer.</p>
+        <div class="row" id="acctEmailRow">
+          <input type="email" id="acctEmail" class="grow" placeholder="Your email" autocomplete="email">
+          <button class="primary" id="acctSend">Email me a code</button>
+        </div>
+        <div class="row hidden" id="acctCodeRow">
+          <input type="text" id="acctCode" inputmode="numeric" maxlength="8" placeholder="6-digit code" style="max-width:160px">
+          <button class="primary" id="acctVerify">Sign in</button>
+          <button class="link" id="acctBack">Use a different email</button>
+        </div>
+        <label class="small" style="display:block;margin-top:10px"><input type="checkbox" id="acctNews"> Email me about new features (a few times a year, unsubscribe any time)</label>
+        <p class="small muted">See the <a href="https://mcp.citrello.app/privacy" target="_blank" rel="noopener">privacy policy</a>.</p>
+      </div>
+      <div id="acctIn" class="hidden">
+        <p>Signed in as <strong id="acctWho"></strong></p>
+        <div id="acctConn"></div>
+        <label class="small" style="display:block;margin-top:10px"><input type="checkbox" id="acctNewsIn"> Email me about new features</label>
+        <details><summary>Computers signed in to this account</summary><div id="acctDevices" class="small"></div></details>
+        <div class="row">
+          <button id="acctSignOut">Sign out of this computer</button>
+          <button class="link" id="acctDelete">Delete my account</button>
+        </div>
+      </div>
+      <div id="acctMsg"></div>
+    </div>
+
+    <div class="card">
+      <h2>ChatGPT and Claude on the web</h2>
+      <p class="muted">Use your library from ChatGPT, or from Claude in the browser and on your phone. Requests go through Citrello's secure bridge to the Citrello app on this computer, so Citrello needs to be running. Sign in above first.</p>
+      <p class="small">Connector address: <code id="connUrl">https://mcp.citrello.app/mcp</code> <button class="link" id="connCopy">Copy</button></p>
+      <details><summary>Add it to ChatGPT</summary>
+        <ol class="small">
+          <li>In ChatGPT open <strong>Settings → Apps &amp; Connectors → Advanced settings</strong> and turn on <strong>Developer mode</strong> (paid plans).</li>
+          <li>Back in <strong>Apps &amp; Connectors</strong>, click <strong>Create</strong>. Name: <em>Citrello</em>. MCP server URL: the address above. Authentication: <strong>OAuth</strong>. Tick “I trust this application” and click <strong>Create</strong>.</li>
+          <li>Sign in with the same email as here, and enter the code from the email.</li>
+          <li>In a chat, click <strong>+ → More → Developer mode</strong> and turn on Citrello. Then ask: <em>“What's in my Citrello library?”</em></li>
+        </ol>
+      </details>
+      <details><summary>Add it to Claude on the web and phone</summary>
+        <ol class="small">
+          <li>On claude.ai open <strong>Settings → Connectors → Add custom connector</strong>.</li>
+          <li>Name: <em>Citrello</em>. URL: the address above. Click <strong>Add</strong>, then <strong>Connect</strong>, and sign in with the same email.</li>
+          <li>It then works on claude.ai, in the Claude phone apps, and in Claude Desktop too.</li>
+        </ol>
+      </details>
+      <p class="small muted">Requests from the web can save Word files only in Citrello's Documents folder.</p>
+    </div>
+    <div class="card">
       <h2>Claude</h2>
       <p class="muted">Connect Citrello to the Claude desktop app. Claude can then search and add to your library in every chat, cite with <code class="key">[@Key]</code> markers, and write Word documents with live citations.</p>
       <div id="claudeStatus"></div>
@@ -277,17 +327,14 @@
     </div>
 
     <div class="card">
-      <h2>Codex and ChatGPT</h2>
-      <h3 style="margin-top:4px">Codex (app, CLI and IDE extension)</h3>
-      <p class="muted small" style="margin:0">Gives Codex the same tools as Claude: search, add and verify references, format them, and write Word documents with live citations.</p>
+      <h2>Codex</h2>
+      <p class="muted small" style="margin:0">For the Codex app, CLI and IDE extension. Gives Codex the same tools as Claude: search, add and verify references, format them, and write Word documents with live citations.</p>
       <div id="codexStatus"></div>
       <div class="row"><button class="primary" id="codexConnect">Connect to Codex</button>
         <span class="muted small">Then restart Codex (or start a new Codex session).</span></div>
       <details><summary>Set it up by hand</summary>
         <p class="small muted">Add this to <code id="codexPath"></code>:</p><pre id="codexSnippet"></pre>
       </details>
-      <h3>ChatGPT</h3>
-      <p class="muted small" style="margin:0">ChatGPT can only use online connectors, so it needs a secure bridge to the library on your computer. This is coming in a future version.</p>
     </div>
 
     <div class="card">
@@ -397,7 +444,7 @@ document.querySelectorAll("nav button").forEach((b) => b.onclick = () => {
   document.querySelectorAll("nav button").forEach((x) => x.classList.toggle("active", x === b));
   ["library", "documents", "settings"].forEach((t) => show("tab-" + t, t === b.dataset.tab));
   if (b.dataset.tab === "library") loadLibrary();
-  if (b.dataset.tab === "settings") { loadClaude(); loadCodex(); loadWord(); }
+  if (b.dataset.tab === "settings") { loadAccount(); loadClaude(); loadCodex(); loadWord(); }
 });
 
 const relTag = (r) => ({verified: '<span class="tag ok" title="Found by DOI; matches the publisher record">✓ Verified</span>',
@@ -453,6 +500,72 @@ const BOOKMARKLET = "javascript:" + encodeURIComponent(BOOKMARKLET_CODE);
 $("bookmarklet").href = BOOKMARKLET;
 $("bookmarklet").onclick = (e) => { e.preventDefault(); toast("Drag this button to your bookmarks bar"); };
 $("bmCopy").onclick = async () => { await navigator.clipboard.writeText(BOOKMARKLET).catch(() => {}); toast("Copied: paste it as a bookmark's address"); };
+
+
+// ---------- account ----------
+const STATE_TEXT = {online: ["ok", "Connected: ChatGPT and Claude on the web can reach your library while Citrello is running."],
+  connecting: ["warn", "Connecting to the Citrello bridge…"], offline: ["warn", "Not connected to the Citrello bridge. Retrying…"]};
+let acctTimer = null;
+function renderAccount(a) {
+  show("acctOut", !a.signed_in); show("acctIn", a.signed_in);
+  $("connUrl").textContent = a.connector_url || "https://mcp.citrello.app/mcp";
+  if (!a.signed_in) { if (a.error) notice("acctMsg", "warn", esc(a.error)); return; }
+  $("acctMsg").innerHTML = "";
+  $("acctWho").textContent = a.email;
+  const [kind, text] = STATE_TEXT[a.state] || STATE_TEXT.offline;
+  $("acctConn").innerHTML = `<div class="notice ${kind}">${esc(text)}${a.state === "offline" && a.error ? " <span class=small>(" + esc(a.error) + ")</span>" : ""}</div>`;
+  const acc = a.account;
+  if (acc) {
+    $("acctNewsIn").checked = acc.user.newsletter;
+    $("acctDevices").innerHTML = acc.devices.map((d) => `<div class="row" style="margin:6px 0">
+      <span class="grow">${esc(d.name || "Computer")} <span class="muted">· ${esc(d.platform || "")}${d.this_device ? " · this computer" : ""}${d.online ? " · online" : ""}</span></span>
+      ${d.this_device ? "" : `<button class="link" data-dev="${esc(d.id)}">Sign out</button>`}</div>`).join("") || "<p class=muted>None</p>";
+    $("acctDevices").querySelectorAll("[data-dev]").forEach((b) => b.onclick = async () => {
+      if (!confirm("Sign out that computer?")) return;
+      renderAccount(await post("/api/account/remove-device", {device_id: b.dataset.dev}));
+    });
+  } else if (a.account_error) {
+    $("acctMsg").innerHTML = `<div class="notice warn">${esc(a.account_error)}</div>`;
+  }
+  clearTimeout(acctTimer);
+  if (a.state !== "online") acctTimer = setTimeout(loadAccount, 3000);
+}
+async function loadAccount() {
+  try { renderAccount(await api("/api/account")); } catch (e) { notice("acctMsg", "err", esc(e.message)); }
+}
+$("acctSend").onclick = async () => {
+  const email = $("acctEmail").value.trim();
+  if (!email) return $("acctEmail").focus();
+  $("acctSend").disabled = true;
+  try {
+    await post("/api/account/start", {email});
+    show("acctEmailRow", false); show("acctCodeRow", true); $("acctCode").value = ""; $("acctCode").focus();
+    notice("acctMsg", "ok", `We sent a 6-digit code to <strong>${esc(email)}</strong>. Check your inbox (and spam folder).`);
+  } catch (e) { notice("acctMsg", "err", esc(e.message)); }
+  $("acctSend").disabled = false;
+};
+$("acctEmail").onkeydown = (e) => { if (e.key === "Enter") $("acctSend").click(); };
+$("acctCode").onkeydown = (e) => { if (e.key === "Enter") $("acctVerify").click(); };
+$("acctBack").onclick = () => { show("acctEmailRow", true); show("acctCodeRow", false); $("acctMsg").innerHTML = ""; };
+$("acctVerify").onclick = async () => {
+  $("acctVerify").disabled = true;
+  try {
+    const a = await post("/api/account/verify", {email: $("acctEmail").value.trim(), code: $("acctCode").value, newsletter: $("acctNews").checked});
+    show("acctEmailRow", true); show("acctCodeRow", false);
+    renderAccount(a); toast("Signed in");
+  } catch (e) { notice("acctMsg", "err", esc(e.message)); }
+  $("acctVerify").disabled = false;
+};
+$("acctNewsIn").onchange = async () => {
+  try { await post("/api/account/newsletter", {on: $("acctNewsIn").checked}); toast($("acctNewsIn").checked ? "You'll hear about new features" : "Feature emails turned off"); }
+  catch (e) { notice("acctMsg", "err", esc(e.message)); }
+};
+$("acctSignOut").onclick = async () => { renderAccount(await post("/api/account/signout")); toast("Signed out"); };
+$("acctDelete").onclick = async () => {
+  if (!confirm("Delete your Citrello account? Your library on this computer is kept; connectors and other computers are signed out.")) return;
+  try { renderAccount(await post("/api/account/delete")); toast("Account deleted"); } catch (e) { notice("acctMsg", "err", esc(e.message)); }
+};
+$("connCopy").onclick = async () => { try { await navigator.clipboard.writeText($("connUrl").textContent); toast("Copied"); } catch {} };
 
 async function loadCodex() {
   const c = await api("/api/codex");

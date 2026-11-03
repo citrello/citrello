@@ -1,0 +1,12 @@
+{
+  "name": "citrello-bridge",
+  "private": true,
+  "license": "AGPL-3.0-or-later",
+  "scripts": {
+    "dev": "wrangler dev --var DEV_RETURN_CODES:1 --var PUBLIC_URL:http://localhost:8787",
+    "deploy": "wrangler deploy"
+  },
+  "devDependencies": {
+    "wrangler": "4.42.0"
+  }
+}

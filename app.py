@@ -34,6 +34,7 @@ import docx
 
 import citeformat
 import library
+import bridge_client
 import citrello_core as core
 import codex_config
 import word_addin
@@ -544,6 +545,29 @@ class Handler(BaseHTTPRequestHandler):
         return origin is None or origin in (f"http://localhost:{PORT}", f"http://127.0.0.1:{PORT}")
 
     # ---------------- GET ----------------
+    def account_post(self, action):
+        b = self.json_body()
+        try:
+            if action == "start":
+                bridge_client.start_sign_in(str(b.get("email", "")).strip())
+                return self.send(200, {"ok": True})
+            if action == "verify":
+                bridge_client.finish_sign_in(str(b.get("email", "")).strip(), str(b.get("code", "")),
+                                             bool(b.get("newsletter")))
+            elif action == "newsletter":
+                bridge_client.set_newsletter(bool(b.get("on")))
+            elif action == "remove-device":
+                bridge_client.remove_device(str(b.get("device_id", "")))
+            elif action == "signout":
+                bridge_client.sign_out()
+            elif action == "delete":
+                bridge_client.delete_account()
+            else:
+                return self.send(404, {"error": "not found"})
+        except bridge_client.BridgeError as e:
+            return self.send(400, {"error": str(e)})
+        return self.send(200, account_status())
+
     def do_GET(self):
         url = urllib.parse.urlparse(self.path)
         path, qs = url.path, urllib.parse.parse_qs(url.query)
@@ -645,6 +669,8 @@ class Handler(BaseHTTPRequestHandler):
                                    "default": load_config().get("style", citeformat.DEFAULT_STYLE)})
         if path == "/api/codex":
             return self.send(200, codex_config.status(connector_command()))
+        if path == "/api/account":
+            return self.send(200, account_status())
         if path == "/api/claude":
             return self.send(200, claude_status())
         m = re.fullmatch(r"/api/job/(\w+)", path)
@@ -858,11 +884,26 @@ class Handler(BaseHTTPRequestHandler):
         handled = self.library_post(path)
         if handled is not None:
             return handled
+        if path.startswith("/api/account/"):
+            return self.account_post(path[len("/api/account/"):])
         if path == "/api/quit":
             self.send(200, {"ok": True})
             threading.Thread(target=self.server.shutdown, daemon=True).start()
             return
         self.send(404, {"error": "not found"})
+
+
+def account_status():
+    """Sign-in state, the bridge connection, and (when reachable) the account details."""
+    st = bridge_client.CONNECTION.status()
+    if st["signed_in"]:
+        try:
+            st["account"] = bridge_client.account_info()
+        except bridge_client.BridgeError as e:
+            st["account_error"] = str(e)
+        st = {**bridge_client.CONNECTION.status(), **{k: v for k, v in st.items() if k in ("account", "account_error")}}
+    st["connector_url"] = bridge_client.BRIDGE + "/mcp"
+    return st
 
 
 def main():
@@ -886,6 +927,8 @@ def main():
         webbrowser.open(url)
         return
     print(f"Citrello is running at {url}  (close it with the Quit button on the page)")
+    if bridge_client.load_account():
+        bridge_client.CONNECTION.start()  # link to ChatGPT / Claude on the web
     if not args.no_browser:
         threading.Timer(0.5, webbrowser.open, [url]).start()
     try:

@@ -1,0 +1,30 @@
+# Citrello bridge (Cloudflare Worker). See bridge/README.md.
+name = "citrello-bridge"
+main = "src/index.js"
+compatibility_date = "2025-09-01"
+workers_dev = true
+routes = [{ pattern = "mcp.citrello.app", custom_domain = true }]
+
+[vars]
+PUBLIC_URL = "https://mcp.citrello.app"
+MAIL_FROM = "Citrello <hello@citrello.app>"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "citrello"
+database_id = "00000000-0000-0000-0000-000000000000"  # replaced by the deploy workflow
+migrations_dir = "migrations"
+
+[[durable_objects.bindings]]
+name = "RELAY"
+class_name = "Relay"
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["Relay"]
+
+[triggers]
+crons = ["17 3 * * *"]
+
+[observability]
+enabled = true

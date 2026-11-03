@@ -28,6 +28,9 @@ your computer and is shared by the Citrello app, Claude and Word:
 - **Claude connector:** Claude Desktop (and Claude Code) can search, add, organise, verify and
   format your references, check the citations in a text, and write or restyle Word documents with
   live citations. Install it with one click (`Citrello.mcpb`).
+- **ChatGPT, Claude on the web and phone:** sign in to a free Citrello account, then add the connector
+  `https://mcp.citrello.app/mcp`. Requests go through Citrello's bridge to the app on your computer.
+- **Codex:** one click adds Citrello to the Codex app, CLI and IDE extension.
 - **Word tab (Windows)**
   - **Insert / Edit citation:** a search dialog over your library, with page, prefix ("see") and
     "year only" for *Smith et al. (2020)*.
@@ -56,6 +59,8 @@ your computer and is shared by the Citrello app, Claude and Word:
    drag it onto **Claude Desktop → Settings → Extensions** and click **Install**.
 4. **Settings → Word → Install Word button**, then restart Word.
 5. **Settings → Browser button:** drag **＋ Add to Citrello** onto your bookmarks bar.
+6. *Optional:* **Settings → Account:** sign in with your email to use ChatGPT or Claude on the web, then follow
+   the steps under **ChatGPT and Claude on the web**.
 
 ## Using it with Claude
 Once installed, Citrello's tools are available in every Claude Desktop chat. For example:
@@ -71,9 +76,14 @@ Once installed, Citrello's tools are available in every Claude Desktop chat. For
 - **Extra styles:** `%USERPROFILE%\Citrello\styles`.
 - **Backups made by the Word tab before changes:** `%USERPROFILE%\Citrello\backups`.
 
-**Privacy:** everything runs on your computer. Citrello only goes online to look up references
-(Crossref, doi.org, the page you add), to download citation styles, and, if you connect them, to
-reach your Mendeley or Zotero account. There is no tracking.
+**Privacy:** your library stays on your computer. Citrello only goes online for these:
+- to look up references (Crossref, doi.org, the page you add);
+- to download citation styles;
+- to reach your Mendeley or Zotero account, if you connect them;
+- if you sign in, to keep the connection open for ChatGPT and Claude on the web.
+
+The account is optional. It stores your email, your computers and whether you want feature emails. See the
+[privacy policy](https://mcp.citrello.app/privacy). There is no other tracking.
 
 ## Build from source
 Requires Windows and Python 3.10+.
@@ -86,6 +96,8 @@ without building, use `Start Citrello.bat` (needs `pip install python-docx citep
 Each push to this repository is tested, and each version tag (`v1.0.0`, …) builds the Windows files
 and attaches them to a GitHub release automatically. See `.github/workflows/build.yml`.
 
+The account and connector service is in [`bridge/`](bridge/README.md). It runs on Cloudflare Workers.
+
 Development setup:
 ```
 pip install python-docx citeproc-py pytest
@@ -94,8 +106,8 @@ pytest
 
 ## Limits
 - **Windows only:** the Word tab and the packaged app are Windows-only for now.
-- **Claude access:** the connector works with Claude Desktop and Claude Code. Claude in the browser
-  can't reach your computer.
+- **Web connectors need the app running:** ChatGPT and Claude on the web reach your library through the app,
+  so Citrello must be open on a computer that's signed in.
 - **Footnote styles** (e.g. Chicago notes) are not supported yet.
 - **Formatting engine:** the open-source citeproc-py. A few styles may differ in small details from
   Zotero's or Mendeley's output.
