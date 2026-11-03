@@ -3,7 +3,7 @@ name: Deploy bridge (mcp.citrello.app)
 # Deploys the Cloudflare Worker in bridge/ whenever it changes on main, or by hand (Actions → Run workflow).
 # Needs these repository secrets (Settings → Secrets and variables → Actions):
 #   CLOUDFLARE_API_TOKEN, CLOUDFLARE_ACCOUNT_ID   required
-#   RESEND_API_KEY                                 sends the sign-in emails
+#   RESEND_API_KEY (or RESEND_API_KEY_CITRELLO)    sends the sign-in emails
 #   BRIDGE_ADMIN_TOKEN                             protects /admin (user numbers, feature emails)
 on:
   push:
@@ -46,7 +46,7 @@ jobs:
     env:
       CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
       CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-      RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+      RESEND_API_KEY: ${{ secrets.RESEND_API_KEY || secrets.RESEND_API_KEY_CITRELLO }}
       BRIDGE_ADMIN_TOKEN: ${{ secrets.BRIDGE_ADMIN_TOKEN }}
     steps:
       - name: Skip when Cloudflare isn't set up yet
