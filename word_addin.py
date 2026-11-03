@@ -621,7 +621,7 @@ Private Function DocStyle(doc As Document) As String
     DocStyle = doc.Variables("CitrelloStyle").Value
     If Err.Number <> 0 Then
         Err.Clear
-        DocStyle = doc.Variables("RefciteStyle").Value   ' chosen with Refcite, Citrello's old name
+        DocStyle = doc.Variables("RefciteStyle").Value   ' chosen with an earlier version
         If Err.Number <> 0 Then DocStyle = ""
     End If
 End Function
@@ -1159,7 +1159,7 @@ def _default_startup():
     return os.path.join(os.environ.get("APPDATA", os.path.expanduser("~")), "Microsoft", "Word", "STARTUP")
 
 
-OLD_TEMPLATE = "Refcite.dotm"  # Citrello's old name; removed when Citrello's template is installed
+OLD_TEMPLATE = "Refcite.dotm"  # an earlier version's template; removed on install
 
 
 def installed_paths():
@@ -1202,7 +1202,7 @@ def install():
         old = os.path.join(startup, OLD_TEMPLATE)
         try:
             if os.path.exists(old):
-                os.remove(old)  # otherwise Word would show the old Refcite tab next to Citrello's
+                os.remove(old)  # otherwise Word would show two tabs
             shutil.copyfile(out, dest)
         except PermissionError:
             raise RuntimeError("Close Word first: it is using the old Citrello button. Then click Install again.")

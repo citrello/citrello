@@ -23,16 +23,16 @@ from html.parser import HTMLParser
 import citrello_core as core
 
 HOME = os.environ.get("CITRELLO_HOME") or os.path.join(os.path.expanduser("~"), "Citrello")
-# Citrello used to be called Refcite; its data is picked up once (see migrate_from_refcite)
-OLD_HOME = os.environ.get("REFCITE_HOME") or os.path.join(os.path.expanduser("~"), "Refcite")
+# data of an earlier development version, picked up once (see migrate_legacy_data)
+OLD_HOME = os.environ.get("CITRELLO_LEGACY_HOME") or os.path.join(os.path.expanduser("~"), "Refcite")
 
 
 def library_path():
     return os.path.join(HOME, "library.json")
 
 
-def migrate_from_refcite():
-    """Copy the library, settings and Mendeley login of Refcite (Citrello's old name) once.
+def migrate_legacy_data():
+    """Copy the library, settings and Mendeley login of an earlier development version once.
     The old files are left untouched as a backup. Returns what was copied."""
     done = []
     try:
@@ -46,7 +46,7 @@ def migrate_from_refcite():
                 shutil.copyfile(o, n)
                 done.append(new)
     except OSError as e:  # never block start-up over this
-        print(f"Could not copy Refcite data: {e}")
+        print(f"Could not copy earlier data: {e}")
     return done
 
 

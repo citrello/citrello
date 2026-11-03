@@ -302,7 +302,7 @@ def handle(msg):
 
 
 def main():
-    library.migrate_from_refcite()
+    library.migrate_legacy_data()
     out = _PROTOCOL_OUT or sys.__stdout__.buffer
     stdin = sys.stdin.buffer
     while True:

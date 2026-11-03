@@ -8,6 +8,6 @@ sys.path.insert(0, ROOT)
 
 _tmp = tempfile.mkdtemp(prefix="citrello_test_")
 os.environ["CITRELLO_HOME"] = os.path.join(_tmp, "library")      # must be set before `import library`
-os.environ["REFCITE_HOME"] = os.path.join(_tmp, "no-old-refcite")
+os.environ["CITRELLO_LEGACY_HOME"] = os.path.join(_tmp, "no-legacy-data")
 os.environ["CITRELLO_CROSSREF"] = "http://127.0.0.1:9"            # unreachable: tests stay offline
 os.environ["CITRELLO_DOIORG"] = "http://127.0.0.1:9"

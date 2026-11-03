@@ -358,7 +358,7 @@ def remove_manual_connector():
     for path in claude_config_paths():
         cfg = _read_cfg(path)
         names = [n for n in ("citrello", "refcite") if isinstance(cfg, dict) and n in cfg.get("mcpServers", {})]
-        if names:  # "refcite": Citrello's old name
+        if names:  # also the entry of an earlier development version
             shutil.copyfile(path, path + ".citrello-backup")
             for n in names:
                 del cfg["mcpServers"][n]
@@ -864,7 +864,7 @@ def main():
     ap = argparse.ArgumentParser(description="Citrello app")
     ap.add_argument("--no-browser", action="store_true")
     args = ap.parse_args()
-    library.migrate_from_refcite()
+    library.migrate_legacy_data()
     url = f"http://localhost:{PORT}/"
     server = None
     for attempt in range(20):

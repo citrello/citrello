@@ -57,10 +57,6 @@ your computer and is shared by the Citrello app, Claude and Word:
 4. **Settings → Word → Install Word button**, then restart Word.
 5. **Settings → Browser button:** drag **＋ Add to Citrello** onto your bookmarks bar.
 
-Coming from Refcite (Citrello's earlier name)? Your library, settings and Mendeley login are copied
-over automatically on first start. Remove the old **Refcite** extension in Claude Desktop under
-**Settings → Extensions**.
-
 ## Using it with Claude
 Once installed, Citrello's tools are available in every Claude Desktop chat. For example:
 - "Add 10.1016/j.renene.2016.10.066 to my Citrello library, project *Decommissioning review*."

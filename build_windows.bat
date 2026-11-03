@@ -8,8 +8,6 @@ echo Please close Claude Desktop first (it keeps the connector running).
 echo Closing Citrello if it is running...
 taskkill /IM Citrello.exe /F >nul 2>&1
 taskkill /IM CitrelloMCP.exe /F >nul 2>&1
-taskkill /IM Refcite.exe /F >nul 2>&1
-taskkill /IM RefciteMCP.exe /F >nul 2>&1
 if exist dist rmdir /s /q dist
 if exist build rmdir /s /q build
 echo.
