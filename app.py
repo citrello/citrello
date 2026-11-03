@@ -13,6 +13,7 @@ it in the browser:
 """
 import argparse
 import contextlib
+import html
 import io
 import json
 import os
@@ -716,6 +717,27 @@ class Handler(BaseHTTPRequestHandler):
                 items = [it for it in items if not it.get("projects")]
             return self.send(200, {"total": len(data["items"]), "projects": data["projects"],
                                    "path": library.library_path(), "items": [item_public(it) for it in items]})
+        if path == "/api/library/item":  # the Library's detail panel
+            data = library.load()
+            it = library.get(data, qs.get("key", [""])[0])
+            if not it:
+                return self.send(404, {"error": "Not found"})
+            out = item_public(it)
+            c = it["csl"]
+            out["names"] = [(" ".join(x for x in (a.get("given"), a.get("family")) if x) or a.get("literal", ""))
+                            for a in c.get("author", [])]
+            out.update(volume=c.get("volume", ""), issue=c.get("issue", ""), page=c.get("page", ""),
+                       url=c.get("URL", ""), raw=it.get("raw", ""))
+            style = qs.get("style", [""])[0] or load_config().get("style") or "apa"
+            try:
+                r = citeformat.Renderer(style, {it["key"]: c})
+                i = r.add([{"key": it["key"]}])
+                strip = lambda h: html.unescape(re.sub(r"<[^>]+>", "", h)).strip()  # noqa: E731
+                out["formatted"] = {"style": r.info["title"], "citation": strip(r.render(i)),
+                                    "reference": strip(r.bibliography()[0])}
+            except Exception as e:
+                out["formatted"] = {"error": str(e)}
+            return self.send(200, out)
         if path == "/api/library/export":
             data = library.load()
             project = qs.get("project", [""])[0]

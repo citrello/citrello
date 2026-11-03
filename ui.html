@@ -4,115 +4,188 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Citrello</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Gloock&family=Figtree:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
   :root {
-    --bg: #f6f5f2; --card: #ffffff; --ink: #1d1d1f; --muted: #6b6b70; --line: #e4e2dc;
-    --accent: #9b1c31; --accent-ink: #ffffff; --accent-soft: #f6e8ea;
-    --ok: #1f7a4d; --ok-soft: #e5f3ec; --warn: #9a6200; --warn-soft: #fbf1de; --err: #b3261e; --err-soft: #fbe9e7;
+    --cobalt: #1d3f8f; --cobalt-2: #16306e; --lemon: #f6d646; --lemon-soft: #fbeeb0; --leaf: #3e7b4f;
+    --bg: #f6f8fd; --card: #ffffff; --ink: #14213d; --muted: #4a5774; --line: #d5def0; --sky: #eaf0fb;
+    --accent: var(--cobalt); --accent-ink: #ffffff; --accent-soft: var(--sky);
+    --ok: #2f6b40; --ok-soft: #e1f0e5; --warn: #8a5a00; --warn-soft: #fff1c7; --err: #b3261e; --err-soft: #fde3e1;
+    --sel: var(--lemon-soft); --side: var(--cobalt); --side-ink: #dfe6f7; --side-muted: #b9c6e8;
+    --serif: Gloock, Georgia, serif;
   }
   @media (prefers-color-scheme: dark) {
     :root:not([data-theme="light"]) {
-      --bg: #161618; --card: #1f1f22; --ink: #ececee; --muted: #9a9aa1; --line: #33333a;
-      --accent: #e0627a; --accent-ink: #1a0b0f; --accent-soft: #3a1f26;
-      --ok: #5cc392; --ok-soft: #173126; --warn: #e2b04f; --warn-soft: #362a12; --err: #f08a80; --err-soft: #3b1d1a;
+      --bg: #0f1730; --card: #17213f; --ink: #e8edf8; --muted: #a9b5d3; --line: #2b3a63; --sky: #1e2c52;
+      --accent: #8fb0ff; --accent-ink: #0f1730; --accent-soft: #22325c; --cobalt: #8fb0ff;
+      --ok: #7fd09a; --ok-soft: #173326; --warn: #f0c45a; --warn-soft: #3a2e10; --err: #ff8a80; --err-soft: #3d1c1a;
+      --sel: #3a3416; --side: #0b1226; --lemon-soft: #3a3416;
     }
   }
   * { box-sizing: border-box; }
-  body { margin: 0; background: var(--bg); color: var(--ink);
-         font: 15px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
-  main { max-width: 1040px; margin: 0 auto; padding: 24px 16px 64px; }
-  header { display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; margin-bottom: 18px; }
-  h1 { font-size: 24px; margin: 0; letter-spacing: -0.02em; }
-  header p { margin: 2px 0 0; color: var(--muted); font-size: 14px; }
-  nav { display: flex; gap: 4px; background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 4px; }
-  nav button { border: none; background: none; padding: 7px 16px; border-radius: 9px; font-weight: 600; color: var(--muted); }
-  nav button.active { background: var(--accent-soft); color: var(--accent); }
-  .card { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 20px 22px; margin-bottom: 16px; }
-  h2 { font-size: 17px; margin: 0 0 6px; }
+  body { margin: 0; background: var(--bg); color: var(--ink); font: 15px/1.5 Figtree, system-ui, "Segoe UI", sans-serif; }
+  a { color: var(--accent); }
+  :focus-visible { outline: 3px solid var(--leaf); outline-offset: 2px; }
+
+  /* shell */
+  .app { display: grid; grid-template-columns: 232px 1fr; min-height: 100vh; }
+  .side { background: var(--side); color: var(--side-ink); padding: 20px 14px; display: flex; flex-direction: column; gap: 2px;
+          position: sticky; top: 0; height: 100vh; overflow-y: auto; }
+  .logo { font: 30px var(--serif); color: #fff; padding: 0 10px 2px; }
+  .logo span { color: var(--lemon); }
+  .tagline { font-size: 12.5px; color: var(--side-muted); padding: 0 10px 18px; }
+  .side nav { display: flex; flex-direction: column; gap: 2px; }
+  .side button.navb, .side .proj { all: unset; box-sizing: border-box; display: flex; justify-content: space-between; align-items: center;
+          width: 100%; padding: 9px 12px; border-radius: 10px; color: var(--side-ink); font-weight: 500; cursor: pointer; }
+  .side button.navb:hover, .side .proj:hover { background: rgba(255,255,255,.08); }
+  .side button.navb.active, .side .proj.active { background: rgba(255,255,255,.16); color: #fff; font-weight: 700; }
+  .side button.navb:focus-visible, .side .proj:focus-visible { outline: 3px solid var(--lemon); }
+  .side small { color: var(--side-muted); font-weight: 500; }
+  .side h4 { font: 600 12.5px Figtree, sans-serif; color: var(--side-muted); margin: 22px 12px 6px; }
+  .proj .dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: var(--lemon); margin-right: 9px; flex: none; }
+  .proj > span { display: flex; align-items: center; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .side-foot { margin-top: auto; padding: 14px 12px 0; border-top: 1px solid rgba(255,255,255,.15); font-size: 13px; color: var(--side-muted); }
+  .side-foot .conn { display: flex; align-items: center; gap: 8px; color: var(--side-ink); margin-bottom: 10px; }
+  .side-foot .conn i { width: 8px; height: 8px; border-radius: 50%; background: var(--side-muted); flex: none; }
+  .side-foot .conn i.on { background: #8fd19e; }
+  .side-foot button.link { color: var(--side-muted); }
+  .main { min-width: 0; padding: 22px 28px 48px; }
+
+  /* type and controls */
+  h1 { font: 400 32px/1.15 var(--serif); color: var(--cobalt); margin: 0; letter-spacing: -.2px; }
+  h2 { font: 400 22px/1.2 var(--serif); color: var(--cobalt); margin: 0 0 6px; }
   h3 { font-size: 15px; margin: 16px 0 4px; }
-  .muted { color: var(--muted); }
-  .small { font-size: 13px; }
+  .muted { color: var(--muted); } .small { font-size: 13px; }
+  .page-head { margin: 4px 0 14px; } .page-head p { margin: 4px 0 0; color: var(--muted); font-size: 14px; }
   button, .btn { font: inherit; font-weight: 600; border: 1px solid var(--line); background: var(--card); color: var(--ink);
-                 padding: 8px 14px; border-radius: 10px; cursor: pointer; text-decoration: none; display: inline-block; }
+                 padding: 9px 15px; border-radius: 10px; cursor: pointer; text-decoration: none; display: inline-block; }
+  button:hover, .btn:hover { border-color: var(--accent); }
   button.primary, .btn.primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+  button.primary:hover, .btn.primary:hover { background: var(--cobalt-2); }
   button:disabled { opacity: .5; cursor: default; }
   button.link { border: none; background: none; color: var(--muted); padding: 0; font-weight: 500; text-decoration: underline; }
   button.icon { padding: 2px 8px; font-weight: 500; color: var(--muted); }
+  button.danger { color: var(--err); }
   .row { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin-top: 10px; }
   input[type=text], input[type=password], input[type=email], input[type=search], select, textarea {
-    font: inherit; padding: 8px 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--bg); color: var(--ink); }
+    font: inherit; padding: 9px 12px; border: 1px solid var(--line); border-radius: 10px; background: var(--card); color: var(--ink); }
   textarea { width: 100%; min-height: 84px; resize: vertical; }
   .grow { flex: 1; min-width: 180px; }
   label.field { display: block; margin-top: 10px; font-size: 13px; color: var(--muted); }
   label.field input, label.field select { display: block; width: 100%; margin-top: 3px; }
-  .drop { display: block; border: 2px dashed var(--line); border-radius: 12px; padding: 22px 16px; text-align: center; cursor: pointer; margin-top: 10px; }
-  .drop.over, .drop:hover { border-color: var(--accent); background: var(--accent-soft); }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 22px 24px; margin-bottom: 16px; max-width: 980px; }
+  .panel { border: 1px solid var(--line); border-radius: 14px; padding: 16px 18px; margin: 0 0 14px; background: var(--card); }
+  .panel > strong { font: 400 19px var(--serif); color: var(--cobalt); }
+  .drop { display: block; border: 2px dashed var(--line); border-radius: 14px; padding: 24px 16px; text-align: center; cursor: pointer; margin-top: 10px; background: var(--bg); }
+  .drop.over, .drop:hover { border-color: var(--accent); background: var(--sky); }
   .drop strong { color: var(--accent); }
   .bar { height: 8px; background: var(--line); border-radius: 99px; overflow: hidden; margin-top: 10px; }
-  .bar > div { height: 100%; width: 0; background: var(--accent); transition: width .3s; }
-  .chips { display: flex; flex-wrap: wrap; gap: 8px; margin: 10px 0 4px; }
-  .chip { font-size: 13px; padding: 3px 10px; border-radius: 99px; background: var(--bg); border: 1px solid var(--line); }
-  .chip.ok, .tag.ok { background: var(--ok-soft); color: var(--ok); border-color: transparent; }
-  .chip.new, .tag.new { background: var(--accent-soft); color: var(--accent); border-color: transparent; }
-  .chip.warn, .tag.warn { background: var(--warn-soft); color: var(--warn); border-color: transparent; }
-  .chip.bad, .tag.bad { background: var(--err-soft); color: var(--err); border-color: transparent; }
-  .tag { display: inline-block; font-size: 12px; padding: 1px 8px; border-radius: 99px; white-space: nowrap; margin: 1px 2px 1px 0; background: var(--bg); border: 1px solid var(--line); }
-  .table-wrap { max-height: 560px; overflow: auto; border: 1px solid var(--line); border-radius: 10px; margin-top: 10px; }
+  .bar > div { height: 100%; width: 0; background: var(--leaf); transition: width .3s; }
+  .chips { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 12px; align-items: center; }
+  .chip, .tag { font-size: 12.5px; font-weight: 700; padding: 2px 10px; border-radius: 99px; background: var(--sky); color: var(--cobalt); border: 0; white-space: nowrap; display: inline-block; }
+  .tag { margin: 1px 4px 1px 0; }
+  .chip.ok, .tag.ok { background: var(--ok-soft); color: var(--ok); }
+  .chip.new, .tag.new { background: var(--lemon-soft); color: var(--ink); }
+  .chip.warn, .tag.warn { background: var(--warn-soft); color: var(--warn); }
+  .chip.bad, .tag.bad { background: var(--err-soft); color: var(--err); }
+  .table-wrap { max-height: 560px; overflow: auto; border: 1px solid var(--line); border-radius: 12px; margin-top: 10px; background: var(--card); }
   table { width: 100%; border-collapse: collapse; font-size: 13.5px; }
   th { position: sticky; top: 0; background: var(--card); text-align: left; font-weight: 600; color: var(--muted); padding: 8px 10px; border-bottom: 1px solid var(--line); z-index: 1; }
   td { padding: 8px 10px; border-bottom: 1px solid var(--line); vertical-align: top; }
   tr:last-child td { border-bottom: none; }
   td.n { color: var(--muted); width: 36px; font-variant-numeric: tabular-nums; }
-  td .t { font-weight: 600; }
-  td .meta { color: var(--muted); font-size: 12.5px; }
-  code.key { font-size: 12.5px; background: var(--bg); border: 1px solid var(--line); padding: 1px 6px; border-radius: 6px; cursor: pointer; white-space: nowrap; }
-  ul.issues { margin: 4px 0 0; padding-left: 16px; font-size: 12.5px; }
-  ul.issues li.problem { color: var(--err); }
-  ul.issues li.check { color: var(--warn); }
+  td .t { font-weight: 600; } td .meta { color: var(--muted); font-size: 12.5px; }
   tr.problem td:first-child { box-shadow: inset 3px 0 0 var(--err); }
-  tr.check td:first-child { box-shadow: inset 3px 0 0 var(--warn); }
+  tr.check td:first-child { box-shadow: inset 3px 0 0 var(--lemon); }
+  code.key { font: 600 12.5px Figtree, sans-serif; color: var(--cobalt); background: var(--sky); padding: 2px 8px; border-radius: 6px; cursor: pointer; white-space: nowrap; }
+  ul.issues { margin: 4px 0 0; padding-left: 16px; font-size: 12.5px; }
+  ul.issues li.problem { color: var(--err); } ul.issues li.check { color: var(--warn); } ul.issues li.ok { color: var(--ok); }
   .notice { padding: 10px 14px; border-radius: 10px; margin-top: 12px; font-size: 14px; }
   .notice.err { background: var(--err-soft); color: var(--err); }
   .notice.warn { background: var(--warn-soft); color: var(--warn); }
   .notice.ok { background: var(--ok-soft); color: var(--ok); }
-  .panel { border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px; margin-top: 12px; background: var(--bg); }
   .opts { display: flex; flex-wrap: wrap; gap: 16px; margin-top: 10px; font-size: 14px; align-items: center; }
   ol.next { margin: 8px 0 0; padding-left: 20px; }
   details summary { cursor: pointer; color: var(--muted); font-size: 14px; margin-top: 10px; }
   pre { background: var(--bg); border: 1px solid var(--line); border-radius: 8px; padding: 10px; font-size: 12.5px; overflow: auto; }
   .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
-  footer { display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; color: var(--muted); font-size: 13px; margin-top: 24px; }
-  .toast { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); background: var(--ink); color: var(--bg); padding: 8px 16px; border-radius: 10px; font-size: 14px; opacity: 0; transition: opacity .2s; pointer-events: none; }
+  .toast { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); background: var(--ink); color: var(--bg); padding: 9px 16px; border-radius: 10px; font-size: 14px; opacity: 0; transition: opacity .2s; pointer-events: none; z-index: 5; }
   .toast.show { opacity: 1; }
   .hidden { display: none !important; }
-  @media (max-width: 700px) { .hide-sm { display: none; } .grid2 { grid-template-columns: 1fr; } }
+
+  /* library */
+  .lib { display: grid; grid-template-columns: minmax(0, 1fr) 360px; gap: 24px; align-items: start; }
+  .searchbar { display: flex; margin-bottom: 4px; }
+  .lib-head { display: flex; justify-content: space-between; align-items: flex-end; gap: 14px; flex-wrap: wrap; margin: 22px 0 14px; }
+  .lib-head .actions { display: flex; gap: 8px; flex-wrap: wrap; }
+  .searchbox { flex: 1; min-width: 260px; display: flex; align-items: center; background: var(--card); border: 2px solid var(--line); border-radius: 12px; padding: 0 6px 0 14px; }
+  .searchbox:focus-within { border-color: var(--accent); }
+  .searchbox input { flex: 1; border: 0; background: none; padding: 11px 0; outline: none; font-size: 15.5px; }
+  .qadd { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; background: var(--lemon-soft); border-radius: 10px; padding: 8px 12px; margin: 8px 0 0; font-size: 14px; }
+  .reflist { background: var(--card); border: 1px solid var(--line); border-radius: 14px; overflow: hidden; }
+  .ref { display: grid; grid-template-columns: 4px minmax(0, 1fr) auto; gap: 14px; padding: 12px 16px; border-bottom: 1px solid var(--line); align-items: center; cursor: pointer; }
+  .ref:last-child { border-bottom: 0; }
+  .ref:hover { background: var(--bg); }
+  .ref.sel { background: var(--sel); }
+  .ref .rb { width: 4px; align-self: stretch; min-height: 32px; border-radius: 2px; background: var(--line); }
+  .ref.verified .rb { background: var(--leaf); } .ref.check .rb { background: var(--lemon); } .ref.problem .rb { background: var(--err); }
+  .ref .t { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .ref .m { color: var(--muted); font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .ref .m .problem { color: var(--err); } .ref .m .check { color: var(--warn); }
+  .detail { position: sticky; top: 22px; background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 22px; max-height: calc(100vh - 44px); overflow: auto; }
+  .detail h2 { font-size: 23px; margin: 10px 0 6px; }
+  .detail .m { color: var(--muted); font-size: 14px; }
+  .detail h4 { font: 700 12.5px Figtree, sans-serif; color: var(--muted); margin: 20px 0 6px; }
+  .copyline { display: flex; justify-content: space-between; align-items: center; gap: 8px; border: 1px dashed var(--accent); border-radius: 10px; padding: 8px 8px 8px 12px; font-weight: 700; color: var(--cobalt); margin-bottom: 8px; word-break: break-all; }
+  .copyline button { padding: 5px 10px; font-size: 13px; }
+  .formatted { background: var(--sky); border-radius: 10px; padding: 12px 14px; font: 14px/1.55 Georgia, serif; }
+  .empty-detail { color: var(--muted); text-align: center; padding: 40px 10px; }
+  .empty-detail b { display: block; font: 400 22px var(--serif); color: var(--cobalt); margin-bottom: 6px; }
+
+  @media (max-width: 1180px) { .lib { grid-template-columns: 1fr; } .detail { position: static; max-height: none; } }
+  @media (max-width: 760px) {
+    .app { grid-template-columns: 1fr; }
+    .side { position: static; height: auto; flex-direction: row; flex-wrap: wrap; align-items: center; gap: 6px; padding: 12px; }
+    .side .tagline, .side h4, #projNav, .side-foot { display: none; }
+    .side nav { flex-direction: row; } .side button.navb { gap: 6px; } .main { padding: 16px; }
+    .grid2 { grid-template-columns: 1fr; } .hide-sm { display: none; }
+  }
 </style>
+
 </head>
 <body>
-<main>
-  <header>
-    <div>
-      <h1>Citrello</h1>
-      <p>References, the sweet part. Shared with Claude in every chat, live in your Word documents.</p>
-    </div>
-    <nav>
-      <button data-tab="library" class="active">Library</button>
-      <button data-tab="documents">Documents</button>
-      <button data-tab="settings">Settings</button>
-    </nav>
-  </header>
-
+<div class="app">
+<aside class="side">
+  <div class="logo">citr<span>ello</span></div>
+  <div class="tagline">References, the sweet part.</div>
+  <nav aria-label="Sections">
+    <button class="navb active" data-tab="library">Library <small id="navCount"></small></button>
+    <button class="navb" data-tab="documents">Documents</button>
+    <button class="navb" data-tab="settings">Settings</button>
+  </nav>
+  <h4>Projects</h4>
+  <div id="projNav"></div>
+  <div class="side-foot">
+    <div class="conn"><i id="connDot"></i><span id="connText">Web connectors: not signed in</span></div>
+    <div>Citrello <span id="ver"></span> · <button class="link" id="quit">Quit</button></div>
+  </div>
+</aside>
+<main class="main">
   <!-- ================= LIBRARY ================= -->
-  <section id="tab-library">
-    <div class="card">
-      <div class="row" style="margin-top:0">
-        <input type="search" id="q" class="grow" placeholder="Search author, title, year, DOI or key…">
-        <select id="projectFilter"><option value="*">All projects</option></select>
-        <button class="primary" id="openAdd">+ Add references</button>
-        <button id="openImport">Import</button>
-        <button id="openExport">Export</button>
-        <button id="verifyBtn" title="Check the references shown against Crossref">Verify online</button>
+  <section id="tab-library" class="lib">
+    <div>
+      <div class="searchbar">
+        <label class="searchbox"><input type="search" id="q" autocomplete="off" aria-label="Search or add"
+          placeholder="Search your library, or paste a DOI, a link or a reference to add it"></label>
       </div>
+      <div class="qadd hidden" id="qAdd"><span id="qAddText"></span><button class="primary" id="qAddBtn">Add to library</button></div>
+      <div id="qAddResult"></div>
+      <select id="projectFilter" class="hidden" aria-hidden="true"><option value="*">All projects</option></select>
+      <div class="page-head lib-head"><div><h1 id="libTitle">Library</h1>
+        <p>Shared with Claude and ChatGPT in every chat, and live in your Word documents.</p></div>
+        <div class="actions"><button class="primary" id="openAdd">Add several</button><button id="openImport">Import</button>
+          <button id="openExport">Export</button><button id="verifyBtn" title="Check the references shown against Crossref">Verify online</button></div></div>
 
       <div class="panel hidden" id="verifyPanel">
         <strong>Verify online</strong>
@@ -165,18 +238,12 @@
       </div>
 
       <div class="chips" id="libChips"></div>
-      <div class="row" style="margin-top:4px">
-        <label class="small"><input type="checkbox" id="libOnlyIssues"> Only references that need attention</label>
-      </div>
-      <div class="table-wrap">
-        <table>
-          <thead><tr><th>Key</th><th>Reference</th><th>Reliability</th><th class="hide-sm">Projects</th><th></th></tr></thead>
-          <tbody id="libRows"></tbody>
-        </table>
-      </div>
-      <p class="muted small" id="libEmpty" style="display:none">Your library is empty. Add references above, import your Mendeley or Zotero library, or convert a document (Documents tab).</p>
-      <p class="muted small">Click a key to copy its citation marker, e.g. <code class="key">[@Topham2017]</code>. Claude uses the same markers.</p>
+      <div class="reflist" id="libRows"></div>
+      <p class="muted small" id="libEmpty" style="display:none">Your library is empty. Paste a DOI or a link in the box above, import your Mendeley or Zotero library, or convert a document (Documents).</p>
+      <p class="muted small" id="libNoMatch" style="display:none">Nothing in your library matches. To add it, paste its DOI, a link, or the full reference.</p>
+      <label class="small muted" style="display:inline-flex;gap:6px;margin-top:12px"><input type="checkbox" id="libOnlyIssues"> Only references that need attention</label>
     </div>
+    <aside class="detail" id="detail" aria-live="polite"><div class="empty-detail"><b>Pick a reference</b>Its details, citation marker and formatted reference appear here.</div></aside>
   </section>
 
   <!-- ================= DOCUMENTS ================= -->
@@ -435,11 +502,8 @@
   </section>
 
   <datalist id="projectList"></datalist>
-  <footer>
-    <span>Citrello <span id="ver"></span> · runs on this computer only</span>
-    <button class="link" id="quit">Quit Citrello</button>
-  </footer>
 </main>
+</div>
 <div class="toast" id="toast"></div>
 
 <script>
@@ -459,8 +523,9 @@ function toast(msg) { const t = $("toast"); t.textContent = msg; t.classList.add
 function notice(el, kind, html) { $(el).innerHTML = `<div class="notice ${kind}">${html}</div>`; }
 
 // ---------- tabs ----------
-document.querySelectorAll("nav button").forEach((b) => b.onclick = () => {
-  document.querySelectorAll("nav button").forEach((x) => x.classList.toggle("active", x === b));
+document.querySelectorAll(".side button.navb").forEach((b) => b.onclick = () => {
+  document.querySelectorAll(".side button.navb").forEach((x) => x.classList.toggle("active", x === b));
+  window.scrollTo(0, 0);
   ["library", "documents", "settings"].forEach((t) => show("tab-" + t, t === b.dataset.tab));
   if (b.dataset.tab === "library") loadLibrary();
   if (b.dataset.tab === "documents") loadBibExports();
@@ -505,7 +570,7 @@ $("logout").onclick = async () => { await post("/api/logout"); loadStatus(); };
 $("zSave").onclick = async () => { await post("/api/config", {zotero_user: $("zUser").value, zotero_key: $("zKey").value}); $("zKey").value = ""; loadStatus(); $("zMsg").textContent = "Saved."; };
 $("quit").onclick = async () => {
   await post("/api/quit").catch(() => {});
-  document.body.innerHTML = '<main><h1>Citrello has closed.</h1><p class="muted">You can close this tab. The Claude connector keeps working.</p></main>';
+  document.body.innerHTML = '<main class="main" style="max-width:640px;margin:15vh auto;text-align:center"><h1>Citrello has closed.</h1><p class="muted">You can close this tab. Claude Desktop and Codex keep working; ChatGPT and Claude on the web need Citrello running.</p></main>';
 };
 
 // ---------- browser button (bookmarklet) ----------
@@ -526,7 +591,13 @@ $("bmCopy").onclick = async () => { await navigator.clipboard.writeText(BOOKMARK
 const STATE_TEXT = {online: ["ok", "Connected: ChatGPT and Claude on the web can reach your library while Citrello is running."],
   connecting: ["warn", "Connecting to the Citrello bridge…"], offline: ["warn", "Not connected to the Citrello bridge. Retrying…"]};
 let acctTimer = null;
+function renderSideConn(a) {
+  const on = a.signed_in && a.state === "online";
+  $("connDot").classList.toggle("on", on);
+  $("connText").textContent = !a.signed_in ? "Web connectors: not signed in" : on ? "ChatGPT and web: connected" : "ChatGPT and web: connecting…";
+}
 function renderAccount(a) {
+  renderSideConn(a);
   show("acctOut", !a.signed_in); show("acctIn", a.signed_in);
   $("connUrl").textContent = a.connector_url || "https://mcp.citrello.app/mcp";
   if (!a.signed_in) { if (a.error) notice("acctMsg", "warn", esc(a.error)); return; }
@@ -656,6 +727,7 @@ $("claudeAuto").onclick = async () => {
 $("claudeShowFile").onclick = () => post("/api/claude/show-extension").catch(() => {});
 
 // ---------- library ----------
+let selKey = null;
 async function loadLibrary() {
   const q = encodeURIComponent($("q").value), p = encodeURIComponent($("projectFilter").value);
   lib = await api(`/api/library?q=${q}&project=${p}`);
@@ -665,6 +737,9 @@ async function loadLibrary() {
     `<option value="-" ${sel === "-" ? "selected" : ""}>No project</option>`;
   $("projectList").innerHTML = lib.projects.map((x) => `<option value="${esc(x)}">`).join("");
   $("libPath").textContent = lib.path;
+  $("navCount").textContent = lib.total || "";
+  renderProjects();
+  $("libTitle").textContent = sel === "*" ? "Library" : sel === "-" ? "References without a project" : sel;
   const count = (k) => lib.items.filter((i) => i.reliability === k).length;
   $("libChips").innerHTML = `<span class="chip">${lib.items.length}${lib.items.length !== lib.total ? " of " + lib.total : ""} references</span>` +
     (count("verified") ? `<span class="chip ok">${count("verified")} verified</span>` : "") +
@@ -674,25 +749,122 @@ async function loadLibrary() {
   const only = $("libOnlyIssues").checked;
   const items = lib.items.filter((i) => !only || ["check", "problem"].includes(i.reliability));
   $("libEmpty").style.display = lib.total ? "none" : "block";
-  $("libRows").innerHTML = items.map((i) => `<tr class="${i.reliability || ""}">
-      <td><code class="key" data-key="${esc(i.key)}" title="Copy [@${esc(i.key)}]">${esc(i.key)}</code></td>
-      <td><div class="t">${esc(i.title)}</div><div class="meta">${esc(i.authors)}${i.year ? " · " + esc(i.year) : ""}${i.container ? " · " + esc(i.container) : ""}${i.doi ? " · " + esc(i.doi) : ""}</div>${issuesList(i.checks)}</td>
-      <td>${relTag(i.reliability)}</td>
-      <td class="hide-sm">${i.projects.map((p) => `<span class="tag">${esc(p)}</span>`).join("")}
-        <button class="icon" data-proj="${esc(i.key)}" title="Change projects">✎</button></td>
-      <td><button class="icon" data-del="${esc(i.key)}" title="Delete">✕</button></td></tr>`).join("");
+  $("libNoMatch").style.display = lib.total && !items.length ? "block" : "none";
+  show("libRows", items.length > 0);
+  $("libRows").innerHTML = items.map((i) => {
+    const issue = (i.checks || []).find((c) => c.level === "problem") || (i.checks || [])[0];
+    return `<div class="ref ${i.reliability || ""} ${i.key === selKey ? "sel" : ""}" data-sel="${esc(i.key)}" tabindex="0" role="button" aria-label="${esc(i.title)}">
+      <div class="rb" title="${esc(REL_TEXT[i.reliability] || "")}"></div>
+      <div style="min-width:0"><div class="t">${esc(i.title)}</div>
+        <div class="m">${[i.authors, i.year, i.container].filter(Boolean).map(esc).join(" · ")}${issue ? ` · <span class="${issue.level}">${esc(issue.text)}</span>` : ""}</div></div>
+      <code class="key" data-key="${esc(i.key)}" title="Copy [@${esc(i.key)}]">${esc(i.key)}</code></div>`;
+  }).join("");
+  if (!items.some((i) => i.key === selKey)) selKey = items.length ? items[0].key : null;
+  $("libRows").querySelectorAll(".ref").forEach((r) => r.classList.toggle("sel", r.dataset.sel === selKey));
+  renderDetail();
   setExportLinks();
 }
-let qTimer; $("q").oninput = () => { clearTimeout(qTimer); qTimer = setTimeout(loadLibrary, 200); };
-$("projectFilter").onchange = loadLibrary; $("libOnlyIssues").onchange = loadLibrary;
-$("libRows").onclick = async (ev) => {
+const REL_TEXT = {verified: "Verified: matches the publisher's record", check: "Check: some details need a look",
+                  problem: "Problem: retracted, or a wrong DOI", complete: "Complete: details look complete, not checked online"};
+
+function renderProjects() {
+  const cur = $("projectFilter").value;
+  const btn = (val, label, dot) => `<button class="proj ${cur === val ? "active" : ""}" data-proj-nav="${esc(val)}">
+    <span>${dot ? '<span class="dot"></span>' : ""}${esc(label)}</span></button>`;
+  $("projNav").innerHTML = btn("*", "All references", false) + lib.projects.map((x) => btn(x, x, true)).join("") +
+    (lib.projects.length ? btn("-", "No project", false) : `<p class="small" style="color:var(--side-muted);padding:0 12px;margin:4px 0">Add a project name when you add references to group them.</p>`);
+}
+$("projNav").onclick = (ev) => {
+  const b = ev.target.closest("[data-proj-nav]"); if (!b) return;
+  $("projectFilter").value = b.dataset.projNav;
+  document.querySelector('.side button.navb[data-tab="library"]').click();
+};
+
+async function renderDetail() {
+  const box = $("detail");
+  if (!selKey) { box.innerHTML = `<div class="empty-detail"><b>Pick a reference</b>Its details, citation marker and formatted reference appear here.</div>`; return; }
+  const key = selKey;
+  let it;
+  try { it = await api(`/api/library/item?key=${encodeURIComponent(key)}`); } catch (e) { box.innerHTML = `<div class="notice err">${esc(e.message)}</div>`; return; }
+  if (key !== selKey) return;  // another reference was picked meanwhile
+  const pills = {verified: '<span class="chip ok">Verified on Crossref</span>', complete: '<span class="chip">Complete, not checked online</span>',
+                 check: '<span class="chip warn">Check</span>', problem: '<span class="chip bad">Problem</span>'};
+  const where = [it.container, it.volume && (it.volume + (it.issue ? `(${it.issue})` : "")), it.page].filter(Boolean).join(", ");
+  const f = it.formatted || {};
+  box.innerHTML = `${pills[it.reliability] || ""}
+    <h2>${esc(it.title)}</h2>
+    <div class="m">${esc(it.names.join(", ") || it.authors)}${it.year ? " · " + esc(it.year) : ""}${where ? "<br>" + esc(where) : ""}
+      ${it.doi ? `<br><a href="https://doi.org/${encodeURIComponent(it.doi).replace(/%2F/g, "/")}" target="_blank" rel="noopener">${esc(it.doi)}</a>` : it.url ? `<br><a href="${esc(it.url)}" target="_blank" rel="noopener">${esc(it.url)}</a>` : ""}</div>
+    ${it.checks && it.checks.length ? `<h4>Reliability</h4>${issuesList(it.checks)}` : it.reliability === "verified" ? `<h4>Reliability</h4><ul class="issues"><li class="ok">Matches the publisher's record. Not retracted.</li></ul>` : ""}
+    <h4>Cite it</h4>
+    <div class="copyline">[@${esc(it.key)}]<button data-copy="[@${esc(it.key)}]">Copy</button></div>
+    <div class="copyline">\\cite{${esc(it.key)}}<button data-copy="\\cite{${esc(it.key)}}">Copy</button></div>
+    ${f.reference ? `<h4>In ${esc(f.style)}</h4><div class="formatted">${esc(f.reference)}</div><p class="small muted" style="margin:6px 0 0">In the text: ${esc(f.citation)}</p>` : ""}
+    <h4>Projects</h4>
+    <div>${it.projects.length ? it.projects.map((p) => `<span class="tag">${esc(p)}</span>`).join("") : '<span class="small muted">None</span>'}</div>
+    <div class="row" style="margin-top:18px"><button data-proj="${esc(it.key)}">Change projects</button><button class="danger" data-del="${esc(it.key)}">Delete</button></div>`;
+}
+$("detail").onclick = async (ev) => {
   const t = ev.target;
-  if (t.dataset.key) { await navigator.clipboard.writeText(`[@${t.dataset.key}]`).catch(() => {}); toast(`Copied [@${t.dataset.key}]`); }
-  if (t.dataset.del && confirm(`Delete ${t.dataset.del} from your library?`)) { await post("/api/library/delete", {keys: [t.dataset.del]}); loadLibrary(); }
+  if (t.dataset.copy) { await navigator.clipboard.writeText(t.dataset.copy).catch(() => {}); toast("Copied " + t.dataset.copy); }
+  if (t.dataset.del && confirm(`Delete ${t.dataset.del} from your library?`)) { await post("/api/library/delete", {keys: [t.dataset.del]}); selKey = null; loadLibrary(); }
   if (t.dataset.proj) {
     const it = lib.items.find((i) => i.key === t.dataset.proj);
     const v = prompt("Projects for " + it.key + " (comma-separated):", it.projects.join(", "));
     if (v !== null) { await post("/api/library/projects", {key: it.key, projects: v.split(",").map((s) => s.trim()).filter(Boolean)}); loadLibrary(); }
+  }
+};
+
+// The search box also adds: a DOI, a link or a typed reference.
+const looksAddable = (v) => /10\.\d{4,9}\/\S+/.test(v) || /^https?:\/\/\S+$/i.test(v) || (v.length > 60 && /\b(1[89]|20)\d{2}\b/.test(v));
+function updateQAdd() {
+  const v = $("q").value.trim(), on = looksAddable(v);
+  show("qAdd", on);
+  if (on) {
+    const kind = /10\.\d{4,9}\//.test(v) && v.length < 120 ? "this DOI" : /^https?:/i.test(v) ? "this link" : "this reference";
+    const proj = !["*", "-"].includes($("projectFilter").value) ? ` to ${esc($("projectFilter").value)}` : "";
+    $("qAddText").innerHTML = `Press <b>Enter</b> to look up ${kind} and add it${proj}.`;
+  }
+}
+async function addFromSearch() {
+  const text = $("q").value.trim(); if (!looksAddable(text)) return;
+  $("qAddBtn").disabled = true; $("qAddText").textContent = "Looking it up…";
+  const p = $("projectFilter").value;
+  try {
+    const r = await post("/api/library/add", {text, project: ["*", "-"].includes(p) ? "" : p});
+    const x = r.results[0];
+    if (!x.ok) throw new Error(x.error);
+    $("q").value = ""; show("qAdd", false);
+    selKey = x.item.key;
+    $("qAddResult").innerHTML = `<div class="notice ${x.item.reliability === "problem" ? "err" : x.item.reliability === "check" ? "warn" : "ok"}">
+      ${x.created ? "Added" : "Already in your library"}: <code class="key" data-key="${esc(x.item.key)}">${esc(x.item.key)}</code> ${esc(x.item.title)}${issuesList(x.item.checks)}</div>`;
+    setTimeout(() => { $("qAddResult").innerHTML = ""; }, 8000);
+    await loadLibrary();
+  } catch (e) { $("qAddResult").innerHTML = `<div class="notice err">${esc(e.message)}</div>`; updateQAdd(); }
+  $("qAddBtn").disabled = false;
+}
+let qTimer; $("q").oninput = () => { updateQAdd(); clearTimeout(qTimer); qTimer = setTimeout(loadLibrary, 200); };
+$("q").onkeydown = (e) => { if (e.key === "Enter" && looksAddable($("q").value.trim())) { e.preventDefault(); addFromSearch(); } };
+$("qAddBtn").onclick = addFromSearch;
+$("qAddResult").onclick = async (ev) => { const k = ev.target.dataset.key; if (k) { await navigator.clipboard.writeText(`[@${k}]`).catch(() => {}); toast(`Copied [@${k}]`); } };
+$("projectFilter").onchange = loadLibrary; $("libOnlyIssues").onchange = loadLibrary;
+function pick(key) {
+  selKey = key;
+  $("libRows").querySelectorAll(".ref").forEach((r) => r.classList.toggle("sel", r.dataset.sel === key));
+  renderDetail();
+}
+$("libRows").onclick = async (ev) => {
+  const t = ev.target;
+  if (t.dataset.key) { await navigator.clipboard.writeText(`[@${t.dataset.key}]`).catch(() => {}); toast(`Copied [@${t.dataset.key}]`); }
+  const row = t.closest(".ref"); if (row) pick(row.dataset.sel);
+};
+$("libRows").onkeydown = (ev) => {
+  const row = ev.target.closest(".ref"); if (!row) return;
+  if (ev.key === "Enter" || ev.key === " ") { ev.preventDefault(); pick(row.dataset.sel); }
+  if (ev.key === "ArrowDown" || ev.key === "ArrowUp") {
+    ev.preventDefault();
+    const next = ev.key === "ArrowDown" ? row.nextElementSibling : row.previousElementSibling;
+    if (next) { next.focus(); pick(next.dataset.sel); }
   }
 };
 const togglePanel = (id) => ["addPanel", "importPanel", "exportPanel", "verifyPanel"].forEach((p) => show(p, p === id && $(p).classList.contains("hidden")));
@@ -974,9 +1146,10 @@ $("again").onclick = () => $("file").click();
 // ---------- start ----------
 const params = new URLSearchParams(location.search);
 if (params.get("login_error")) { $("loginErr").textContent = "Mendeley login failed: " + params.get("login_error"); show("loginErr"); }
-if (params.get("connected") || params.get("login_error")) document.querySelector('nav button[data-tab="settings"]').click();
+if (params.get("connected") || params.get("login_error")) document.querySelector('.side button.navb[data-tab="settings"]').click();
 if (params.toString()) history.replaceState(null, "", "/");
 loadStatus(); loadStyles(); loadLibrary();
+api("/api/account").then(renderSideConn).catch(() => {});
 </script>
 </body>
 </html>
