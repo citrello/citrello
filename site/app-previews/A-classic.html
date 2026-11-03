@@ -1,0 +1,33 @@
+<!doctype html><html><head><meta charset="utf-8"><title>App A · Amalfi classic</title><link rel="stylesheet" href="common.css"><style>
+body{background:var(--white)}
+.tiles{height:28px;background:url(../public/tile.svg) repeat-x left center/28px 28px var(--cobalt)}
+header{display:flex;align-items:center;justify-content:space-between;max-width:1160px;margin:0 auto;padding:18px 28px}
+.logo{font:28px Gloock,serif;color:var(--cobalt)}.logo span{color:var(--leaf)}
+.tabs{display:flex;background:var(--sky);border-radius:999px;padding:4px}
+.tabs b{padding:8px 20px;border-radius:999px;font-weight:600;color:var(--cobalt)}.tabs b.on{background:var(--cobalt);color:#fff}
+main{max-width:1160px;margin:0 auto;padding:8px 28px 40px}
+h1{font:400 38px Gloock,serif;color:var(--cobalt);margin:8px 0 4px}.sub{color:var(--muted);margin:0 0 22px}
+.tools{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:14px}
+.tools input{flex:1;min-width:260px;padding:12px 16px;border:2px solid var(--line);border-radius:999px}
+.tools select{padding:10px 14px;border:2px solid var(--line);border-radius:999px;background:#fff}
+.btn{padding:11px 20px;border-radius:999px;border:2px solid var(--cobalt);background:#fff;color:var(--cobalt);font-weight:700}
+.btn.primary{background:var(--cobalt);color:#fff}
+.chips{display:flex;gap:8px;margin:0 0 18px}
+.list{border:2px solid var(--cobalt);border-radius:22px;box-shadow:8px 8px 0 var(--lemon);overflow:hidden;background:#fff}
+.row{display:grid;grid-template-columns:130px 1fr 110px 90px;gap:16px;padding:14px 20px;border-bottom:1px solid var(--line);align-items:start}
+.row:last-child{border:0}.row.problem{box-shadow:inset 4px 0 var(--bad)}.row.check{box-shadow:inset 4px 0 var(--lemon)}
+.row .t{font-weight:600}.row .m{color:var(--muted);font-size:13.5px}
+.proj{font-size:13px;color:var(--cobalt);font-weight:600}
+.hint{color:var(--muted);font-size:13px;margin-top:22px}
+</style></head><body><div class="tiles"></div>
+<header><div class="logo">citr<span>ello</span></div><nav class="tabs"><b class="on">Library</b><b>Documents</b><b>Settings</b></nav></header>
+<main><h1>Your library</h1><p class="sub">Shared with Claude and ChatGPT in every chat, and live in your Word documents.</p>
+<div class="tools"><input placeholder="Search author, title, year, DOI or key…"><select><option>All projects</option></select>
+<button class="btn primary">Add references</button><button class="btn">Import</button><button class="btn">Export</button><button class="btn">Verify online</button></div>
+<div class="chips"><span class="pill complete">7 references</span><span class="pill verified">3 verified</span><span class="pill check">1 to check</span><span class="pill problem">2 problems</span></div>
+<div class="list" id="list"></div><p class="hint">Click a key to copy its citation marker, like [@Topham2017].</p></main>
+<script src="data.js"></script><script>
+document.getElementById("list").innerHTML=REFS.map(r=>`<div class="row ${r.rel}"><div><span class="key">${r.key}</span></div>
+<div><div class="t">${r.title}</div><div class="m">${r.meta}${r.doi?" · "+r.doi:""}</div>${r.issue?`<div class="issue ${r.rel}">${r.issue}</div>`:""}</div>
+<div><span class="pill ${r.rel}">${REL[r.rel]}</span></div><div class="proj">Thesis</div></div>`).join("");
+</script></body></html>

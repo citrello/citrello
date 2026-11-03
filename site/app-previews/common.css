@@ -1,0 +1,10 @@
+@import url("https://fonts.googleapis.com/css2?family=Gloock&family=Figtree:wght@400;500;600;700&display=swap");
+:root{--cobalt:#1d3f8f;--cobalt-2:#16306e;--lemon:#f6d646;--lemon-soft:#fbeeb0;--leaf:#3e7b4f;--ink:#14213d;--sky:#eaf0fb;
+--muted:#4a5774;--line:#d5def0;--bad:#b3261e;--bad-soft:#fde3e1;--warn:#8a5a00;--warn-soft:#fff1c7;--ok-soft:#e1f0e5;--white:#fff}
+*{box-sizing:border-box}body{margin:0;font:15px/1.5 Figtree,sans-serif;color:var(--ink)}
+.pill{display:inline-block;font-size:12.5px;font-weight:700;padding:2px 10px;border-radius:999px;white-space:nowrap}
+.pill.verified{background:var(--ok-soft);color:var(--leaf)}.pill.check{background:var(--warn-soft);color:var(--warn)}
+.pill.problem{background:var(--bad-soft);color:var(--bad)}.pill.complete{background:var(--sky);color:var(--cobalt)}
+.key{font:600 13px Figtree,sans-serif;color:var(--cobalt);background:var(--sky);padding:2px 8px;border-radius:6px}
+.issue{font-size:13px;margin-top:3px}.issue.problem{color:var(--bad)}.issue.check{color:var(--warn)}
+input,select{font:inherit;color:inherit}

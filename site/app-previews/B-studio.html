@@ -1,0 +1,48 @@
+<!doctype html><html><head><meta charset="utf-8"><title>App B · Studio</title><link rel="stylesheet" href="common.css"><style>
+body{background:#f6f8fd;display:grid;grid-template-columns:232px 1fr 360px;min-height:100vh}
+aside.nav{background:var(--cobalt);color:#fff;padding:22px 16px;display:flex;flex-direction:column;gap:4px}
+.logo{font:28px Gloock,serif;color:#fff;padding:0 10px 18px}.logo span{color:var(--lemon)}
+.nav a{display:flex;justify-content:space-between;padding:9px 12px;border-radius:10px;color:#dfe6f7;font-weight:500}
+.nav a.on{background:rgba(255,255,255,.14);color:#fff;font-weight:700}.nav a small{color:#b9c6e8}
+.nav h4{font:600 12.5px Figtree,sans-serif;color:#b9c6e8;margin:20px 12px 6px}
+.nav .dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--lemon);margin-right:8px}
+.nav .foot{margin-top:auto;font-size:13px;color:#b9c6e8;padding:12px;border-top:1px solid rgba(255,255,255,.15)}
+.nav .foot b{color:#fff;font-weight:600}.nav .foot i{font-style:normal;color:#8fd19e}
+main{padding:22px 28px;min-width:0}
+.top{display:flex;gap:10px;align-items:center;margin-bottom:14px}
+.top input{flex:1;padding:11px 14px;border:1px solid var(--line);border-radius:10px;background:#fff}
+.btn{padding:10px 16px;border-radius:10px;border:1px solid var(--line);background:#fff;font-weight:600;color:var(--ink)}
+.btn.primary{background:var(--cobalt);border-color:var(--cobalt);color:#fff}
+h1{font:400 30px Gloock,serif;color:var(--cobalt);margin:4px 0 2px}.sub{color:var(--muted);margin:0 0 14px;font-size:14px}
+.filters{display:flex;gap:8px;margin-bottom:12px}.filters span{cursor:pointer}
+.list{background:#fff;border:1px solid var(--line);border-radius:14px}
+.row{display:grid;grid-template-columns:12px 1fr auto;gap:14px;padding:12px 16px;border-bottom:1px solid var(--line);align-items:center}
+.row:last-child{border:0}.row.sel{background:var(--lemon-soft)}
+.bar{width:4px;height:34px;border-radius:2px;background:var(--leaf)}.problem .bar{background:var(--bad)}.check .bar{background:var(--lemon)}.complete .bar{background:var(--line)}
+.row .t{font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.row .m{color:var(--muted);font-size:13px}
+aside.detail{background:#fff;border-left:1px solid var(--line);padding:26px 24px}
+aside.detail h2{font:400 24px/1.2 Gloock,serif;color:var(--cobalt);margin:10px 0 6px}
+.detail .m{color:var(--muted);font-size:14px}.detail h4{font:700 12.5px Figtree,sans-serif;color:var(--muted);margin:22px 0 6px}
+.cite{background:var(--sky);border-radius:10px;padding:12px 14px;font:14px/1.5 Georgia,serif}
+.marker{display:flex;justify-content:space-between;align-items:center;border:1px dashed var(--cobalt);border-radius:10px;padding:10px 12px;font-weight:700;color:var(--cobalt)}
+.marker button{font:600 13px Figtree,sans-serif;background:var(--cobalt);color:#fff;border:0;border-radius:8px;padding:6px 10px}
+.ok{background:var(--ok-soft);color:var(--leaf);border-radius:10px;padding:10px 12px;font-size:14px}
+</style></head><body>
+<aside class="nav"><div class="logo">citr<span>ello</span></div>
+<a class="on">Library <small>7</small></a><a>Documents</a><a>Settings</a>
+<h4>Projects</h4><a><span><span class="dot"></span>Thesis</span><small>7</small></a><a><span><span class="dot" style="background:#8fd19e"></span>Decommissioning review</span><small>0</small></a><a><small>+ New project</small></a>
+<div class="foot"><b>Claude, ChatGPT</b><br><i>● Connected</i></div></aside>
+<main><div class="top"><input placeholder="Search author, title, year, DOI or key…"><button class="btn primary">Add references</button><button class="btn">Import</button><button class="btn">Export</button></div>
+<h1>Library</h1><p class="sub">Shared with Claude and ChatGPT in every chat, and live in your Word documents.</p>
+<div class="filters"><span class="pill complete">All 7</span><span class="pill verified">3 verified</span><span class="pill check">1 to check</span><span class="pill problem">2 problems</span></div>
+<div class="list" id="list"></div></main>
+<aside class="detail"><span class="pill verified">Verified on Crossref</span><h2>Sustainable decommissioning of an offshore wind farm</h2>
+<div class="m">Eva Topham, David McMillan · 2017<br>Renewable Energy 102, 470–480</div>
+<h4>Cite it</h4><div class="marker">[@Topham2017]<button>Copy</button></div>
+<h4>In APA</h4><div class="cite">Topham, E., &amp; McMillan, D. (2017). Sustainable decommissioning of an offshore wind farm. <i>Renewable Energy, 102</i>, 470–480.</div>
+<h4>Reliability</h4><div class="ok">Matches the publisher's record. Not retracted.</div></aside>
+<script src="data.js"></script><script>
+document.getElementById("list").innerHTML=REFS.map((r,i)=>`<div class="row ${r.rel} ${i===0?"sel":""}"><div class="bar"></div>
+<div style="min-width:0"><div class="t">${r.title}</div><div class="m">${r.meta}${r.issue?` · <span class="issue ${r.rel}" style="font-size:13px">${r.issue}</span>`:""}</div></div>
+<div><span class="key">${r.key}</span></div></div>`).join("");
+</script></body></html>
