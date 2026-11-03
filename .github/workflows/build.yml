@@ -45,6 +45,32 @@ jobs:
           MSIX_PUBLISHER: ${{ vars.MSIX_PUBLISHER }}
           MSIX_PUBLISHER_NAME: ${{ vars.MSIX_PUBLISHER_NAME }}
         run: python packaging\make_msix.py dist
+      - name: Install-test the Store package (test-signed) and call the connector through its alias
+        shell: pwsh
+        env:
+          MSIX_PUBLISHER: ${{ vars.MSIX_PUBLISHER }}
+        run: |
+          $subject = if ($env:MSIX_PUBLISHER) { $env:MSIX_PUBLISHER } else { "CN=Citrello" }
+          $cert = New-SelfSignedCertificate -Type Custom -Subject $subject -KeyUsage DigitalSignature -FriendlyName "Citrello CI test" `
+            -CertStoreLocation "Cert:\CurrentUser\My" -TextExtension @("2.5.29.37={text}1.3.6.1.5.5.7.3.3", "2.5.29.19={text}")
+          $pw = ConvertTo-SecureString -String "ci-test" -Force -AsPlainText
+          Export-PfxCertificate -Cert $cert -FilePath test.pfx -Password $pw | Out-Null
+          Export-Certificate -Cert $cert -FilePath test.cer | Out-Null
+          Import-Certificate -FilePath test.cer -CertStoreLocation Cert:\LocalMachine\TrustedPeople | Out-Null
+          $signtool = (Get-ChildItem "C:\Program Files (x86)\Windows Kits\10\bin\10.*\x64\signtool.exe" | Select-Object -Last 1).FullName
+          Copy-Item (Get-ChildItem dist\Citrello-*.msix).FullName test.msix
+          & $signtool sign /fd SHA256 /f test.pfx /p ci-test test.msix
+          if ($LASTEXITCODE) { throw "signing failed" }
+          Add-AppxPackage -Path test.msix
+          Get-AppxPackage *Citrello* | Format-List Name, Version, InstallLocation
+          $alias = Join-Path $env:LOCALAPPDATA "Microsoft\WindowsApps\citrello-mcp.exe"
+          if (-not (Test-Path $alias)) { throw "alias citrello-mcp.exe was not created" }
+          $init = '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-06-18","capabilities":{},"clientInfo":{"name":"ci","version":"1"}}}'
+          $list = '{"jsonrpc":"2.0","id":2,"method":"tools/list"}'
+          $out = ($init, $list) | & $alias
+          $out
+          if (-not ($out -match '"citrello"') -or -not ($out -match 'search_references')) { throw "the packaged connector did not answer" }
+          Remove-AppxPackage (Get-AppxPackage *Citrello*).PackageFullName
       - uses: actions/upload-artifact@v4
         with:
           name: Citrello-windows

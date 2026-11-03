@@ -66,15 +66,22 @@ MANIFEST = """<?xml version="1.0" encoding="utf-8"?>
           Square310x310Logo="Assets\\Square310x310Logo.png" ShortName="Citrello" />
       </uap:VisualElements>
       <Extensions>
-        <!-- citrello-mcp.exe: how Claude Desktop, Claude Code and Codex start the connector of the Store version -->
-        <uap3:Extension Category="windows.appExecutionAlias" Executable="CitrelloMCP.exe" EntryPoint="Windows.FullTrustApplication">
-          <uap3:AppExecutionAlias>
-            <desktop:ExecutionAlias Alias="citrello-mcp.exe" />
-          </uap3:AppExecutionAlias>
-        </uap3:Extension>
         <uap3:Extension Category="windows.appExecutionAlias" Executable="Citrello.exe" EntryPoint="Windows.FullTrustApplication">
           <uap3:AppExecutionAlias>
             <desktop:ExecutionAlias Alias="citrello.exe" />
+          </uap3:AppExecutionAlias>
+        </uap3:Extension>
+      </Extensions>
+    </Application>
+    <!-- The connector: no Start menu entry, reached as citrello-mcp.exe by Claude Desktop, Claude Code and Codex -->
+    <Application Id="CitrelloMCP" Executable="CitrelloMCP.exe" EntryPoint="Windows.FullTrustApplication">
+      <uap:VisualElements DisplayName="Citrello connector" Description="Connects Claude and Codex to your Citrello library."
+        BackgroundColor="transparent" AppListEntry="none"
+        Square150x150Logo="Assets\\Square150x150Logo.png" Square44x44Logo="Assets\\Square44x44Logo.png" />
+      <Extensions>
+        <uap3:Extension Category="windows.appExecutionAlias" Executable="CitrelloMCP.exe" EntryPoint="Windows.FullTrustApplication">
+          <uap3:AppExecutionAlias>
+            <desktop:ExecutionAlias Alias="citrello-mcp.exe" />
           </uap3:AppExecutionAlias>
         </uap3:Extension>
       </Extensions>
