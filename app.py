@@ -368,18 +368,78 @@ def remove_manual_connector():
     return removed
 
 
+def _ps(script, timeout=60):
+    """Run a short PowerShell script; returns stdout ("" on failure)."""
+    try:
+        return subprocess.run(["powershell", "-NoProfile", "-NonInteractive", "-Command", script],
+                              capture_output=True, text=True, timeout=timeout,
+                              creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0)).stdout.strip()
+    except Exception:
+        return ""
+
+
+def mcpb_associated():
+    """Does Windows know that .mcpb files open with Claude Desktop?"""
+    if not sys.platform.startswith("win"):
+        return sys.platform == "darwin"
+    try:
+        out = subprocess.run(["cmd", "/c", "assoc", ".mcpb"], capture_output=True, text=True, timeout=10,
+                             creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0)).stdout
+        return "=" in out
+    except Exception:
+        return False
+
+
+def show_in_explorer(path):
+    if sys.platform.startswith("win"):
+        subprocess.Popen(["explorer", "/select,", path])
+    elif sys.platform == "darwin":
+        subprocess.Popen(["open", "-R", path])
+
+
 def install_extension():
+    """Open Citrello.mcpb with Claude Desktop - only if Windows knows that file type; otherwise the
+    caller offers the automatic connection or the manual extension steps (no confusing 'Open with')."""
     path = extension_path()
     if not path:
-        raise ValueError("Citrello.mcpb was not found next to Citrello.exe. Run build_windows.bat again; it creates it in dist.")
-    removed = remove_manual_connector()
+        raise ValueError("Citrello.mcpb was not found next to Citrello.exe. Keep the files from the download together.")
+    if not mcpb_associated():
+        return {"manual": True, "path": path}
     if sys.platform.startswith("win"):
-        os.startfile(path)  # Claude Desktop opens its install window
-    elif sys.platform == "darwin":
-        subprocess.run(["open", path], check=False)
+        os.startfile(path)  # Claude Desktop shows its install window
     else:
-        raise ValueError("Opening the extension automatically works on Windows and macOS. Open Citrello.mcpb with Claude Desktop.")
-    return {"opened": path, "removed_manual": removed}
+        subprocess.run(["open", path], check=False)
+    return {"opened": path}
+
+
+def connect_automatically():
+    """No settings to edit by hand: close Claude Desktop, add Citrello to its settings, start it again.
+    (Claude rewrites its settings file while it runs, so editing it with Claude open does not stick.)"""
+    if not sys.platform.startswith("win"):
+        return dict(claude_connect(), restarted=False)
+    exe = _ps("(Get-Process claude -ErrorAction SilentlyContinue | Select-Object -First 1).Path") if claude_running() else ""
+    if claude_running():
+        subprocess.run(["taskkill", "/IM", "claude.exe", "/F"], capture_output=True, timeout=30,
+                       creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
+        for _ in range(20):
+            if not claude_running():
+                break
+            time.sleep(0.5)
+        time.sleep(1.5)  # let it finish writing its files
+    status = claude_connect()
+    restarted = False
+    if exe and "\\windowsapps\\" not in exe.lower():
+        try:
+            subprocess.Popen([exe])
+            restarted = True
+        except OSError:
+            pass
+    if not restarted:  # Microsoft Store / MSIX install: start it through its app id
+        restarted = bool(_ps(
+            "$p = Get-AppxPackage -Name '*Claude*' | Select-Object -First 1; "
+            "if ($p) { $id = (Get-AppxPackageManifest $p).Package.Applications.Application.Id | Select-Object -First 1; "
+            "Start-Process ('shell:AppsFolder\\' + $p.PackageFamilyName + '!' + $id); 'ok' }"))
+    return dict(status, restarted=restarted)
 
 
 def claude_status():
@@ -391,8 +451,11 @@ def claude_status():
         found.append({"path": p, "folder_exists": os.path.isdir(os.path.dirname(p)),
                       "connected": bool(entry), "up_to_date": entry == cmd})
     used = [f for f in found if f["folder_exists"]] or found[:1]
+    ext = extension_installed()
+    if ext and any(f["connected"] for f in found) and not claude_running():
+        remove_manual_connector()  # the extension replaces the hand-made entry; never both
     return {"config_path": claude_config_path(), "config_paths": found,
-            "extension_file": extension_path(), "extension_installed": extension_installed(),
+            "extension_file": extension_path(), "extension_installed": ext,
             "claude_running": claude_running(),
             "claude_installed": any(f["folder_exists"] for f in found),
             "connected": all(f["connected"] for f in used), "up_to_date": all(f["up_to_date"] for f in used),
@@ -721,6 +784,13 @@ class Handler(BaseHTTPRequestHandler):
                 return self.send(200, word_addin.remove())
             if path == "/api/claude/install-extension":
                 return self.send(200, install_extension())
+            if path == "/api/claude/connect-auto":
+                return self.send(200, connect_automatically())
+            if path == "/api/claude/show-extension":
+                p = extension_path()
+                if p:
+                    show_in_explorer(p)
+                return self.send(200, {"path": p})
             if path == "/api/claude/connect":
                 return self.send(200, claude_connect())
         except Exception as e:

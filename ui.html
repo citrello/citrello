@@ -247,8 +247,25 @@
       <p class="muted">Connect Citrello to the Claude desktop app. Claude can then search and add to your library in every chat, cite with <code class="key">[@Key]</code> markers, and write Word documents with live citations.</p>
       <div id="claudeStatus"></div>
       <div class="row">
-        <button class="primary" id="claudeInstall">Install in Claude Desktop</button>
-        <span class="muted small">Claude Desktop opens its own install window: click <strong>Install</strong>.</span>
+        <button class="primary" id="claudeInstall">Connect to Claude Desktop</button>
+      </div>
+      <div class="panel hidden" id="claudeChoice">
+        <strong>Windows doesn't know that .mcpb files belong to Claude, so here are two ways:</strong>
+        <div class="grid2" style="margin-top:8px">
+          <div>
+            <h3>Connect automatically (easiest)</h3>
+            <p class="small muted" style="margin:0">Citrello closes Claude Desktop, adds itself to Claude's settings and starts Claude again. Nothing to do by hand.</p>
+            <div class="row"><button class="primary" id="claudeAuto">Connect automatically</button></div>
+          </div>
+          <div>
+            <h3>Or install the extension yourself</h3>
+            <ol class="small" style="margin:4px 0 0; padding-left:18px">
+              <li>Open Claude Desktop → <strong>Settings → Extensions</strong>.</li>
+              <li><button class="link" id="claudeShowFile">Show Citrello.mcpb in File Explorer</button></li>
+              <li>Drag the file onto Claude's Extensions page (or use <strong>Advanced settings → Install Extension…</strong>) and click <strong>Install</strong>.</li>
+            </ol>
+          </div>
+        </div>
       </div>
       <p class="muted small">Used <strong>Refcite</strong> (Citrello's earlier name) before? Your library and settings were copied over automatically. In Claude Desktop, remove the old <strong>Refcite</strong> extension under <strong>Settings → Extensions</strong>, so Claude doesn't see two libraries.</p>
             <details><summary>Other ways to connect (advanced)</summary>
@@ -470,11 +487,25 @@ async function loadClaude() {
 $("claudeInstall").onclick = async () => {
   try {
     const r = await post("/api/claude/install-extension");
-    $("claudeStatus").innerHTML = `<div class="notice ok">Claude Desktop should now show <strong>Install Citrello</strong>: click <strong>Install</strong>.` +
-      (r.removed_manual ? " (The old manual connection was removed so Citrello isn't connected twice.)" : "") +
-      ` If nothing appears, open Claude Desktop and try again, or drag the file onto <strong>Settings → Extensions</strong>.</div>`;
+    if (r.manual) { show("claudeChoice"); return; }
+    $("claudeStatus").innerHTML = `<div class="notice ok">Claude Desktop should now show <strong>Install Citrello</strong>: click <strong>Install</strong>. If it doesn't, use the options below.</div>`;
+    show("claudeChoice");
   } catch (e) { $("claudeStatus").innerHTML = `<div class="notice err">${esc(e.message)}</div>`; }
 };
+$("claudeAuto").onclick = async () => {
+  if (!confirm("Citrello will close Claude Desktop for a few seconds and start it again. Your chats are kept. Continue?")) return;
+  $("claudeAuto").disabled = true;
+  $("claudeStatus").innerHTML = `<div class="notice warn">Connecting… Claude Desktop is being restarted.</div>`;
+  try {
+    const r = await post("/api/claude/connect-auto");
+    $("claudeStatus").innerHTML = r.connected
+      ? `<div class="notice ok">Connected. ${r.restarted ? "Claude Desktop has been restarted" : "Start Claude Desktop again"}; Citrello's tools are now in every chat. Try asking: “What's in my Citrello library?”</div>`
+      : `<div class="notice err">Couldn't write Claude's settings. Use “install the extension yourself” instead.</div>`;
+    show("claudeChoice", !r.connected);
+  } catch (e) { $("claudeStatus").innerHTML = `<div class="notice err">${esc(e.message)}</div>`; }
+  $("claudeAuto").disabled = false;
+};
+$("claudeShowFile").onclick = () => post("/api/claude/show-extension").catch(() => {});
 $("claudeConnect").onclick = async () => {
   try {
     const c = await api("/api/claude");
