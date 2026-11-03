@@ -35,6 +35,7 @@ import docx
 import citeformat
 import library
 import citrello_core as core
+import codex_config
 import word_addin
 
 VERSION = core.VERSION
@@ -642,6 +643,8 @@ class Handler(BaseHTTPRequestHandler):
         if path == "/api/styles":
             return self.send(200, {"styles": citeformat.list_styles(),
                                    "default": load_config().get("style", citeformat.DEFAULT_STYLE)})
+        if path == "/api/codex":
+            return self.send(200, codex_config.status(connector_command()))
         if path == "/api/claude":
             return self.send(200, claude_status())
         m = re.fullmatch(r"/api/job/(\w+)", path)
@@ -801,6 +804,8 @@ class Handler(BaseHTTPRequestHandler):
                 return self.send(200, word_addin.install())
             if path == "/api/word/remove":
                 return self.send(200, word_addin.remove())
+            if path == "/api/codex/connect":
+                return self.send(200, codex_config.connect(connector_command()))
             if path == "/api/claude/install-extension":
                 return self.send(200, install_extension())
             if path == "/api/claude/connect-auto":

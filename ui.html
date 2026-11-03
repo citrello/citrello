@@ -277,6 +277,20 @@
     </div>
 
     <div class="card">
+      <h2>Codex and ChatGPT</h2>
+      <h3 style="margin-top:4px">Codex (app, CLI and IDE extension)</h3>
+      <p class="muted small" style="margin:0">Gives Codex the same tools as Claude: search, add and verify references, format them, and write Word documents with live citations.</p>
+      <div id="codexStatus"></div>
+      <div class="row"><button class="primary" id="codexConnect">Connect to Codex</button>
+        <span class="muted small">Then restart Codex (or start a new Codex session).</span></div>
+      <details><summary>Set it up by hand</summary>
+        <p class="small muted">Add this to <code id="codexPath"></code>:</p><pre id="codexSnippet"></pre>
+      </details>
+      <h3>ChatGPT</h3>
+      <p class="muted small" style="margin:0">ChatGPT can only use online connectors, so it needs a secure bridge to the library on your computer. This is coming in a future version.</p>
+    </div>
+
+    <div class="card">
       <h2>Browser button</h2>
       <p class="muted">Add the paper you're looking at, from any website, with one click. It reads the page in your own browser, so sites that block robots (ScienceDirect, IEEE…) and your university login work too.</p>
       <ol class="small">
@@ -383,7 +397,7 @@ document.querySelectorAll("nav button").forEach((b) => b.onclick = () => {
   document.querySelectorAll("nav button").forEach((x) => x.classList.toggle("active", x === b));
   ["library", "documents", "settings"].forEach((t) => show("tab-" + t, t === b.dataset.tab));
   if (b.dataset.tab === "library") loadLibrary();
-  if (b.dataset.tab === "settings") { loadClaude(); loadWord(); }
+  if (b.dataset.tab === "settings") { loadClaude(); loadCodex(); loadWord(); }
 });
 
 const relTag = (r) => ({verified: '<span class="tag ok" title="Found by DOI; matches the publisher record">✓ Verified</span>',
@@ -439,6 +453,19 @@ const BOOKMARKLET = "javascript:" + encodeURIComponent(BOOKMARKLET_CODE);
 $("bookmarklet").href = BOOKMARKLET;
 $("bookmarklet").onclick = (e) => { e.preventDefault(); toast("Drag this button to your bookmarks bar"); };
 $("bmCopy").onclick = async () => { await navigator.clipboard.writeText(BOOKMARKLET).catch(() => {}); toast("Copied: paste it as a bookmark's address"); };
+
+async function loadCodex() {
+  const c = await api("/api/codex");
+  $("codexPath").textContent = c.config_path; $("codexSnippet").textContent = c.snippet;
+  $("codexStatus").innerHTML = c.connected && c.up_to_date ? `<div class="notice ok">Connected. Citrello's tools are available in Codex.</div>`
+    : c.connected ? `<div class="notice warn">Codex has an older Citrello entry. Click Connect to update it.</div>`
+    : !c.codex_found ? `<div class="notice warn">Codex doesn't seem to be set up on this computer yet. You can still connect; it takes effect once Codex is installed.</div>`
+    : `<div class="notice warn">Not connected yet.</div>`;
+}
+$("codexConnect").onclick = async () => {
+  try { await post("/api/codex/connect"); await loadCodex(); toast("Connected: restart Codex"); }
+  catch (e) { $("codexStatus").innerHTML = `<div class="notice err">${esc(e.message)}</div>`; }
+};
 
 async function loadWord() {
   const w = await api("/api/word");

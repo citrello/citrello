@@ -213,3 +213,20 @@ def test_connector_protocol():
     bad = mcp_server.handle({"jsonrpc": "2.0", "id": 4, "method": "tools/call",
                              "params": {"name": "get_reference", "arguments": {"key": "Nope"}}})
     assert bad["result"]["isError"]
+
+
+# ---------------- Codex ----------------
+
+def test_codex_config_keeps_other_settings(tmp_path, monkeypatch):
+    import tomllib
+    import codex_config
+    monkeypatch.setenv("CODEX_HOME", str(tmp_path))
+    (tmp_path / "config.toml").write_text(
+        '# mine\nmodel = "gpt-5.5"\n\n[mcp_servers.other]\ncommand = "npx"\n\n'
+        '[mcp_servers.citrello]\ncommand = "old.exe"\n\n[mcp_servers.citrello.env]\nX = "1"\n\n[profiles.fast]\nmodel = "m"\n')
+    entry = {"command": "C:\\Users\\O'Brien\\Citrello\\CitrelloMCP.exe", "args": []}   # a quote in the path
+    assert codex_config.connect(entry)["up_to_date"]
+    cfg = tomllib.loads((tmp_path / "config.toml").read_text())
+    assert cfg["model"] == "gpt-5.5" and cfg["profiles"]["fast"]["model"] == "m"
+    assert cfg["mcp_servers"]["other"]["command"] == "npx"
+    assert cfg["mcp_servers"]["citrello"] == {"command": entry["command"], "args": [], "startup_timeout_sec": 30}
