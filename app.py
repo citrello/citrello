@@ -332,8 +332,25 @@ def claude_config_path():
     return next((p for p in reversed(paths) if os.path.isdir(os.path.dirname(p))), paths[0])
 
 
+def store_package():
+    """True when running as the Microsoft Store (MSIX) package."""
+    if not sys.platform.startswith("win"):
+        return False
+    try:
+        import ctypes
+        n = ctypes.c_uint32(0)
+        # 15700 = APPMODEL_ERROR_NO_PACKAGE; a packaged app gets 122 (buffer too small) for this probe
+        return ctypes.windll.kernel32.GetCurrentPackageFullName(ctypes.byref(n), None) != 15700
+    except Exception:
+        return False
+
+
 def connector_command():
     """How Claude Desktop should start the Citrello connector on this computer."""
+    if store_package():
+        # The Store version's files are in a protected folder; its connector is reached through an alias.
+        alias = os.path.join(os.environ.get("LOCALAPPDATA", ""), "Microsoft", "WindowsApps", "citrello-mcp.exe")
+        return {"command": alias}
     if getattr(sys, "frozen", False):
         exe = os.path.join(os.path.dirname(sys.executable),
                            "CitrelloMCP.exe" if sys.platform.startswith("win") else "CitrelloMCP")
@@ -361,7 +378,18 @@ def extension_path():
     """Citrello.mcpb, the one-click Claude Desktop extension, built next to Citrello.exe."""
     base = os.path.dirname(sys.executable) if getattr(sys, "frozen", False) else os.path.dirname(os.path.abspath(__file__))
     p = os.path.join(base, "Citrello.mcpb")
-    return p if os.path.exists(p) else None
+    if not os.path.exists(p):
+        return None
+    if store_package():  # File Explorer can't show the Store's app folder, so hand over a copy
+        copy = os.path.join(library.HOME, "Citrello.mcpb")
+        try:
+            if not os.path.exists(copy) or os.path.getmtime(copy) < os.path.getmtime(p):
+                os.makedirs(library.HOME, exist_ok=True)
+                shutil.copy2(p, copy)
+            return copy
+        except OSError:
+            return p
+    return p
 
 
 def extension_installed():

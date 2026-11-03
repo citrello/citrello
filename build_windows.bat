@@ -17,13 +17,15 @@ echo.
 set /p CID=Mendeley client ID: 
 set /p CSEC=Mendeley client secret: 
 python -c "import json,sys; json.dump({'client_id':sys.argv[1].strip(),'client_secret':sys.argv[2].strip()},open('app_config.json','w'))" "%CID%" "%CSEC%"
-python -m pip install --upgrade python-docx citeproc-py pyinstaller
-python -m PyInstaller --noconfirm --clean --onefile --noconsole --name Citrello ^
+python -m pip install --upgrade python-docx citeproc-py pyinstaller pillow
+python brand_icon.py citrello.ico
+python -m PyInstaller --noconfirm --clean --onefile --noconsole --name Citrello --icon citrello.ico ^
   --add-data "ui.html;." --add-data "clip.html;." --add-data "app_config.json;." --add-data "styles;styles" ^
   --collect-data docx --collect-data citeproc app.py
-python -m PyInstaller --noconfirm --onefile --console --name CitrelloMCP ^
+python -m PyInstaller --noconfirm --onefile --console --name CitrelloMCP --icon citrello.ico ^
   --add-data "styles;styles" --collect-data docx --collect-data citeproc mcp_server.py
 python make_mcpb.py dist\CitrelloMCP.exe dist\Citrello.mcpb
+python packaging\make_msix.py dist
 del app_config.json
 echo.
 if exist dist\Citrello.exe if exist dist\Citrello.mcpb (

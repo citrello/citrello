@@ -29,13 +29,22 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-      - run: pip install python-docx citeproc-py pyinstaller
+      - run: pip install python-docx citeproc-py pyinstaller pillow
+      - name: Draw the icon
+        run: python brand_icon.py citrello.ico
       - name: Build Citrello.exe (the app)
-        run: python -m PyInstaller --noconfirm --onefile --noconsole --name Citrello --add-data "ui.html;." --add-data "clip.html;." --add-data "styles;styles" --collect-data docx --collect-data citeproc app.py
+        run: python -m PyInstaller --noconfirm --onefile --noconsole --name Citrello --icon citrello.ico --add-data "ui.html;." --add-data "clip.html;." --add-data "styles;styles" --collect-data docx --collect-data citeproc app.py
       - name: Build CitrelloMCP.exe (the Claude connector)
-        run: python -m PyInstaller --noconfirm --onefile --console --name CitrelloMCP --add-data "styles;styles" --collect-data docx --collect-data citeproc mcp_server.py
+        run: python -m PyInstaller --noconfirm --onefile --console --name CitrelloMCP --icon citrello.ico --add-data "styles;styles" --collect-data docx --collect-data citeproc mcp_server.py
       - name: Build Citrello.mcpb (one-click Claude Desktop extension)
         run: python make_mcpb.py dist\CitrelloMCP.exe dist\Citrello.mcpb
+      - name: Build the Microsoft Store package (.msix)
+        env:
+          # From Partner Center -> Product identity (repository variables, not secrets)
+          MSIX_IDENTITY_NAME: ${{ vars.MSIX_IDENTITY_NAME }}
+          MSIX_PUBLISHER: ${{ vars.MSIX_PUBLISHER }}
+          MSIX_PUBLISHER_NAME: ${{ vars.MSIX_PUBLISHER_NAME }}
+        run: python packaging\make_msix.py dist
       - uses: actions/upload-artifact@v4
         with:
           name: Citrello-windows
@@ -43,6 +52,10 @@ jobs:
             dist/Citrello.exe
             dist/CitrelloMCP.exe
             dist/Citrello.mcpb
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Citrello-store-package
+          path: dist/Citrello-*.msix
       - name: Attach to the release (version tags only)
         if: startsWith(github.ref, 'refs/tags/v')
         uses: softprops/action-gh-release@v2

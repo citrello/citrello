@@ -17,25 +17,20 @@ import zlib
 
 
 def _icon_png(size=512):
-    """A simple Citrello icon (white "R" on a red rounded square), drawn without extra libraries."""
-    glyph = ["11110", "10001", "10001", "11110", "10100", "10010", "10001"]  # 5x7 letter R
-    red, white = (155, 28, 49, 255), (255, 255, 255, 255)
-    cell, gx, gy = size // 11, None, None
-    gx, gy = (size - 5 * cell) // 2, (size - 7 * cell) // 2
-    radius = size // 5
+    """Fallback icon without Pillow: a lemon disc on a cobalt rounded square, drawn without extra libraries."""
+    cobalt, lemon, white = (29, 63, 143, 255), (246, 214, 70, 255), (255, 255, 255, 255)
+    radius, c, r_out, r_in = size // 5, (size - 1) / 2, size * 0.34, size * 0.29
     rows = []
     for y in range(size):
         row = bytearray([0])  # filter byte
         for x in range(size):
-            # rounded-square mask
             dx = max(radius - x, 0, x - (size - 1 - radius))
             dy = max(radius - y, 0, y - (size - 1 - radius))
             if dx * dx + dy * dy > radius * radius:
                 px = (0, 0, 0, 0)
             else:
-                cx, cy = (x - gx) // cell, (y - gy) // cell
-                inside = 0 <= cx < 5 and 0 <= cy < 7 and x >= gx and y >= gy and glyph[cy][cx] == "1"
-                px = white if inside else red
+                d = ((x - c) ** 2 + (y - c) ** 2) ** 0.5
+                px = lemon if d <= r_in else white if d <= r_out else cobalt
             row.extend(px)
         rows.append(bytes(row))
 
@@ -43,6 +38,15 @@ def _icon_png(size=512):
         return struct.pack(">I", len(data)) + tag + data + struct.pack(">I", zlib.crc32(tag + data) & 0xFFFFFFFF)
     return (b"\x89PNG\r\n\x1a\n" + chunk(b"IHDR", struct.pack(">IIBBBBB", size, size, 8, 6, 0, 0, 0))
             + chunk(b"IDAT", zlib.compress(b"".join(rows), 9)) + chunk(b"IEND", b""))
+
+
+def _icon():
+    """The Citrello lemon-slice icon (brand_icon.py, needs Pillow); a plain fallback without Pillow."""
+    try:
+        import brand_icon
+        return brand_icon.png_bytes(512)
+    except ImportError:
+        return _icon_png()
 
 
 def manifest(tools):
@@ -97,7 +101,7 @@ def build(exe, out):
         raise SystemExit(f"Connector not found: {exe}")
     with zipfile.ZipFile(out, "w", zipfile.ZIP_DEFLATED) as z:
         z.writestr("manifest.json", json.dumps(manifest(tool_list()), indent=2))
-        z.writestr("icon.png", _icon_png())
+        z.writestr("icon.png", _icon())
         z.write(exe, "server/CitrelloMCP.exe")
     return out
 

@@ -10,3 +10,4 @@ app_config.json
 *.mcpb
 .pytest_cache/
 site/shots/
+citrello.ico
