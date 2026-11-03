@@ -1,0 +1,242 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Citrello: the free reference manager for Claude, ChatGPT, Word and Overleaf</title>
+<meta name="description" content="Citrello is a free, open-source reference manager. Claude and ChatGPT cite only real, checked papers from your library; Word citations stay live in 10,000 styles; LaTeX gets clean .bib files.">
+<meta property="og:title" content="Citrello: references used to be the bitter end. Now they're dessert.">
+<meta property="og:description" content="Free, open-source reference manager for Claude, ChatGPT, Word and Overleaf.">
+<meta property="og:url" content="https://citrello.app/">
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Gloock&family=Figtree:wght@400;500;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="site.css">
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+<div class="tiles" aria-hidden="true"></div>
+
+<header class="wrap nav">
+  <a class="logo" href="/" aria-label="Citrello home">citr<span>ello</span></a>
+  <nav aria-label="Main">
+    <a href="#problems">What it fixes</a>
+    <a href="#ai">ChatGPT and Claude</a>
+    <a href="#latex">LaTeX</a>
+    <a href="https://github.com/citrello/citrello">GitHub</a>
+    <a class="nav-cta" href="#download">Download</a>
+  </nav>
+</header>
+
+<main id="main">
+<!-- ============ HERO ============ -->
+<section class="wrap hero">
+  <div class="hero-text">
+    <h1>References used to be the bitter end. Now they're dessert.</h1>
+    <p class="lead">Citrello is a free reference manager for Claude, ChatGPT, Word and Overleaf. Your library stays on your computer, and every citation stays live and checked.</p>
+    <div class="ctas">
+      <a class="btn" href="#download">Download for Windows</a>
+      <a class="btn-link" href="https://github.com/citrello/citrello">Free and open source</a>
+    </div>
+    <p class="tagline">References, the sweet part.</p>
+  </div>
+
+  <figure class="chat" aria-label="Example: asking Claude to write with your Citrello library">
+    <div class="chat-who">You, to Claude</div>
+    <p class="chat-prompt" id="prompt" data-text="Write the introduction of my offshore wind decommissioning paper using only my Thesis references, leave out anything retracted, and give me a Word file in Elsevier Harvard style."></p>
+    <ol class="chat-steps" id="steps">
+      <li><b>Searched</b> your Thesis project: 23 references</li>
+      <li class="warn"><b>Checked</b> them on Crossref: 1 retracted, left out</li>
+      <li><b>Wrote</b> Introduction.docx with 18 live citations</li>
+    </ol>
+    <div class="chat-file" id="file">
+      <svg viewBox="0 0 24 24" width="28" height="28" aria-hidden="true"><path d="M6 2h9l5 5v15H6z" fill="#fff" stroke="#1d3f8f" stroke-width="1.6"/><path d="M15 2v5h5" fill="none" stroke="#1d3f8f" stroke-width="1.6"/><path d="M9 12h8M9 15h8M9 18h5" stroke="#3e7b4f" stroke-width="1.6"/></svg>
+      <div><b>Introduction.docx</b><br><span>Elsevier Harvard · bibliography included</span></div>
+    </div>
+    <button class="replay" id="replay" type="button">Play again</button>
+  </figure>
+</section>
+
+<section class="works" aria-label="Works with">
+  <div class="wrap">
+    <span>Works with</span>
+    <ul><li>Claude</li><li>ChatGPT</li><li>Codex</li><li>Microsoft Word</li><li>Overleaf and LaTeX</li><li>Mendeley</li><li>Zotero</li></ul>
+  </div>
+</section>
+
+<!-- ============ PROBLEMS ============ -->
+<div id="problems">
+
+<section class="pain" id="ai">
+  <div class="wrap pain-grid">
+    <div class="pain-text">
+      <h2>AI makes up references.</h2>
+      <p class="before">Ask a chatbot for sources and some of them don't exist. The DOI leads nowhere, or the paper says something else. You find out when a reviewer does.</p>
+      <p class="after"><b>With Citrello</b>, Claude and ChatGPT search your own library and cite only papers in it. A new paper is looked up on Crossref before it's added. The library is the same in every chat.</p>
+    </div>
+    <div class="visual card">
+      <div class="ref fake"><span class="tag bad">Doesn't exist</span>Miller, R. (2021). Offshore turbine end-of-life costs. <i>J. Wind Eng.</i> 14, 220–231.</div>
+      <div class="ref real"><span class="tag ok">Verified on Crossref</span>Topham, E., McMillan, D., 2017. Sustainable decommissioning of an offshore wind farm. <i>Renew. Energy</i> 102, 470–480.</div>
+      <p class="caption">Only the second one can come from Citrello.</p>
+    </div>
+  </div>
+</section>
+
+<section class="pain alt">
+  <div class="wrap pain-grid flip">
+    <div class="pain-text">
+      <h2>A new journal means redoing every reference.</h2>
+      <p class="before">Rejected from one journal, off to the next: new citation style, new order, new numbers. A whole afternoon of retyping, and one mistake is enough.</p>
+      <p class="after"><b>With Citrello</b>, citations in Word are live. Pick any of 10,000 journal styles and click <b>Update</b>: every citation and the bibliography change at once, as one Undo step.</p>
+    </div>
+    <div class="visual card styles">
+      <div class="style-tabs" role="tablist" aria-label="Citation style">
+        <button role="tab" aria-selected="true" data-style="apa">APA</button>
+        <button role="tab" aria-selected="false" data-style="ieee">IEEE</button>
+        <button role="tab" aria-selected="false" data-style="harvard">Harvard</button>
+        <button role="tab" aria-selected="false" data-style="nature">Nature</button>
+      </div>
+      <p class="doc-line" id="styleText"></p>
+      <div class="doc-bib"><span>References</span><p id="styleBib"></p></div>
+    </div>
+  </div>
+</section>
+
+<section class="pain">
+  <div class="wrap pain-grid">
+    <div class="pain-text">
+      <h2>Retracted papers and wrong DOIs slip in.</h2>
+      <p class="before">Papers get retracted after you cite them. DOIs get mistyped. Nobody checks the 60th reference until it's too late.</p>
+      <p class="after"><b>With Citrello</b>, every reference gets a rating: <span class="pill ok">verified</span> <span class="pill warn">check</span> or <span class="pill bad">problem</span>. Retractions, DOIs that don't exist, and authors that don't match are flagged. Check a whole library in one click.</p>
+    </div>
+    <div class="visual card list">
+      <div class="row"><span class="pill ok">verified</span>Topham &amp; McMillan (2017) Sustainable decommissioning…</div>
+      <div class="row"><span class="pill bad">problem</span>Smith (2019) Offshore wind economics…<em>Retracted in 2023</em></div>
+      <div class="row"><span class="pill bad">problem</span>Lee (2020) Blade recycling…<em>This DOI doesn't exist</em></div>
+      <div class="row"><span class="pill warn">check</span>Ørsted (2025) Our offshore wind farms<em>Web page, no DOI</em></div>
+    </div>
+  </div>
+</section>
+
+<section class="pain alt">
+  <div class="wrap pain-grid flip">
+    <div class="pain-text">
+      <h2>Drafts with typed citations can't be fixed.</h2>
+      <p class="before">A co-author typed [1], [2–5] and (Smith et al., 2020) by hand, with a typed reference list at the end. Change anything and the numbering falls apart.</p>
+      <p class="after"><b>With Citrello</b>, drop the Word file in. Every reference is looked up and added to your library, and the typed citations become live ones. Mendeley's Word plugin can take them over too.</p>
+    </div>
+    <div class="visual card convert">
+      <p>Costs are often underestimated <span class="typed">[3]</span> and rarely published <span class="typed">[4–6]</span>.</p>
+      <div class="arrow" aria-hidden="true">↓</div>
+      <p>Costs are often underestimated <span class="live">(Topham and McMillan, 2017)</span> and rarely published <span class="live">(Bilgili and Alphan, 2022; Vetters et al., 2024)</span>.</p>
+    </div>
+  </div>
+</section>
+
+<section class="pain">
+  <div class="wrap pain-grid">
+    <div class="pain-text">
+      <h2>Collecting papers is tedious.</h2>
+      <p class="before">Copy the title, search for it, download a citation file, import it, fix the details. For every paper.</p>
+      <p class="after"><b>With Citrello</b>, click <b>Add to Citrello</b> in your bookmarks bar on any paper's page, even behind your university login. Select a reference on the page to add that one instead. Or paste a link or a DOI.</p>
+    </div>
+    <div class="visual card browser">
+      <div class="bar"><span></span><span></span><span></span><div class="url">sciencedirect.com/science/article/pii/S0960148116308953</div></div>
+      <div class="bookmarks"><span class="bm">＋ Add to Citrello</span><span class="bm dim">Inbox</span><span class="bm dim">Overleaf</span></div>
+      <div class="added"><b>Added:</b> Topham2017, verified on Crossref</div>
+    </div>
+  </div>
+</section>
+
+<section class="pain alt" id="latex">
+  <div class="wrap pain-grid flip">
+    <div class="pain-text">
+      <h2>Messy .bib files and broken \cite keys.</h2>
+      <p class="before">BibTeX copied from search engines, lowercased acronyms, the same paper under two keys, and a key that suddenly isn't in the .bib anymore.</p>
+      <p class="after"><b>With Citrello</b>, keys never change. Exports protect acronyms and escape special characters. Check an Overleaf project for missing, unused and duplicate entries, convert a hand-typed bibliography, and keep a .bib file up to date automatically.</p>
+    </div>
+    <pre class="visual card code" aria-label="Example BibTeX entry"><span class="c">% written by Citrello</span>
+@article{<b>Topham2017</b>,
+  author = {Topham, Eva and McMillan, David},
+  title  = {Sustainable decommissioning of an
+            offshore wind farm},
+  journal = {Renewable Energy},
+  year   = {2017},
+  pages  = {470--480},
+  doi    = {10.1016/j.renene.2016.10.066}
+}
+<span class="c">% and in a title: {LiDAR}, {CO2}, {NOx}</span></pre>
+  </div>
+</section>
+
+<section class="pain">
+  <div class="wrap pain-grid">
+    <div class="pain-text">
+      <h2>Your references are locked in one app.</h2>
+      <p class="before">Your library lives inside one company's software. Moving means losing details, and the free plan always ends somewhere.</p>
+      <p class="after"><b>With Citrello</b>, import and export Mendeley, Zotero, EndNote, RIS, BibTeX and CSL-JSON whenever you like. It's free and open source, and the library is a file on your computer.</p>
+    </div>
+    <div class="visual card swap">
+      <span>Mendeley</span><span class="arrows" aria-hidden="true">⇄</span><span class="me">Citrello</span><span class="arrows" aria-hidden="true">⇄</span><span>Zotero</span>
+    </div>
+  </div>
+</section>
+
+</div>
+
+<!-- ============ PRIVACY ============ -->
+<section class="privacy">
+  <div class="wrap narrow">
+    <h2>Your library stays on your computer.</h2>
+    <p>Citrello goes online only to look up references, download citation styles, and pass requests from ChatGPT or Claude on the web to the app on your computer. There are no ads and no tracking. An account is optional, and only needed for the web connectors.</p>
+    <p><a href="https://mcp.citrello.app/privacy">Read the privacy policy</a></p>
+  </div>
+</section>
+
+<!-- ============ DOWNLOAD ============ -->
+<section class="download" id="download">
+  <div class="wrap">
+    <h2>Get started in three steps.</h2>
+    <ol class="steps">
+      <li><h3>Download Citrello</h3><p>For Windows. Start <b>Citrello.exe</b>; your library opens in the browser.</p></li>
+      <li><h3>Connect your AI</h3><p>One click for Claude Desktop and Codex. For ChatGPT and Claude on the web, sign in and add the connector.</p></li>
+      <li><h3>Add the Word tab</h3><p><b>Settings → Word</b> adds Insert citation, Update and Citation style to Word.</p></li>
+    </ol>
+    <div class="ctas center">
+      <a class="btn big" href="https://github.com/citrello/citrello/releases/latest">Download for Windows</a>
+    </div>
+    <p class="note">Windows may say "Windows protected your PC" for new apps: click <b>More info → Run anyway</b>. A Mac version is planned.</p>
+  </div>
+</section>
+
+<!-- ============ FAQ ============ -->
+<section class="faq">
+  <div class="wrap narrow">
+    <h2>Questions</h2>
+    <details><summary>Is it really free?</summary><p>Yes. Citrello is open source under the AGPL licence. There's no paid plan.</p></details>
+    <details><summary>Can I keep using Mendeley or Zotero?</summary><p>Yes. Import your library from either and export back at any time. Citations in Word use Mendeley's format, so Mendeley Cite can take a document over.</p></details>
+    <details><summary>Which AI apps work with it?</summary><p>Claude Desktop, Claude Code and Codex connect directly. ChatGPT and Claude on the web and phone connect through Citrello's secure bridge while the app is running.</p></details>
+    <details><summary>Does it work with Overleaf?</summary><p>Yes. Export clean BibTeX or biblatex, check an Overleaf project .zip, convert hand-typed bibliographies, and keep a .bib file up to date.</p></details>
+    <details><summary>What about Mac?</summary><p>The app and the Word tab are Windows-only for now. A Mac version is planned.</p></details>
+  </div>
+</section>
+</main>
+
+<footer>
+  <div class="tiles" aria-hidden="true"></div>
+  <div class="wrap foot">
+    <a class="logo" href="/">citr<span>ello</span></a>
+    <p>References, the sweet part.</p>
+    <nav aria-label="Footer">
+      <a href="https://github.com/citrello/citrello">GitHub</a>
+      <a href="https://mcp.citrello.app/privacy">Privacy</a>
+      <a href="https://github.com/citrello/citrello/blob/main/LICENSE">Licence (AGPL)</a>
+    </nav>
+    <p class="small">© 2026 Armin Hosseinghorbani</p>
+  </div>
+</footer>
+
+<script src="site.js"></script>
+</body>
+</html>

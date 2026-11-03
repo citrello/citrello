@@ -1,0 +1,12 @@
+# citrello.app website: static files served by Cloudflare. Deployed by .github/workflows/site.yml.
+name = "citrello-site"
+compatibility_date = "2025-09-01"
+workers_dev = false
+routes = [
+  { pattern = "citrello.app", custom_domain = true },
+  { pattern = "www.citrello.app", custom_domain = true },
+]
+
+[assets]
+directory = "./public"
+not_found_handling = "404-page"

@@ -9,3 +9,4 @@ venv/
 app_config.json
 *.mcpb
 .pytest_cache/
+site/shots/
