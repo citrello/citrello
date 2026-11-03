@@ -1,0 +1,35 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Citrello · Limoncello night</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display&family=Outfit:wght@300;400;600&display=swap" rel="stylesheet">
+<style>
+:root{--plum:#2b1630;--plum2:#3d2245;--glow:#ffe27a;--zest:#f5c518;--cream:#f6eefa;--mute:#c9b6d0}
+*{box-sizing:border-box}body{margin:0;font:300 18px/1.65 Outfit,sans-serif;color:var(--cream);background:var(--plum)}
+nav{display:flex;justify-content:space-between;align-items:center;max-width:1180px;margin:0 auto;padding:24px}
+.logo{font:30px "DM Serif Display",serif;color:var(--glow)}nav a{color:var(--mute);margin-left:26px;text-decoration:none;font-weight:400}
+.hero{max-width:1180px;margin:0 auto;padding:40px 24px 100px;display:grid;grid-template-columns:1fr 380px;gap:60px;align-items:center;position:relative}
+.hero::before{content:"";position:absolute;right:60px;top:40px;width:420px;height:420px;border-radius:50%;background:radial-gradient(circle,rgba(255,226,122,.35),transparent 65%);z-index:0}
+h1{font:78px/1 "DM Serif Display",serif;margin:0 0 24px;position:relative}
+.sub{font-size:20px;color:var(--mute);max-width:30em;margin:0 0 32px;position:relative}
+.btn{position:relative;display:inline-block;background:var(--glow);color:var(--plum);padding:16px 28px;border-radius:12px;font-weight:600;text-decoration:none}
+.glass{position:relative;z-index:1;justify-self:center}
+.chat{max-width:760px;margin:-40px auto 0;background:var(--plum2);border:1px solid rgba(255,226,122,.25);border-radius:20px;padding:26px 30px;position:relative}
+.chat b{font-size:14px;color:var(--glow);font-weight:400}
+.prompt{font-size:20px;font-weight:400;margin:6px 0 16px}
+.prompt::after{content:"";display:inline-block;width:2px;height:1.05em;background:var(--glow);vertical-align:-3px;margin-left:2px}
+ol{margin:0;padding-left:20px;color:var(--mute);font-size:16px}
+.pain{max-width:760px;margin:0 auto;padding:110px 24px}
+.pain h2{font:56px/1.05 "DM Serif Display",serif;margin:0 0 14px;color:var(--glow)}.pain p{font-size:21px;color:var(--mute);margin:0}
+</style></head><body>
+<nav><div class="logo">citrello</div><div><a href="#">Features</a><a href="#">For LaTeX</a><a href="#">GitHub</a></div></nav>
+<section class="hero"><div><h1 data-copy="headline"></h1><p class="sub" data-copy="sub"></p><a class="btn" href="#">Download for Windows, free</a></div>
+<svg class="glass" viewBox="0 0 200 320" width="260" aria-label="A small glass of limoncello">
+<defs><linearGradient id="l" x1="0" x2="0" y1="0" y2="1"><stop offset="0" stop-color="#ffe98f"/><stop offset="1" stop-color="#f5c518"/></linearGradient></defs>
+<path d="M50 40 L150 40 L138 210 Q100 222 62 210 Z" fill="rgba(255,255,255,.08)" stroke="#f6eefa" stroke-opacity=".5" stroke-width="2"/>
+<path d="M58 100 L142 100 L138 208 Q100 220 62 208 Z" fill="url(#l)"/>
+<ellipse cx="100" cy="100" rx="42" ry="6" fill="#fff4b8"/>
+<rect x="92" y="215" width="16" height="60" fill="rgba(255,255,255,.18)"/><ellipse cx="100" cy="282" rx="48" ry="9" fill="rgba(255,255,255,.18)"/>
+<circle cx="150" cy="44" r="26" fill="#f5c518" stroke="#fff4b8" stroke-width="5"/><path d="M150 22v44M128 44h44M135 29l30 30M165 29l-30 30" stroke="#fff4b8" stroke-width="2"/>
+</svg></section>
+<div class="chat"><b>You, to Claude</b><p class="prompt" data-copy="prompt"></p><ol data-copy="steps"></ol></div>
+<section class="pain"><h2 data-copy="painTitle"></h2><p data-copy="painText"></p></section>
+<script src="_content.js"></script></body></html>

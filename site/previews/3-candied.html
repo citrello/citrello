@@ -1,0 +1,33 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Citrello · Candied</title>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,600;12..96,800&display=swap" rel="stylesheet">
+<style>
+:root{--lemon:#ffe45c;--grape:#ff6f91;--lime:#b8e05a;--violet:#2d1b69;--white:#fff}
+*{box-sizing:border-box}body{margin:0;overflow-x:hidden;font:18px/1.55 "Bricolage Grotesque",sans-serif;color:var(--violet);background:var(--lemon);overflow-x:hidden}
+nav{display:flex;justify-content:space-between;align-items:center;max-width:1200px;margin:0 auto;padding:22px 24px;position:relative;z-index:2}
+.logo{font-weight:800;font-size:30px;letter-spacing:-1px}
+nav a{color:var(--violet);margin-left:24px;font-weight:600;text-decoration:none}
+.hero{max-width:1200px;margin:0 auto;padding:40px 24px 100px;position:relative}
+.slice{position:absolute;right:-230px;top:20px;width:520px;height:520px;border-radius:50%;
+background:radial-gradient(circle,var(--white) 0 6%,transparent 6.5%),repeating-conic-gradient(var(--lime) 0 26deg,var(--white) 26deg 30deg);
+box-shadow:0 0 0 22px var(--white),0 0 0 40px #8dbb2f;animation:spin 60s linear infinite;z-index:0}
+@keyframes spin{to{transform:rotate(360deg)}}@media (prefers-reduced-motion:reduce){.slice{animation:none}}
+h1{font-size:96px;line-height:.92;font-weight:800;letter-spacing:-3px;margin:0 0 26px;max-width:8.4em;position:relative}
+.sub{font-size:21px;max-width:28em;position:relative;margin:0 0 30px}
+.btn{position:relative;display:inline-block;background:var(--violet);color:var(--lemon);padding:18px 30px;border-radius:20px;font-weight:800;font-size:19px;text-decoration:none;box-shadow:0 6px 0 var(--grape)}
+.chat{position:relative;margin-top:54px;max-width:680px;background:var(--white);border-radius:28px;padding:26px 28px;transform:rotate(-1.2deg);box-shadow:0 10px 0 var(--violet)}
+.chat b{font-size:14px;color:var(--grape)}
+.prompt{font-size:20px;font-weight:600;margin:6px 0 16px}
+.prompt::after{content:"";display:inline-block;width:3px;height:1.05em;background:var(--grape);vertical-align:-3px;margin-left:2px}
+ol{list-style:none;padding:0;margin:0;display:flex;flex-wrap:wrap;gap:10px}
+ol li{background:var(--lime);border-radius:999px;padding:7px 14px;font-size:15px;font-weight:600}
+ol li:nth-child(2){background:var(--grape);color:#fff}
+.pain{background:var(--violet);color:var(--white);padding:110px 24px}.pain>div{max-width:900px;margin:0 auto}
+.pain h2{font-size:72px;line-height:.95;font-weight:800;letter-spacing:-2px;margin:0 0 18px;color:var(--lemon)}.pain p{font-size:22px;max-width:32em;margin:0}
+</style></head><body>
+<nav><div class="logo">citrello</div><div><a href="#">Features</a><a href="#">For LaTeX</a><a href="#">GitHub</a></div></nav>
+<section class="hero"><div class="slice" aria-hidden="true"></div>
+<h1 data-copy="headline"></h1><p class="sub" data-copy="sub"></p><a class="btn" href="#">Get Citrello free</a>
+<div class="chat"><b>You, to Claude</b><p class="prompt" data-copy="prompt"></p><ol data-copy="steps"></ol></div></section>
+<section class="pain"><div><h2 data-copy="painTitle"></h2><p data-copy="painText"></p></div></section>
+<script src="_content.js"></script></body></html>

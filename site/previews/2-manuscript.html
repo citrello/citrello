@@ -1,0 +1,38 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Citrello · Manuscript</title>
+<link href="https://fonts.googleapis.com/css2?family=Newsreader:opsz,wght@6..72,400;6..72,600&family=Caveat:wght@600&display=swap" rel="stylesheet">
+<style>
+:root{--paper:#f7f9fc;--grid:#e3e9f3;--ink:#1b2a41;--red:#d6332e;--hi:#fff27a;--soft:#5b6b82}
+*{box-sizing:border-box}body{margin:0;font:19px/1.7 Newsreader,serif;color:var(--ink);background:var(--paper);
+background-image:linear-gradient(var(--grid) 1px,transparent 1px),linear-gradient(90deg,var(--grid) 1px,transparent 1px);background-size:28px 28px}
+nav{display:flex;justify-content:space-between;align-items:baseline;max-width:1120px;margin:0 auto;padding:26px 24px}
+.logo{font-weight:600;font-size:26px}.logo sup{color:var(--red);font-size:14px}
+nav a{color:var(--ink);margin-left:26px}
+.page{max-width:1120px;margin:20px auto 0;display:grid;grid-template-columns:1fr 340px;gap:40px;padding:0 24px 80px}
+.sheet{background:#fff;padding:64px 72px;box-shadow:0 1px 0 #d8dee8,0 18px 40px -24px rgba(27,42,65,.35);position:relative}
+h1{font-size:62px;line-height:1.05;font-weight:600;margin:0 0 22px;letter-spacing:-.6px}
+.sub{font-size:21px;color:var(--soft);margin:0 0 30px}
+.btn{display:inline-block;background:var(--ink);color:#fff;padding:14px 26px;text-decoration:none;font:600 18px Newsreader,serif}
+.note{font:600 26px/1.1 Caveat,cursive;color:var(--red);position:absolute}
+.n1{right:-30px;top:30px;transform:rotate(6deg)}.n2{left:72px;bottom:28px;transform:rotate(-3deg)}
+.refs{margin-top:44px;font-size:15px;color:var(--soft);border-top:1px solid var(--grid);padding-top:14px}
+.refs s{text-decoration-color:var(--red);text-decoration-thickness:2px}
+.side{align-self:start;margin-top:40px}
+.chat{background:#fff;border:1px solid #d8dee8;padding:20px}
+.chat b{font-size:14px;color:var(--soft);font-weight:600}
+.prompt{font-size:17px;line-height:1.55;margin:6px 0 12px}.prompt mark{background:var(--hi)}
+.prompt::after{content:"";display:inline-block;width:2px;height:1em;background:var(--ink);vertical-align:-2px}
+ol{margin:0;padding-left:20px;font-size:15px}ol li{margin:6px 0}
+.pain{max-width:760px;margin:0 auto;padding:40px 24px 120px}
+.pain h2{font-size:48px;line-height:1.1;margin:0 0 12px;position:relative;display:inline-block}
+.pain h2::after{content:"";position:absolute;left:-4px;right:-4px;top:52%;height:3px;background:var(--red);transform:rotate(-1.5deg)}
+.pain .fix{font:600 34px Caveat,cursive;color:var(--red);margin-left:12px}
+</style></head><body>
+<nav><div class="logo">Citrello<sup>[1]</sup></div><div><a href="#">Features</a><a href="#">For LaTeX</a><a href="#">GitHub</a></div></nav>
+<div class="page"><div class="sheet">
+<h1 data-copy="headline"></h1><p class="sub" data-copy="sub"></p><a class="btn" href="#">Download for Windows, free</a>
+<div class="refs">References<br><s>[14] Smith, J. (2019). Offshore wind… (retracted)</s><br>[15] Topham, E. and McMillan, D. (2017). Sustainable decommissioning…</div>
+<div class="note n1">renumber<br>everything?!</div><div class="note n2">no more of this →</div></div>
+<aside class="side"><div class="chat"><b>You, to Claude</b><p class="prompt" data-copy="prompt"></p><ol data-copy="steps"></ol></div></aside></div>
+<section class="pain"><h2 data-copy="painTitle"></h2><span class="fix">fixed</span><p data-copy="painText"></p></section>
+<script src="_content.js"></script></body></html>

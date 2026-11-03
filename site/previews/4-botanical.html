@@ -1,0 +1,38 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Citrello · Botanical</title>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant:ital,wght@0,600;1,500&family=Karla:wght@400;600&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#fbfcf7;--ink:#22302a;--sage:#4f6b4a;--lemon:#f2e39a;--line:#cfd8c8}
+*{box-sizing:border-box}body{margin:0;font:17px/1.65 Karla,sans-serif;color:var(--ink);background:var(--bg)}
+nav{display:flex;justify-content:space-between;align-items:center;max-width:1140px;margin:0 auto;padding:24px}
+.logo{font:600 30px Cormorant,serif}nav a{color:var(--ink);margin-left:26px}
+.hero{max-width:1140px;margin:0 auto;padding:30px 24px 90px;display:grid;grid-template-columns:420px 1fr;gap:64px;align-items:center}
+.plate{border:1px solid var(--line);padding:22px;background:#fff}
+.plate figcaption{font:italic 500 18px Cormorant,serif;color:var(--sage);margin-top:10px;text-align:center}
+h1{font:600 74px/1 Cormorant,serif;margin:0 0 22px;letter-spacing:-.5px}
+.sub{font-size:19px;max-width:31em;margin:0 0 30px}
+.btn{display:inline-block;background:var(--sage);color:#fff;padding:14px 26px;border-radius:4px;font-weight:600;text-decoration:none}
+.chat{margin-top:40px;border-left:3px solid var(--lemon);padding:4px 0 4px 22px;max-width:620px}
+.chat b{font-size:14px;color:var(--sage)}
+.prompt{font:italic 500 23px/1.4 Cormorant,serif;margin:4px 0 12px}
+.prompt::after{content:"";display:inline-block;width:2px;height:1em;background:var(--sage);vertical-align:-2px}
+ol{margin:0;padding-left:20px;font-size:15px}
+.pain{border-top:1px solid var(--line);max-width:1140px;margin:0 auto;padding:90px 24px;display:grid;grid-template-columns:420px 1fr;gap:64px}
+.pain h2{font:600 52px/1.05 Cormorant,serif;margin:0}.pain p{font-size:20px;margin:0;max-width:30em}
+</style></head><body>
+<nav><div class="logo">Citrello</div><div><a href="#">Features</a><a href="#">For LaTeX</a><a href="#">GitHub</a></div></nav>
+<section class="hero"><figure class="plate" style="margin:0">
+<svg viewBox="0 0 360 380" width="100%" fill="none" stroke="#22302a" stroke-width="1.3" stroke-linecap="round" aria-label="Drawing of a citrus branch">
+<path d="M40 360 C90 280 140 220 230 120 C260 88 290 60 330 30"/>
+<path d="M120 250 C80 230 60 190 70 150 C110 160 135 200 120 250Z" fill="#e4ecdd"/><path d="M120 250 C100 210 85 185 70 150"/>
+<path d="M200 150 C215 110 250 90 290 92 C282 132 248 158 200 150Z" fill="#e4ecdd"/><path d="M200 150 C235 128 262 110 290 92"/>
+<path d="M300 55 C320 70 330 95 318 118 C298 108 290 82 300 55Z" fill="#e4ecdd"/>
+<ellipse cx="175" cy="275" rx="62" ry="70" fill="#f2e39a"/><path d="M175 205 C170 195 172 188 180 184"/>
+<circle cx="155" cy="255" r="2"/><circle cx="190" cy="250" r="2"/><circle cx="170" cy="295" r="2"/><circle cx="200" cy="290" r="2"/><circle cx="150" cy="300" r="2"/>
+<circle cx="292" cy="190" r="34" fill="#fff"/><circle cx="292" cy="190" r="27" fill="#f2e39a"/>
+<path d="M292 163v54M265 190h54M273 171l38 38M311 171l-38 38"/>
+</svg><figcaption>Fig. 1. Citrus citrello, the reference fruit</figcaption></figure>
+<div><h1 data-copy="headline"></h1><p class="sub" data-copy="sub"></p><a class="btn" href="#">Download for Windows, free</a>
+<div class="chat"><b>You, to Claude</b><p class="prompt" data-copy="prompt"></p><ol data-copy="steps"></ol></div></div></section>
+<section class="pain"><h2 data-copy="painTitle"></h2><p data-copy="painText"></p></section>
+<script src="_content.js"></script></body></html>

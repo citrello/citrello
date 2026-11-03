@@ -1,0 +1,31 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Citrello · Amalfi</title>
+<link href="https://fonts.googleapis.com/css2?family=Gloock&family=Figtree:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+:root{--cobalt:#1d3f8f;--lemon:#f6d646;--white:#fff;--leaf:#3e7b4f;--ink:#14213d;--sky:#eaf0fb}
+*{box-sizing:border-box}body{margin:0;font:17px/1.6 Figtree,sans-serif;color:var(--ink);background:var(--white)}
+.tiles{height:64px;background-color:var(--cobalt);background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='64' height='64'%3E%3Crect width='64' height='64' fill='%231d3f8f'/%3E%3Ccircle cx='32' cy='32' r='14' fill='%23f6d646'/%3E%3Cpath d='M32 6c6 8 6 14 0 18c-6-4-6-10 0-18zM32 58c6-8 6-14 0-18c-6 4-6 10 0 18zM6 32c8-6 14-6 18 0c-4 6-10 6-18 0zM58 32c-8-6-14-6-18 0c4 6 10 6 18 0z' fill='%23fff'/%3E%3Ccircle cx='32' cy='32' r='5' fill='%233e7b4f'/%3E%3Ccircle cx='0' cy='0' r='8' fill='%23fff'/%3E%3Ccircle cx='64' cy='0' r='8' fill='%23fff'/%3E%3Ccircle cx='0' cy='64' r='8' fill='%23fff'/%3E%3Ccircle cx='64' cy='64' r='8' fill='%23fff'/%3E%3C/svg%3E")}
+nav{display:flex;justify-content:space-between;align-items:center;max-width:1180px;margin:0 auto;padding:22px 24px}
+.logo{font:28px Gloock,serif;color:var(--cobalt)}.logo i{font-style:normal;color:var(--leaf)}
+nav a{color:var(--ink);text-decoration:none;margin-left:28px;font-weight:500}
+.hero{max-width:1180px;margin:0 auto;padding:56px 24px 88px;display:grid;grid-template-columns:1.05fr .95fr;gap:56px;align-items:center}
+h1{font:72px/1.02 Gloock,serif;margin:0 0 24px;color:var(--cobalt);letter-spacing:-.5px}
+.sub{font-size:20px;max-width:30em;margin:0 0 32px}
+.btn{display:inline-block;background:var(--cobalt);color:#fff;padding:16px 28px;border-radius:999px;font-weight:700;text-decoration:none}
+.btn2{margin-left:18px;color:var(--cobalt);font-weight:700}
+.chat{background:var(--sky);border:3px solid var(--cobalt);border-radius:28px;padding:28px;position:relative;box-shadow:12px 12px 0 var(--lemon)}
+.chat .who{font-size:13px;font-weight:700;color:var(--cobalt);margin-bottom:8px}
+.prompt{background:#fff;border-radius:16px;padding:18px 20px;font-size:17px;min-height:120px}
+.prompt::after{content:"";display:inline-block;width:2px;height:1.1em;background:var(--cobalt);vertical-align:-3px;margin-left:2px}
+ol{list-style:none;padding:0;margin:18px 0 0}ol li{padding:9px 0 9px 34px;position:relative;font-size:15px}
+ol li::before{content:"";position:absolute;left:6px;top:13px;width:16px;height:16px;border-radius:50%;background:var(--leaf);box-shadow:inset 0 0 0 4px var(--sky)}
+.pain{background:var(--lemon);padding:96px 24px}.pain>div{max-width:780px;margin:0 auto}
+.pain h2{font:52px/1.05 Gloock,serif;margin:0 0 16px;color:var(--cobalt)}.pain p{font-size:21px;margin:0}
+</style></head><body>
+<div class="tiles"></div>
+<nav><div class="logo">citr<i>ello</i></div><div><a href="#">Features</a><a href="#">For LaTeX</a><a href="#">GitHub</a></div></nav>
+<section class="hero"><div><h1 data-copy="headline"></h1><p class="sub" data-copy="sub"></p>
+<a class="btn" href="#">Download for Windows</a><a class="btn2" href="#">It's free and open source</a></div>
+<div class="chat"><div class="who">You, to Claude</div><div class="prompt" data-copy="prompt"></div><ol data-copy="steps"></ol></div></section>
+<section class="pain"><div><h2 data-copy="painTitle"></h2><p data-copy="painText"></p></div></section>
+<script src="_content.js"></script></body></html>
