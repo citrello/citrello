@@ -5,7 +5,7 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 rm -rf build dist
-python3 -m pip install --upgrade python-docx citeproc-py pyinstaller pillow certifi
+python3 -m pip install --upgrade python-docx citeproc-py pypdf pyinstaller pillow certifi
 
 python3 brand_icon.py build-icon.png 1024 >/dev/null
 VERSION=$(python3 -c "import citrello_core; print(citrello_core.VERSION)")

@@ -18,7 +18,7 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-      - run: pip install python-docx citeproc-py pytest playwright
+      - run: pip install python-docx citeproc-py pypdf pytest playwright
       - run: python -m playwright install --with-deps chromium
       - run: pytest -q
 
@@ -30,7 +30,7 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-      - run: pip install python-docx citeproc-py pyinstaller pillow
+      - run: pip install python-docx citeproc-py pypdf pyinstaller pillow
       - name: Draw the icon
         run: python brand_icon.py citrello.ico
       - name: Build Citrello.exe (the app)

@@ -305,9 +305,9 @@
   <section id="tab-documents" class="hidden">
     <div class="card" id="chkCard">
       <h2>Check the references in a document</h2>
-      <p class="muted">Any Word document, made with Zotero, Mendeley, EndNote, Word's own citations or typed by hand. Citrello checks every reference online and finds retracted papers, DOIs that are wrong or don't exist, the same paper listed twice, citations that point to a missing reference, and references that are never cited. Then add them all to your library in one click.</p>
-      <label class="drop" id="chkDrop"><input type="file" id="chkFile" accept=".docx" hidden>
-        <div id="chkDropText"><strong>Choose a Word file</strong> or drag it here</div></label>
+      <p class="muted">Any Word document or PDF, made with Zotero, Mendeley, EndNote, Word's own citations or typed by hand. Citrello checks every reference online and finds retracted papers, DOIs that are wrong or don't exist, the same paper listed twice, citations that point to a missing reference, and references that are never cited. Then add them all to your library in one click.</p>
+      <label class="drop" id="chkDrop"><input type="file" id="chkFile" accept=".docx,.pdf" hidden>
+        <div id="chkDropText"><strong>Choose a Word file or a PDF</strong> or drag it here</div></label>
       <div id="chkResult"></div>
     </div>
 
@@ -1156,7 +1156,7 @@ dropZone($("updDrop"), $("updFile"), async (file) => {
 // ---------- documents: check references ----------
 let chk = null, chkTimer = null;
 dropZone($("chkDrop"), $("chkFile"), async (file) => {
-  if (!/\.docx$/i.test(file.name)) return notice("chkResult", "err", "Please choose a Word document (.docx). For LaTeX, use the LaTeX and Overleaf card.");
+  if (!/\.(docx|pdf)$/i.test(file.name)) return notice("chkResult", "err", "Please choose a Word document (.docx) or a PDF. For LaTeX, use the LaTeX and Overleaf card.");
   $("chkDropText").innerHTML = `<strong>${esc(file.name)}</strong> · choose another file to check it`;
   notice("chkResult", "warn", "Reading the document…");
   try {
@@ -1182,7 +1182,7 @@ function renderCheck() {
     return;
   }
   const r = c.report, problems = r.counts.problem + r.citation_issues.filter((x) => x.level === "problem").length;
-  const name = c.name.replace(/\.docx$/i, "");
+  const name = c.name.replace(/\.(docx|pdf)$/i, "");
   const newOnes = r.refs.filter((x) => !x.in_library).length;
   let h = `<div class="chips" style="margin-top:14px">
       <span class="chip">${r.references} references · ${esc(r.manager)}</span>
@@ -1207,8 +1207,35 @@ function renderCheck() {
         : `<input type="text" id="chkProject" list="projectList" value="${esc(name)}" placeholder="Project">
            <button class="primary" id="chkAdd" ${newOnes ? "" : "disabled"}>${newOnes ? `Add ${newOnes} new reference${newOnes > 1 ? "s" : ""} to my library` : "All are in your library"}</button>`}
       <a class="btn" href="/api/doccheck/${id}/report.csv">Download the report (.csv)</a></div>`;
-  if (r.source === "typed") h += `<p class="small muted">The citations are typed by hand. To make them live citations, use <b>Convert a document with typed citations</b> below.</p>`;
+  if (r.source !== "pdf") {
+    const f = c.fixed;
+    h += `<div class="panel" style="margin-top:16px"><strong>Fix the document</strong>
+      <p class="small muted" style="margin:4px 0 0">Citrello writes a corrected copy: every citation becomes a live citation, details are corrected from the publisher's record, duplicates are merged, and the reference list is rebuilt in the style you choose, with correct numbering. Your original file isn't changed. The references are also added to your library (they're what the live citations use).</p>`;
+    if (f) {
+      h += `<div class="notice ok">Fixed: ${f.citations} citations and ${f.entries} references in ${esc(f.style)}.</div>
+        <div class="row"><a class="btn primary" href="/api/doccheck/${id}/fixed.docx">Download the fixed document</a></div>`;
+      const li = (arr) => `<ul class="issues">${arr.join("")}</ul>`;
+      if (f.corrected.length) h += `<h3>Corrected from the publisher's record</h3>` + li(f.corrected.map((x) => `<li class="ok">[${x.number}] ${esc(x.title)}: ${x.changes.map(esc).join(", ")}</li>`));
+      if (f.merged.length) h += `<h3>Duplicates merged</h3>` + li(f.merged.map((x) => `<li class="ok">${esc(x)}</li>`));
+      if (f.dropped_uncited.length) h += `<h3>Removed from the list (never cited)</h3>` + li([`<li class="check">${f.dropped_uncited.map((n) => `[${n}]`).join(", ")}</li>`]);
+      if (f.still_problems.length || f.unfixable.length) h += `<h3>Still needs you</h3>` + li([
+          ...f.still_problems.map((x) => `<li class="problem">${esc(x.title)}: ${esc(x.text)}</li>`),
+          ...f.unfixable.map((t) => `<li class="problem">${esc(t)}</li>`)]);
+    } else {
+      h += `<div class="row"><select id="chkStyle" aria-label="Citation style">${styles.map((st) => `<option value="${st.id}">${esc(st.title)}</option>`).join("")}</select>
+        <button class="primary" id="chkFix">Fix and download</button></div>`;
+    }
+    h += `</div>`;
+  } else {
+    h += `<p class="small muted">A PDF can't be changed. To get a fixed document, check the Word version.</p>`;
+  }
   $("chkResult").innerHTML = h;
+  if ($("chkStyle")) { const def = $("defStyle").value; if (def) $("chkStyle").value = def; }
+  if ($("chkFix")) $("chkFix").onclick = async () => {
+    $("chkFix").disabled = true; $("chkFix").textContent = "Fixing…";
+    try { chk = await post(`/api/doccheck/${id}/fix`, {style: $("chkStyle").value, project: name}); chk.id = id; renderCheck(); loadLibrary(); }
+    catch (e) { toast(e.message); $("chkFix").disabled = false; $("chkFix").textContent = "Fix and download"; }
+  };
   if ($("chkAdd")) $("chkAdd").onclick = async () => {
     $("chkAdd").disabled = true;
     try { chk = await post(`/api/doccheck/${id}/add`, {project: $("chkProject").value}); chk.id = id; renderCheck(); toast("Added to your library"); loadLibrary(); }

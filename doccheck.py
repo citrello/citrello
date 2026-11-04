@@ -24,7 +24,7 @@ import citeformat
 import citrello_core as core
 
 MANAGERS = {"zotero": "Zotero", "mendeley": "Mendeley or Citrello", "endnote": "EndNote", "word": "Word's own citations",
-            "typed": "typed by hand", "other": "another reference manager"}
+            "typed": "typed by hand", "pdf": "PDF", "other": "another reference manager"}
 
 
 # ---------------------------------------------------------------------------
@@ -195,6 +195,99 @@ def read_citations(path):
 
 
 # ---------------------------------------------------------------------------
+# PDF: the text of the reference list and of the body
+# ---------------------------------------------------------------------------
+
+PDF_HEADING_RE = re.compile(r"^\s*(?:\d+\.?\s*)?(references|bibliography|literature cited|works cited|reference list|"
+                            r"references and notes|sources)\s*:?\s*$", re.I)
+PDF_END_RE = re.compile(r"^\s*(?:\d+\.?\s*)?(appendix|appendices|acknowledg|supplementary|supporting information|"
+                        r"author contributions|declaration of|conflicts? of interest|data availability|biograph)", re.I)
+NUM_START_RE = re.compile(r"^\s*(?:\[(\d{1,3})\]|(\d{1,3})\.)\s+\S")
+AUTHOR_START_RE = re.compile(r"^[A-Z\u00C0-\u017F][\w\u00C0-\u017F'\u2019\-]+(?: [A-Z][\w'\-]+)?,\s+(?:[A-Z]\.|[A-Z][a-z]+)")
+
+
+def pdf_text(path):
+    """Text of each page, with running headers/footers and page numbers removed."""
+    from pypdf import PdfReader
+    reader = PdfReader(path)
+    pages = [(p.extract_text() or "").splitlines() for p in reader.pages]
+    counts = {}
+    for lines in pages:
+        for ln in set(l.strip() for l in lines):
+            counts[ln] = counts.get(ln, 0) + 1
+    repeated = {ln for ln, n in counts.items() if n >= 3 and len(pages) >= 4 and len(ln) < 120}
+    out = []
+    for lines in pages:
+        for ln in lines:
+            t = ln.strip()
+            if not t or t in repeated or re.fullmatch(r"\d{1,4}|page \d+( of \d+)?", t, re.I):
+                continue
+            out.append(t)
+    return out
+
+
+def split_pdf_references(lines):
+    """-> (body lines, [(number, text)]) from the lines of a PDF."""
+    start = None
+    for i in range(len(lines) - 1, -1, -1):
+        if PDF_HEADING_RE.match(lines[i]):
+            start = i
+            break
+    if start is None:
+        return lines, []
+    body, rest = lines[:start], lines[start + 1:]
+    for j, ln in enumerate(rest):
+        if PDF_END_RE.match(ln) and len(ln) < 60:
+            rest = rest[:j]
+            break
+    numbered = sum(1 for ln in rest if NUM_START_RE.match(ln))
+    by_author = sum(1 for ln in rest if AUTHOR_START_RE.match(ln))
+    use_numbers = numbered >= 2 or (numbered == 1 and not by_author)  # short lists count too
+    entries, cur, expect = [], None, 1
+    for ln in rest:
+        m = NUM_START_RE.match(ln) if use_numbers else None
+        n = int(m.group(1) or m.group(2)) if m else None
+        new = (m and n in (expect, expect + 1)) if use_numbers else (
+            AUTHOR_START_RE.match(ln) and (cur is None or re.search(r"(\.|\d)\s*$", cur[1]) or YEAR_IN.search(cur[1])))
+        if new:
+            if cur:
+                entries.append(cur)
+            if m:
+                expect = n + 1
+                ln = ln[m.end(0) - 1:].lstrip()
+            cur = [n or len(entries) + 1, ln]
+        elif cur:
+            cur[1] = (cur[1][:-1] if cur[1].endswith("-") and not cur[1].endswith(" -") else cur[1] + " ") + ln
+    if cur:
+        entries.append(cur)
+    return body, [(n, re.sub(r"\s+", " ", t).strip()) for n, t in entries if len(t) > 25]
+
+
+YEAR_IN = re.compile(r"\b(19|20)\d{2}[a-z]?\b")
+
+
+def _pdf_cited(body_text, refs, numbered):
+    """Which references the body cites: numbers in [..] for numbered lists; surname and year otherwise."""
+    if numbered:
+        cited = set()
+        for grp in re.findall(r"\[([\d,\s\u2013\-]+)\]", body_text):
+            for part in grp.split(","):
+                a, _, b = part.replace("\u2013", "-").strip().partition("-")
+                if a.strip().isdigit():
+                    lo = int(a)
+                    hi = int(b) if b.strip().isdigit() else lo
+                    cited.update(range(lo, min(hi, lo + 200) + 1))
+        return cited
+    cited = set()
+    for r in refs:
+        fam = next((a.get("family") or a.get("literal") for a in r["csl"].get("author", []) if a), "")
+        y = core.year_of(r["csl"])
+        if fam and y and re.search(re.escape(fam.split()[-1]) + r"[^.;()]{0,60}?" + y, body_text):
+            cited.add(r["number"])
+    return cited
+
+
+# ---------------------------------------------------------------------------
 # The check
 # ---------------------------------------------------------------------------
 
@@ -219,15 +312,43 @@ def _duplicates(refs):
 def check(path, offline=False, email=None, progress=None):
     """The full report for one .docx."""
     say = progress or (lambda *a: None)
-    fields = read_citations(path)
-    document = docx.Document(path)
-    try:
-        _, entries = core.find_bibliography(document)
-    except SystemExit:
-        entries = []
     citation_issues, refs = [], []
+    is_pdf = path.lower().endswith(".pdf")
+    if is_pdf:
+        body, pdf_entries = split_pdf_references(pdf_text(path))
+        if not pdf_entries:
+            raise ValueError("No reference list was found in this PDF (a heading such as 'References' followed by "
+                             "the entries). Scanned PDFs without text can't be read.")
+        fields, entries = {"items": {}, "managers": [], "other": 0, "bibliography_field": False}, []
+    else:
+        fields = read_citations(path)
+        document = docx.Document(path)
+        try:
+            _, entries = core.find_bibliography(document)
+        except SystemExit:
+            entries = []
 
-    if fields["items"]:
+    if is_pdf:
+        source = "pdf"
+        numbered = all(isinstance(n, int) for n, _ in pdf_entries) and len(pdf_entries) >= 2 and \
+            [n for n, _ in pdf_entries] == sorted(n for n, _ in pdf_entries)
+        for i, (num, text) in enumerate(pdf_entries, 1):
+            refs.append({**core.resolve_reference(num, text, True), "cited": None, "typed_text": True})
+        body_text = " ".join(body)
+        has_brackets = bool(re.search(r"\[\d+(?:[,\u2013\-]\s*\d+)*\]", body_text))
+        cited = _pdf_cited(body_text, refs, numbered and has_brackets)
+        if (numbered and has_brackets) or not numbered:
+            for r in refs:
+                r["cited"] = r["number"] in cited
+            if numbered and has_brackets:
+                listed = {r["number"] for r in refs}
+                ghost = sorted(n for n in cited if n not in listed)
+                if ghost:
+                    citation_issues.append({"level": "problem", "text": "Cited but not in the reference list: " +
+                                            ", ".join(f"[{n}]" for n in ghost[:15]) + "."})
+        citation_issues.append({"level": "info", "text": "Read from a PDF: citations are matched from the text, "
+                                "so check anything flagged as never cited."})
+    elif fields["items"]:
         source = [m for m in fields["managers"] if m != "other"][0] if [m for m in fields["managers"] if m != "other"] else "other"
         order = []
         for group in fields["citations"]:
@@ -298,3 +419,147 @@ def check(path, offline=False, email=None, progress=None):
     return {"source": source, "manager": MANAGERS.get(source, source), "managers": fields["managers"],
             "online": not offline, "references": len(refs), "counts": counts, "duplicates": dups,
             "citation_issues": citation_issues, "refs": refs}
+
+
+# ---------------------------------------------------------------------------
+# Fixing a Word document
+# ---------------------------------------------------------------------------
+
+COMPARE = (("title", "title"), ("container-title", "journal"), ("volume", "volume"), ("issue", "issue"),
+           ("page", "pages"), ("DOI", "DOI"))
+
+
+def _changes(before, after):
+    out = []
+    for k, label in COMPARE:
+        a, b = str(before.get(k) or "").strip(), str(after.get(k) or "").strip()
+        if b and core.norm(a) != core.norm(b):
+            out.append(f"{label} added" if not a else f"{label} corrected")
+    ya, yb = core.year_of(before), core.year_of(after)
+    if yb and ya != yb:
+        out.append("year added" if not ya else f"year corrected ({ya} → {yb})")
+    if len(after.get("author") or []) > len(before.get("author") or []):
+        out.append("authors completed")
+    return out
+
+
+def _payload_items(instr, data):
+    """The (identifier, citationItem extras) of a citation field, in order."""
+    s = instr.strip()
+    up = s.upper()
+    if "CSL_CITATION" in up:
+        m = re.search(r"CSL_CITATION\s+(\{.*\})\s*$", s, re.S)
+        try:
+            payload = json.loads(m.group(1)) if m else {}
+        except ValueError:
+            payload = {}
+        out = []
+        for ci in payload.get("citationItems", []):
+            d = ci.get("itemData") or {}
+            ident = str((ci.get("uris") or [None])[0] or ci.get("id") or d.get("id") or "")
+            extra = {k: ci[k] for k in ("locator", "label", "prefix", "suffix", "suppress-author") if ci.get(k)}
+            out.append((ident, extra))
+        return out
+    if up.startswith("ADDIN EN.CITE"):
+        return [(ident, {}) for ident, _ in _endnote_items(data or s)]
+    if re.match(r"CITATION\s", s):
+        return [("word:" + tag, {}) for tag in re.findall(r"(?:^CITATION|\\m)\s+(\S+)", s)]
+    return None
+
+
+def _set_instr(field, text):
+    first = True
+    for r in list(field["begin"].itersiblings()):
+        if r is field["separate"] or r is field["end"]:
+            break
+        it = r.find(qn("w:instrText"))
+        if it is not None:
+            if first:
+                it.text = text
+                first = False
+            else:
+                r.getparent().remove(r)
+    fc = field["begin"].find(qn("w:fldChar"))
+    fd = fc.find(qn("w:fldData")) if fc is not None else None
+    if fd is not None:
+        fc.remove(fd)
+
+
+def fix(path, report, out, style_id=None, project=None):
+    """Write a corrected copy of the document: live citations, corrected details, duplicates merged, the
+    reference list rebuilt in the chosen style. The references are added to the library (they're what the live
+    citations point to). Returns a summary of the changes."""
+    import library
+    if report["source"] == "pdf":
+        raise ValueError("A PDF can't be changed. Fix the Word version of the document instead.")
+    refs = [r for r in report["refs"] if r["csl"].get("title")]
+    before = {r["number"]: dict(r.get("typed") or {}) for r in refs}
+    in_lib = library.add_records(refs, project)
+    keys = {n: it["key"] for n, it in in_lib.items()}
+    data = library.load()
+    work = out + ".tmp.docx"
+
+    if report["source"] == "typed":
+        core.convert_document(path, refs, ("bracket", "superscript", "paren"), "auto", work)
+    else:
+        by_ident = {r.get("manager_id"): keys.get(r["number"]) for r in refs}
+        lib_items = {it["key"]: it for it in data["items"]}
+        document = docx.Document(path)
+        body = document.element.body
+        for f in citeformat.find_fields(body):
+            fc = f["begin"].find(qn("w:fldChar"))
+            fd = fc.find(qn("w:fldData")) if fc is not None else None
+            raw = ""
+            if fd is not None and fd.text:
+                try:
+                    raw = base64.b64decode(re.sub(r"\s+", "", fd.text) + "==").decode("utf-8", "replace")
+                except ValueError:
+                    raw = ""
+            items = _payload_items(f["instr"], raw)
+            up = f["instr"].strip().upper()
+            if items is None:
+                if re.search(r"ZOTERO_BIBL|CSL_BIBLIOGRAPHY|EN\.REFLIST|^BIBLIOGRAPHY", up):
+                    _set_instr(f, "ADDIN Mendeley Bibliography CSL_BIBLIOGRAPHY ")
+                continue
+            group = []
+            for ident, extra in items:
+                key = by_ident.get(ident)
+                if key and key in lib_items:
+                    group.append({"id": key, "itemData": dict(lib_items[key]["csl"], id=key), "citrello-key": key,
+                                  **extra})
+            if group:
+                _set_instr(f, "ADDIN CSL_CITATION " + json.dumps(
+                    {"citationItems": group, "properties": {"noteIndex": 0}}, ensure_ascii=False))
+        document.save(work)
+    res = citeformat.update_document(work, out, style_id, add_missing=False)
+    try:
+        import os
+        os.remove(work)
+    except OSError:
+        pass
+
+    data = library.load()
+    final = {it["key"]: it["csl"] for it in data["items"]}
+    corrected, merged, seen = [], [], {}
+    for r in refs:
+        k = keys.get(r["number"])
+        if not k:
+            continue
+        if k in seen:
+            merged.append(f"[{r['number']}] merged into [{seen[k]}]")
+            continue
+        seen[k] = r["number"]
+        ch = _changes(before.get(r["number"], {}), final.get(k, {}))
+        if ch:
+            corrected.append({"number": r["number"], "title": final[k].get("title", ""), "changes": ch})
+    cited_keys = set(res["keys"])
+    dropped = [r["number"] for r in refs if r.get("cited") is False and keys.get(r["number"]) not in cited_keys]
+    still = [{"number": r["number"], "title": r["csl"].get("title", ""),
+              "text": "; ".join(c["text"] for c in r.get("checks", []) if c["level"] == "problem")}
+             for r in refs if r.get("reliability") == "problem"]
+    # what rebuilding can't fix: citations to references that aren't in the list, citations not recognised
+    unfixable = [i["text"] for i in report["citation_issues"] if i["level"] == "problem"
+                 and not re.search(r"listed more than once|Refresh the bibliography|skips", i["text"])]
+    return {"style": res["style"]["title"], "citations": res["citations"], "entries": res["entries"],
+            "corrected": corrected, "merged": merged, "dropped_uncited": dropped, "still_problems": still,
+            "unfixable": unfixable + [m for m in res["report"] if "not found" in m.lower()]}

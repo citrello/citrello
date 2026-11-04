@@ -128,7 +128,7 @@ def start_verify(keys, include_verified):
 
 def check_public(cid):
     c = CHECKS[cid]
-    out = {k: c[k] for k in ("state", "i", "n", "step", "error", "name", "added")}
+    out = {k: c.get(k) for k in ("state", "i", "n", "step", "error", "name", "added", "fixed")}
     rep = c.get("report")
     if rep:
         index = library._index(library.load()["items"])
@@ -854,6 +854,13 @@ class Handler(BaseHTTPRequestHandler):
         m = re.fullmatch(r"/api/doccheck/(\w+)", path)
         if m and m.group(1) in CHECKS:
             return self.send(200, check_public(m.group(1)))
+        m = re.fullmatch(r"/api/doccheck/(\w+)/fixed\.docx", path)
+        if m and m.group(1) in CHECKS and CHECKS[m.group(1)].get("fixed_path"):
+            c = CHECKS[m.group(1)]
+            name = os.path.basename(c["fixed_path"])
+            return self.send(200, open(c["fixed_path"], "rb").read(),
+                             "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                             {"Content-Disposition": "attachment; filename*=UTF-8''" + urllib.parse.quote(name)})
         m = re.fullmatch(r"/api/doccheck/(\w+)/report\.csv", path)
         if m and m.group(1) in CHECKS and CHECKS[m.group(1)].get("report"):
             c = CHECKS[m.group(1)]
@@ -1120,9 +1127,24 @@ class Handler(BaseHTTPRequestHandler):
             return self.account_post(path[len("/api/account/"):])
         if path == "/api/doccheck":
             data = self.body()
-            if not data.startswith(b"PK"):
-                return self.send(400, {"error": "Choose a Word document (.docx). For LaTeX, use LaTeX and Overleaf below."})
-            return self.send(200, {"id": start_check(urllib.parse.unquote(self.headers.get("X-Filename", "document.docx")), data)})
+            name = urllib.parse.unquote(self.headers.get("X-Filename", "document.docx"))
+            if data.startswith(b"%PDF"):
+                name = os.path.splitext(name)[0] + ".pdf"
+            elif not data.startswith(b"PK"):
+                return self.send(400, {"error": "Choose a Word document (.docx) or a PDF. For LaTeX, use LaTeX and Overleaf below."})
+            return self.send(200, {"id": start_check(name, data)})
+        m = re.fullmatch(r"/api/doccheck/(\w+)/fix", path)
+        if m and m.group(1) in CHECKS and CHECKS[m.group(1)].get("report"):
+            c = CHECKS[m.group(1)]
+            b = self.json_body()
+            out = os.path.join(c["dir"], os.path.splitext(c["name"])[0] + "_fixed.docx")
+            try:
+                c["fixed"] = doccheck.fix(c["path"], c["report"], out, b.get("style") or load_config().get("style"),
+                                          (b.get("project") or "").strip() or None)
+                c["fixed_path"] = out
+            except ValueError as e:
+                return self.send(400, {"error": str(e)})
+            return self.send(200, check_public(m.group(1)))
         m = re.fullmatch(r"/api/doccheck/(\w+)/add", path)
         if m and m.group(1) in CHECKS and CHECKS[m.group(1)].get("report"):
             c = CHECKS[m.group(1)]

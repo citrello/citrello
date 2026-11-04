@@ -29,7 +29,7 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-      - run: pip install python-docx citeproc-py pytest
+      - run: pip install python-docx citeproc-py pypdf pytest
       - name: End-to-end test against a local copy of the bridge
         run: |
           npx wrangler d1 migrations apply citrello --local

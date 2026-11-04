@@ -292,6 +292,35 @@ def test_07b_check_a_document(page, env):
     with page.expect_download() as dl:
         page.click('#chkResult a.btn')
     assert "Sustainable decommissioning" in open(dl.value.path(), encoding="utf-8-sig").read()
+    # fix it: live citations, the duplicate merged, the list rebuilt in IEEE
+    page.select_option("#chkStyle", "ieee")
+    page.click("#chkFix")
+    expect(res).to_contain_text("Duplicates merged", timeout=60000)
+    shot(page, "document-fixed")
+    with page.expect_download() as dl:
+        page.click('#chkResult a.btn.primary')
+    with zipfile.ZipFile(dl.value.path()) as z:
+        xml = z.read("word/document.xml").decode("utf-8")
+    assert "ZOTERO_ITEM" not in xml and "ADDIN CSL_CITATION" in xml and "CSL_BIBLIOGRAPHY" in xml
+
+
+def test_07c_check_a_pdf(page, env):
+    import importlib.util
+    spec = importlib.util.spec_from_file_location("dfix", os.path.join(ROOT, "tests", "test_doccheck.py"))
+    dfix = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(dfix)
+    path = os.path.join(env["_TMP"], "paper.pdf")
+    dfix.make_pdf(path, [["Costs are underestimated [1] and planning matters [4]."],
+                         ["References", "[1] Topham, E. and McMillan, D. (2017). Sustainable decommissioning of an",
+                          "offshore wind farm. Renewable Energy, 102, pp.470-480.",
+                          "[2] Burton, T. and Jenkins, N. (2011). Wind Energy Handbook. Wiley, Chichester."]])
+    tab(page, "documents")
+    page.set_input_files("#chkFile", path)
+    res = page.locator("#chkResult")
+    expect(res).to_contain_text("2 references · PDF", timeout=120000)
+    expect(res).to_contain_text("Cited but not in the reference list: [4]")
+    expect(res).to_contain_text("A PDF can't be changed")
+    shot(page, "pdf-check")
 
 
 def _latex_zip():

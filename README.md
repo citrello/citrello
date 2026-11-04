@@ -41,11 +41,13 @@ your computer and is shared by the Citrello app, Claude and Word:
 - **Browser button:** a bookmark that adds the paper you're looking at, or a reference you've
   selected on the page, even on sites that block robots.
 - **Documents**
-  - **Check the references in any Word document:** whether it was made with Zotero, Mendeley, EndNote, Word's
+  - **Check the references in any Word document or PDF:** whether it was made with Zotero, Mendeley, EndNote, Word's
     own citations or typed by hand. Every reference is checked online (retracted, wrong or nonexistent DOI,
     authors or year not matching the publisher). Citrello also finds the same paper listed twice, citations
     pointing to a missing reference, references never cited, and reference lists that weren't refreshed. One
     click adds them all to your library; the report downloads as a spreadsheet.
+  - **Fix and download (Word):** a corrected copy with live citations, details corrected from the publisher's
+    record, duplicates merged and the reference list rebuilt in any style, plus a list of every change.
   - **Update:** turns `[@Key]` markers (what Claude writes) into live citations.
   - **Convert:** converts papers whose citations were typed by hand, numbered `[1]`, `[2–5]` or
     author-year `(Smith et al., 2020)`, into live citations.
@@ -132,7 +134,7 @@ Windows: requires Python 3.10+. Mac: `bash packaging/build_mac.sh` (builds `dist
 build_windows.bat
 ```
 The script creates `dist\Citrello.exe`, `dist\CitrelloMCP.exe` and `dist\Citrello.mcpb`. To run
-without building, use `Start Citrello.bat` (needs `pip install python-docx citeproc-py`).
+without building, use `Start Citrello.bat` (needs `pip install python-docx citeproc-py pypdf`).
 
 Each push to this repository is tested, and each version tag (`v1.0.0`, …) builds the Windows files
 and attaches them to a GitHub release automatically. See `.github/workflows/build.yml`.
@@ -141,7 +143,7 @@ The account and connector service is in [`bridge/`](bridge/README.md). It runs o
 
 Development setup:
 ```
-pip install python-docx citeproc-py pytest
+pip install python-docx citeproc-py pypdf pytest
 pytest
 ```
 

@@ -17,7 +17,7 @@ echo.
 set /p CID=Mendeley client ID: 
 set /p CSEC=Mendeley client secret: 
 python -c "import json,sys; json.dump({'client_id':sys.argv[1].strip(),'client_secret':sys.argv[2].strip()},open('app_config.json','w'))" "%CID%" "%CSEC%"
-python -m pip install --upgrade python-docx citeproc-py pyinstaller pillow
+python -m pip install --upgrade python-docx citeproc-py pypdf pyinstaller pillow
 python brand_icon.py citrello.ico
 python -m PyInstaller --noconfirm --clean --onefile --noconsole --name Citrello --icon citrello.ico ^
   --add-data "ui.html;." --add-data "clip.html;." --add-data "app_config.json;." --add-data "styles;styles" ^
