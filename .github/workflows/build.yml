@@ -18,7 +18,8 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-      - run: pip install python-docx citeproc-py pytest
+      - run: pip install python-docx citeproc-py pytest playwright
+      - run: python -m playwright install --with-deps chromium
       - run: pytest -q
 
   windows:
@@ -38,6 +39,22 @@ jobs:
         run: python -m PyInstaller --noconfirm --onefile --console --name CitrelloMCP --icon citrello.ico --add-data "styles;styles" --collect-data docx --collect-data citeproc mcp_server.py
       - name: Build Citrello.mcpb (one-click Claude Desktop extension)
         run: python make_mcpb.py dist\CitrelloMCP.exe dist\Citrello.mcpb
+      - name: End-to-end tests of the built app (a browser uses it like a person; online)
+        shell: pwsh
+        env:
+          CITRELLO_APP_CMD: dist\Citrello.exe
+          CITRELLO_MCP_CMD: dist\CitrelloMCP.exe
+          CITRELLO_E2E_ONLINE: "1"
+          CITRELLO_E2E_SHOTS: e2e-screenshots
+        run: |
+          pip install pytest playwright
+          python -m playwright install chromium
+          python -m pytest -v tests/e2e
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: e2e-screenshots-windows
+          path: e2e-screenshots
       - name: Build the Microsoft Store package (.msix)
         env:
           # From Partner Center -> Product identity (repository variables, not secrets)
@@ -119,6 +136,21 @@ jobs:
             | dist/Citrello.app/Contents/MacOS/CitrelloMCP | tee "$RUNNER_TEMP/mcp.txt"
           grep -q Topham2017 "$RUNNER_TEMP/mcp.txt"
           curl -s -X POST -H "Origin: http://localhost:8585" http://localhost:8585/api/quit || true
+      - name: End-to-end tests of the built app (a browser uses it like a person; online)
+        env:
+          CITRELLO_APP_CMD: dist/Citrello.app/Contents/MacOS/Citrello
+          CITRELLO_MCP_CMD: dist/Citrello.app/Contents/MacOS/CitrelloMCP
+          CITRELLO_E2E_ONLINE: "1"
+          CITRELLO_E2E_SHOTS: e2e-screenshots
+        run: |
+          python3 -m pip install pytest playwright
+          python3 -m playwright install chromium
+          python3 -m pytest -v tests/e2e
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: e2e-screenshots-mac
+          path: e2e-screenshots
       - uses: actions/upload-artifact@v4
         with:
           name: Citrello-mac

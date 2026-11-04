@@ -11,3 +11,4 @@ app_config.json
 .pytest_cache/
 site/shots/
 citrello.ico
+tests/e2e/screenshots/
