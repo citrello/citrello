@@ -31,10 +31,12 @@ jobs:
         with:
           python-version: "3.12"
       - run: pip install python-docx citeproc-py pypdf pyinstaller pillow
-      - name: Draw the icon
-        run: python brand_icon.py citrello.ico
+      - name: Draw the icons
+        run: |
+          python brand_icon.py citrello.ico
+          python brand_icon.py mcpb-icon.png 512
       - name: Build Citrello.exe (the app)
-        run: python -m PyInstaller --noconfirm --onefile --noconsole --name Citrello --icon citrello.ico --add-data "ui.html;." --add-data "clip.html;." --add-data "styles;styles" --collect-data docx --collect-data citeproc app.py
+        run: python -m PyInstaller --noconfirm --onefile --noconsole --name Citrello --icon citrello.ico --add-data "ui.html;." --add-data "clip.html;." --add-data "mcpb-icon.png;." --add-data "styles;styles" --collect-data docx --collect-data citeproc app.py
       - name: Build CitrelloMCP.exe (the Claude connector)
         run: python -m PyInstaller --noconfirm --onefile --console --name CitrelloMCP --icon citrello.ico --add-data "styles;styles" --collect-data docx --collect-data citeproc mcp_server.py
       - name: Build Citrello.mcpb (one-click Claude Desktop extension)
@@ -91,19 +93,14 @@ jobs:
       - name: Zip the Windows download (one folder with the three files)
         shell: pwsh
         run: |
-          New-Item -ItemType Directory -Force dist\zip\Citrello | Out-Null
-          Copy-Item dist\Citrello.exe, dist\CitrelloMCP.exe, dist\Citrello.mcpb dist\zip\Citrello\
-          Compress-Archive -Path dist\zip\Citrello -DestinationPath dist\Citrello-windows.zip -Force
+          # just the app and the connector, at the top of the zip (the Claude extension is built on the user's computer)
+          Compress-Archive -Path dist\Citrello.exe, dist\CitrelloMCP.exe -DestinationPath dist\Citrello-windows.zip -Force
       - name: Update test (install the app, offer it as a new version, click Update)
         run: python tests\update_smoke.py dist\Citrello-windows.zip
       - uses: actions/upload-artifact@v4
         with:
           name: Citrello-windows
-          path: |
-            dist/Citrello-windows.zip
-            dist/Citrello.exe
-            dist/CitrelloMCP.exe
-            dist/Citrello.mcpb
+          path: dist/Citrello-windows.zip
       - uses: actions/upload-artifact@v4
         with:
           name: Citrello-store-package
@@ -112,11 +109,7 @@ jobs:
         if: startsWith(github.ref, 'refs/tags/v')
         uses: softprops/action-gh-release@v2
         with:
-          files: |
-            dist/Citrello-windows.zip
-            dist/Citrello.exe
-            dist/CitrelloMCP.exe
-            dist/Citrello.mcpb
+          files: dist/Citrello-windows.zip
           generate_release_notes: true
 
   mac:
@@ -166,13 +159,9 @@ jobs:
       - uses: actions/upload-artifact@v4
         with:
           name: Citrello-mac
-          path: |
-            dist/Citrello-mac.zip
-            dist/Citrello-mac.mcpb
+          path: dist/Citrello-mac.zip
       - name: Attach to the release (version tags only)
         if: startsWith(github.ref, 'refs/tags/v')
         uses: softprops/action-gh-release@v2
         with:
-          files: |
-            dist/Citrello-mac.zip
-            dist/Citrello-mac.mcpb
+          files: dist/Citrello-mac.zip

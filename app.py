@@ -422,25 +422,40 @@ def _read_cfg(path):
         return "invalid"
 
 
-def extension_path():
-    """Citrello.mcpb, the one-click Claude Desktop extension, built next to Citrello.exe."""
-    base = os.path.dirname(sys.executable) if getattr(sys, "frozen", False) else os.path.dirname(os.path.abspath(__file__))
-    mac_app = sys.platform == "darwin" and getattr(sys, "frozen", False)
-    if mac_app:  # Citrello.app/Contents/MacOS/Citrello -> Contents/Resources/Citrello.mcpb
-        base = os.path.join(os.path.dirname(base), "Resources")
-    p = os.path.join(base, "Citrello.mcpb")
-    if not os.path.exists(p):
+def connector_exe():
+    """The connector program shipped beside the app (None when running from source)."""
+    if not getattr(sys, "frozen", False):
         return None
-    if store_package() or mac_app:  # the Store folder and the inside of a Mac .app aren't easy to drag from
-        copy = os.path.join(library.HOME, "Citrello.mcpb")
-        try:
-            if not os.path.exists(copy) or os.path.getmtime(copy) < os.path.getmtime(p):
-                os.makedirs(library.HOME, exist_ok=True)
-                shutil.copy2(p, copy)
-            return copy
-        except OSError:
-            return p
-    return p
+    exe = os.path.join(os.path.dirname(sys.executable), "CitrelloMCP.exe" if sys.platform.startswith("win") else "CitrelloMCP")
+    return exe if os.path.isfile(exe) else None
+
+
+def extension_path():
+    """Citrello.mcpb, the one-click Claude Desktop extension. It isn't shipped (it would hold a second copy of the
+    connector): it's built from the connector into the Citrello folder the first time it's needed, and again
+    after an update."""
+    import make_mcpb
+    exe = connector_exe()
+    if not exe:  # running from source: use one built with make_mcpb.py, if any
+        p = os.path.join(os.path.dirname(os.path.abspath(__file__)), "Citrello.mcpb")
+        return p if os.path.exists(p) else None
+    out = os.path.join(library.HOME, "Citrello.mcpb")
+    try:
+        if make_mcpb.bundle_version(out) != core.VERSION:
+            os.makedirs(library.HOME, exist_ok=True)
+            icon = None
+            try:
+                with open(resource("mcpb-icon.png"), "rb") as f:
+                    icon = f.read()
+            except OSError:
+                pass
+            tmp = out + ".tmp"
+            make_mcpb.build(exe, tmp, icon)
+            os.replace(tmp, out)
+        return out
+    except Exception:
+        traceback.print_exc()
+        return None
 
 
 def extension_installed():

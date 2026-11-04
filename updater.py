@@ -146,6 +146,12 @@ def apply_windows(zip_path, app_dir):
         z.extractall(work)
     src = os.path.join(work, "Citrello") if os.path.isdir(os.path.join(work, "Citrello")) else work
     names = [n for n in ("Citrello.exe", "CitrelloMCP.exe", "Citrello.mcpb") if os.path.isfile(os.path.join(src, n))]
+    stale = os.path.join(app_dir, "Citrello.mcpb")  # older versions shipped it; it's now built when needed
+    if "Citrello.mcpb" not in names and os.path.exists(stale):
+        try:
+            os.remove(stale)
+        except OSError:
+            pass
     if "Citrello.exe" not in names:
         raise ValueError("Update refused: Citrello.exe is missing from the download.")
     moved = []

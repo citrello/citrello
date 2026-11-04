@@ -27,7 +27,7 @@ your computer and is shared by the Citrello app, Claude and Word:
     publisher record.
 - **Claude connector:** Claude Desktop (and Claude Code) can search, add, organise, verify and
   format your references, check the citations in a text, and write or restyle Word documents with
-  live citations. Install it with one click (`Citrello.mcpb`).
+  live citations. Install it from Settings → Claude (Citrello makes the `Citrello.mcpb` extension file for you).
 - **ChatGPT, Claude on the web and phone:** sign in to a free Citrello account, then add the connector
   `https://mcp.citrello.app/mcp`. Requests go through Citrello's bridge to the app on your computer.
 - **Codex:** one click adds Citrello to the Codex app, CLI and IDE extension.
@@ -71,8 +71,9 @@ your computer and is shared by the Citrello app, Claude and Word:
   Mendeley account (import and export) and a Zotero account (import).
 
 ## Install (Windows)
-1. **Download** `Citrello.exe`, `CitrelloMCP.exe` and `Citrello.mcpb` from the
-   [latest release](https://github.com/citrello/citrello/releases/latest). Keep them in one folder.
+1. **Download** `Citrello-windows.zip` from the
+   [latest release](https://github.com/citrello/citrello/releases/latest). Right-click it → **Extract All** into
+   a permanent folder (for example Documents\Citrello). Keep its two files together.
 2. **Start** `Citrello.exe`. Your browser opens Citrello's window.
    - *Windows may say "Windows protected your PC" for new downloads: click **More info → Run
      anyway**.*
@@ -85,7 +86,7 @@ your computer and is shared by the Citrello app, Claude and Word:
 
 ## Install (Mac, beta)
 For Macs with Apple silicon (M1 or newer). The Word tab is Windows-only for now.
-1. **Download** `Citrello-mac.zip` and `Citrello-mac.mcpb` from the
+1. **Download** `Citrello-mac.zip` from the
    [latest release](https://github.com/citrello/citrello/releases/latest). Unzip `Citrello-mac.zip` and drag
    **Citrello** into **Applications**.
 2. **Open it the first time.** The app isn't signed with an Apple developer certificate yet, so macOS blocks
@@ -130,7 +131,8 @@ Windows: requires Python 3.10+. Mac: `bash packaging/build_mac.sh` (builds `dist
 ```
 build_windows.bat
 ```
-The script creates `dist\Citrello.exe`, `dist\CitrelloMCP.exe` and `dist\Citrello.mcpb`. To run
+The script creates `dist\Citrello.exe` and `dist\CitrelloMCP.exe`; the Claude extension (`Citrello.mcpb`) is
+built from the connector the first time you click Connect to Claude Desktop. To run
 without building, use `Start Citrello.bat` (needs `pip install python-docx citeproc-py pypdf`).
 
 Each push to this repository is tested, and each version tag (`v1.0.0`, …) builds the Windows files

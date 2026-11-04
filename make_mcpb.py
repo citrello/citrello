@@ -78,6 +78,15 @@ def manifest(tools, platform="win32"):
     }
 
 
+def bundle_version(path):
+    """The version written in an existing .mcpb, or None."""
+    try:
+        with zipfile.ZipFile(path) as z:
+            return json.loads(z.read("manifest.json")).get("version")
+    except (OSError, KeyError, ValueError, zipfile.BadZipFile):
+        return None
+
+
 def _version():
     sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
     import citrello_core
@@ -100,14 +109,15 @@ def _server_name(platform):
     return "CitrelloMCP.exe" if platform == "win32" else "CitrelloMCP"
 
 
-def build(exe, out):
-    """The platform follows the connector: CitrelloMCP.exe -> Windows, CitrelloMCP -> macOS."""
+def build(exe, out, icon=None):
+    """The platform follows the connector: CitrelloMCP.exe -> Windows, CitrelloMCP -> macOS.
+    icon: PNG bytes (the app passes the one it ships; otherwise it is drawn)."""
     if not os.path.isfile(exe):
         raise SystemExit(f"Connector not found: {exe}")
     platform = "win32" if exe.lower().endswith(".exe") else "darwin"
     with zipfile.ZipFile(out, "w", zipfile.ZIP_DEFLATED) as z:
         z.writestr("manifest.json", json.dumps(manifest(tool_list(), platform), indent=2))
-        z.writestr("icon.png", _icon())
+        z.writestr("icon.png", icon or _icon())
         info = zipfile.ZipInfo("server/" + _server_name(platform))
         info.external_attr = 0o755 << 16  # keep it executable on macOS
         info.compress_type = zipfile.ZIP_DEFLATED

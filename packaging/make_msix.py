@@ -138,10 +138,10 @@ def build(dist):
     layout = os.path.join(dist, "msix")
     shutil.rmtree(layout, ignore_errors=True)
     os.makedirs(layout)
-    for f in ("Citrello.exe", "CitrelloMCP.exe", "Citrello.mcpb"):
+    for f in ("Citrello.exe", "CitrelloMCP.exe"):
         src = os.path.join(dist, f)
         if not os.path.isfile(src):
-            raise SystemExit(f"Missing {src}: build the .exe files and the .mcpb first.")
+            raise SystemExit(f"Missing {src}: build the .exe files first.")
         shutil.copy2(src, layout)
     shutil.copy2(os.path.join(ROOT, "LICENSE"), os.path.join(layout, "LICENSE.txt"))
     write_assets(os.path.join(layout, "Assets"))

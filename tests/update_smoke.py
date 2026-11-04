@@ -53,11 +53,15 @@ def main(zip_path):
         exe = os.path.join(install, "Citrello.app", "Contents", "MacOS", "Citrello")
         marker = os.path.join(install, "Citrello.app", "Contents", "Resources", "OLD-MARKER")
     else:
+        folder = os.path.join(install, "Citrello")
         with zipfile.ZipFile(zip_path) as z:
-            z.extractall(install)
-        exe = os.path.join(install, "Citrello", "Citrello.exe")
-        marker = os.path.join(install, "Citrello", "Citrello.mcpb")
-    open(marker, "wb").write(b"old")  # must be gone (or replaced) after the update
+            z.extractall(folder)
+        exe = os.path.join(folder, "Citrello.exe")
+        marker = os.path.join(folder, "CitrelloMCP.exe")
+    if sys.platform == "darwin":
+        open(marker, "wb").write(b"old")  # must be gone after the update
+    else:
+        open(marker, "wb").write(b"old")  # the connector isn't running: the update must replace it
 
     name = os.path.basename(zip_path)
 
@@ -116,7 +120,7 @@ def main(zip_path):
     if sys.platform == "darwin":
         assert not os.path.exists(marker), "the .app bundle wasn't replaced"
     else:
-        assert open(marker, "rb").read() != b"old", "Citrello.mcpb wasn't replaced"
+        assert open(marker, "rb").read() != b"old", "CitrelloMCP.exe wasn't replaced"
         assert os.path.exists(exe + ".old") or True  # the old exe is renamed (deleted at a later start)
     try:
         api("api/quit", b"{}")
