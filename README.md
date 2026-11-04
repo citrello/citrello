@@ -112,10 +112,12 @@ Once installed, Citrello's tools are available in every Claude Desktop chat. For
 - to look up references (Crossref, doi.org, the page you add);
 - to download citation styles;
 - to reach your Mendeley or Zotero account, if you connect them;
+- once a day, an anonymous usage count: a random install ID, the app version and the operating system
+  (turn it off in Settings → Account);
 - if you sign in, to keep the connection open for ChatGPT and Claude on the web.
 
 The account is optional. It stores your email, your computers and whether you want feature emails. See the
-[privacy policy](https://mcp.citrello.app/privacy). There is no other tracking.
+[privacy policy](https://citrello.app/privacy). There is no other tracking.
 
 ## Build from source
 Windows: requires Python 3.10+. Mac: `bash packaging/build_mac.sh` (builds `dist/Citrello.app`).

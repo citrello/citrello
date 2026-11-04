@@ -61,7 +61,8 @@ def env():
     tmp = tempfile.mkdtemp(prefix="citrello_e2e_")
     e = dict(os.environ, CITRELLO_HOME=os.path.join(tmp, "Citrello"), CITRELLO_ACCOUNT_FILE=os.path.join(tmp, "account.json"),
              CITRELLO_BIB_EXPORTS=os.path.join(tmp, "exports.json"), CODEX_HOME=os.path.join(tmp, "codex"),
-             CITRELLO_LEGACY_HOME=os.path.join(tmp, "none"), CITRELLO_BRIDGE="http://127.0.0.1:9")
+             CITRELLO_LEGACY_HOME=os.path.join(tmp, "none"), CITRELLO_BRIDGE="http://127.0.0.1:9",
+             CITRELLO_APP_CONFIG=os.path.join(tmp, "app.json"), CITRELLO_INSTALL_FILE=os.path.join(tmp, "install.json"))
     if ONLINE:  # the unit tests' conftest points lookups at a dead address; use the real services here
         e.pop("CITRELLO_CROSSREF", None)
         e.pop("CITRELLO_DOIORG", None)
@@ -134,6 +135,18 @@ def write(env, name, data):
 
 
 # ---------------------------------------------------------------------------
+
+def test_00_welcome_on_first_launch(page):
+    expect(page.locator("#welcome")).to_be_visible()
+    expect(page.locator("#wTitle")).to_have_text("Welcome to Citrello")
+    expect(page.locator("#wNews")).not_to_be_checked()   # feature emails are opt-in
+    shot(page, "welcome")
+    page.click("#wSkip")
+    expect(page.locator("#welcome")).to_be_hidden()
+    page.reload()
+    page.wait_for_timeout(1000)
+    expect(page.locator("#welcome")).to_be_hidden()     # only once
+
 
 def test_01_starts_with_an_empty_library(page):
     expect(page.locator("#libEmpty")).to_be_visible()

@@ -503,6 +503,25 @@ async function mcp(request, env) {
 }
 
 // ---------------------------------------------------------------------------
+// Anonymous usage count (the app sends one ping a day; no personal data)
+// ---------------------------------------------------------------------------
+
+async function usagePing(request, env) {
+  const b = await readBody(request);
+  const id = String(b.install_id || "");
+  if (!/^[0-9a-f]{32}$/.test(id)) throw new HttpError(400, "invalid_request", "Bad install_id");
+  const clip = (v, n) => String(v ?? "").replace(/[^\w.\- ]/g, "").slice(0, n);
+  const os = ["windows", "mac", "linux"].includes(b.os) ? b.os : "other";
+  const t = now(), dayStart = t - (t % 86400);
+  await env.DB.prepare(`INSERT INTO installs (id, first_seen, last_seen, days, version, os, os_version, store, signed_in)
+      VALUES (?1, ?2, ?2, 1, ?3, ?4, ?5, ?6, ?7)
+      ON CONFLICT(id) DO UPDATE SET days = days + (CASE WHEN last_seen < ?8 THEN 1 ELSE 0 END), last_seen = ?2,
+        version = ?3, os = ?4, os_version = ?5, store = ?6, signed_in = ?7`)
+    .bind(id, t, clip(b.version, 20), os, clip(b.os_version, 20), b.store ? 1 : 0, b.signed_in ? 1 : 0, dayStart).run();
+  return json({ ok: true });
+}
+
+// ---------------------------------------------------------------------------
 // Unsubscribe and admin
 // ---------------------------------------------------------------------------
 
@@ -541,6 +560,17 @@ async function adminStats(request, env) {
     newsletter_subscribers: await q("SELECT COUNT(*) AS n FROM users WHERE newsletter = 1"),
     devices: await q("SELECT COUNT(*) AS n FROM devices"),
     users_with_connector: await q("SELECT COUNT(DISTINCT user_id) AS n FROM oauth_tokens WHERE kind = 'refresh' AND expires_at > ?", t),
+    installs: {
+      total: await q("SELECT COUNT(*) AS n FROM installs WHERE id != ?", ""),
+      active_1d: await q("SELECT COUNT(*) AS n FROM installs WHERE last_seen > ?", t - 86400),
+      active_7d: await q("SELECT COUNT(*) AS n FROM installs WHERE last_seen > ?", d7),
+      active_30d: await q("SELECT COUNT(*) AS n FROM installs WHERE last_seen > ?", d30),
+      new_7d: await q("SELECT COUNT(*) AS n FROM installs WHERE first_seen > ?", d7),
+      returning_30d: await q("SELECT COUNT(*) AS n FROM installs WHERE last_seen > ? AND days > 1", d30),
+      signed_in_30d: await q("SELECT COUNT(*) AS n FROM installs WHERE last_seen > ? AND signed_in = 1", d30),
+      by_os_30d: (await env.DB.prepare("SELECT os, COUNT(*) AS n FROM installs WHERE last_seen > ? GROUP BY os ORDER BY n DESC").bind(d30).all()).results,
+      by_version_30d: (await env.DB.prepare("SELECT version, COUNT(*) AS n FROM installs WHERE last_seen > ? GROUP BY version ORDER BY n DESC LIMIT 10").bind(d30).all()).results,
+    },
   });
 }
 
@@ -606,6 +636,7 @@ async function route(request, env) {
   if (path === "/token" && m === "POST") return token(request, env);
   if (path === "/revoke" && m === "POST") return revoke(request, env);
 
+  if (path === "/api/ping" && m === "POST") return usagePing(request, env);
   if (path === "/api/auth/start" && m === "POST") return apiAuthStart(request, env);
   if (path === "/api/auth/verify" && m === "POST") return apiAuthVerify(request, env);
   if (path === "/api/me" && (m === "GET" || m === "POST")) return apiMe(request, env);
@@ -641,6 +672,8 @@ export default {
       env.DB.prepare("DELETE FROM oauth_codes WHERE expires_at < ?").bind(t),
       env.DB.prepare("DELETE FROM oauth_tokens WHERE expires_at < ?").bind(t),
       env.DB.prepare("DELETE FROM login_codes WHERE window_start < ? AND expires_at < ?").bind(t - 86400, t),
+      // installs not seen for two years are forgotten
+      env.DB.prepare("DELETE FROM installs WHERE last_seen < ?").bind(t - 2 * 365 * 86400),
     ]);
   },
 };

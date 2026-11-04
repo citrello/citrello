@@ -104,6 +104,10 @@ Citrello app on your own computer. They are never uploaded to or stored by Citre
 the computers you signed in on (computer name, system and app version), and whether you agreed to emails about
 new features. We use this to let you use the same account on several computers and connectors, to count how many
 people use Citrello, and, only if you agreed, to email you about new features.</p>
+<p><b>Anonymous usage count.</b> Once a day, while it runs, the app sends a random install ID made on your
+computer, the app version, your operating system and its version, and whether you're signed in. Nothing else: no
+name, email, IP address record, library or documents. It tells us how many people use Citrello. Turn it off in the
+app (Settings → Account).</p>
 <p><b>Connectors (ChatGPT, Claude on the web).</b> When a connector uses your library, its request is passed through
 our server to the Citrello app on your computer and the answer is passed back. We don't keep the contents of these
 requests. The connector's own provider (for example OpenAI or Anthropic) handles what you send it under its own

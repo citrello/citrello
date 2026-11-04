@@ -113,8 +113,15 @@ def test_end_to_end():
                                                 "arguments": {"text": "x", "output_path": "/tmp/x.docx"}})[2])["result"]
     assert res["isError"]  # web requests can't write outside Citrello's Documents folder
 
+    iid = os.urandom(16).hex()
+    for _ in range(2):
+        assert call("POST", "/api/ping", {"install_id": iid, "version": "1.0.0", "os": "mac", "os_version": "15",
+                                          "store": False, "signed_in": True})[0] == 200
+    assert call("POST", "/api/ping", {"install_id": "../../etc"})[0] == 400
     st, _, raw = call("GET", "/admin/stats", headers={"Authorization": "Bearer testadmin"})
-    assert st == 200 and json.loads(raw)["users"] >= 1
+    stats = json.loads(raw)
+    assert st == 200 and stats["users"] >= 1
+    assert stats["installs"]["active_1d"] >= 1 and any(r["os"] == "mac" for r in stats["installs"]["by_os_30d"])
     assert call("GET", "/admin/stats", headers={"Authorization": "Bearer nope"})[0] == 401
     assert call("POST", "/admin/broadcast", {"subject": "s", "text": "t"}, {"Authorization": "Bearer testadmin"})[0] == 400
 

@@ -143,6 +143,20 @@
   .empty-detail { color: var(--muted); text-align: center; padding: 40px 10px; }
   .empty-detail b { display: block; font: 400 22px var(--serif); color: var(--cobalt); margin-bottom: 6px; }
 
+  /* welcome */
+  .overlay { position: fixed; inset: 0; background: rgba(15, 23, 48, .55); display: grid; place-items: center; z-index: 10; padding: 16px; }
+  .welcome { background: var(--card); color: var(--ink); border-radius: 22px; max-width: 560px; width: 100%; max-height: calc(100vh - 32px); overflow: auto;
+             box-shadow: 10px 10px 0 var(--lemon); border: 2px solid var(--cobalt); }
+  .welcome .wtiles { height: 26px; border-radius: 20px 20px 0 0; background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='64' height='64' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' fill='%231d3f8f'/%3E%3Ccircle cx='32' cy='32' r='14' fill='%23f6d646'/%3E%3Cpath d='M32 6c6 8 6 14 0 18c-6-4-6-10 0-18zM32 58c6-8 6-14 0-18c-6 4-6 10 0 18zM6 32c8-6 14-6 18 0c-4 6-10 6-18 0zM58 32c-8-6-14-6-18 0c4 6 10 6 18 0z' fill='%23fff'/%3E%3Ccircle cx='32' cy='32' r='5' fill='%233e7b4f'/%3E%3C/svg%3E") repeat-x left center/26px 26px #1d3f8f; }
+  .welcome .wbody { padding: 26px 30px 28px; }
+  .welcome h1 { font-size: 34px; margin-bottom: 8px; }
+  .welcome ul.perks { list-style: none; padding: 0; margin: 14px 0 18px; }
+  .welcome ul.perks li { padding: 6px 0 6px 28px; position: relative; }
+  .welcome ul.perks li::before { content: ""; position: absolute; left: 4px; top: 12px; width: 12px; height: 12px; border-radius: 50%; background: var(--lemon); box-shadow: 0 0 0 3px var(--lemon-soft); }
+  .welcome .wrow { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 10px; }
+  .welcome .wrow input { flex: 1; min-width: 200px; }
+  .welcome .fine { font-size: 13px; color: var(--muted); margin: 16px 0 0; }
+  .welcome .skip { margin-top: 14px; }
   @media (max-width: 1180px) { .lib { grid-template-columns: 1fr; } .detail { position: static; max-height: none; } }
   @media (max-width: 760px) {
     .app { grid-template-columns: 1fr; }
@@ -355,6 +369,7 @@
         </div>
       </div>
       <div id="acctMsg"></div>
+      <label class="small" style="display:block;margin-top:14px"><input type="checkbox" id="usageStats"> Send an anonymous daily count (app version and system only) so we know how many people use Citrello</label>
     </div>
 
     <div class="card">
@@ -504,6 +519,37 @@
   <datalist id="projectList"></datalist>
 </main>
 </div>
+<div class="overlay hidden" id="welcome" role="dialog" aria-modal="true" aria-labelledby="wTitle">
+  <div class="welcome"><div class="wtiles" aria-hidden="true"></div><div class="wbody">
+    <div id="wStart">
+      <h1 id="wTitle">Welcome to Citrello</h1>
+      <p class="muted" style="margin:0">Your library stays on this computer. A free account adds:</p>
+      <ul class="perks">
+        <li><b>ChatGPT and Claude on the web and phone</b> can use your library.</li>
+        <li><b>The same account on all your computers.</b></li>
+        <li><b>News about new features</b>, if you'd like it.</li>
+      </ul>
+      <div class="wrow"><input type="email" id="wEmail" placeholder="Your email" autocomplete="email" aria-label="Your email">
+        <button class="primary" id="wSend">Email me a code</button></div>
+      <label class="small" style="display:block;margin-top:10px"><input type="checkbox" id="wNews"> Email me about new features (a few times a year)</label>
+    </div>
+    <div id="wCode" class="hidden">
+      <h1>Check your email</h1>
+      <p class="muted" style="margin:0" id="wSent"></p>
+      <div class="wrow"><input type="text" id="wCodeIn" inputmode="numeric" maxlength="8" placeholder="6-digit code" aria-label="Code">
+        <button class="primary" id="wVerify">Sign in</button></div>
+      <button class="link" id="wBack" style="margin-top:10px">Use a different email</button>
+    </div>
+    <div id="wDone" class="hidden">
+      <h1>You're signed in</h1>
+      <p>Next: paste a DOI or a link into the search box to add your first reference, or import your Mendeley or Zotero library. To use ChatGPT, see <b>Settings → ChatGPT and Claude on the web</b>.</p>
+      <div class="wrow"><button class="primary" id="wFinish">Start using Citrello</button></div>
+    </div>
+    <div id="wMsg"></div>
+    <button class="link skip" id="wSkip">Skip for now</button>
+    <p class="fine">Citrello sends an anonymous daily count (app version and system, no email or library) so we know how many people use it. You can turn it off in Settings. <a href="https://citrello.app/privacy" target="_blank" rel="noopener">Privacy policy</a></p>
+  </div></div>
+</div>
 <div class="toast" id="toast"></div>
 
 <script>
@@ -548,6 +594,7 @@ async function loadStatus() {
   $("email").value = status.email || "";
   $("zUser").value = status.zotero_user || "";
   $("zKey").placeholder = status.has_zotero_key ? "saved" : "";
+  $("usageStats").checked = status.usage_stats;
 }
 async function loadStyles() {
   const r = await api("/api/styles"); styles = r.styles;
@@ -1143,12 +1190,49 @@ function renderDone() {
 }
 $("again").onclick = () => $("file").click();
 
+// ---------- welcome (first launch) ----------
+function closeWelcome() { show("welcome", false); post("/api/config", {welcome_done: "1"}).catch(() => {}); $("q").focus(); }
+function maybeWelcome() {
+  if (status.welcome_done || status.signed_in) return;
+  show("welcome"); setTimeout(() => $("wEmail").focus(), 50);
+}
+$("wSend").onclick = async () => {
+  const email = $("wEmail").value.trim(); if (!email) return $("wEmail").focus();
+  $("wSend").disabled = true; $("wMsg").innerHTML = "";
+  try {
+    await post("/api/account/start", {email});
+    show("wStart", false); show("wCode"); $("wSent").innerHTML = `We sent a 6-digit code to <b>${esc(email)}</b>. Check your inbox and spam folder.`;
+    $("wCodeIn").value = ""; $("wCodeIn").focus();
+  } catch (e) { notice("wMsg", "err", esc(e.message)); }
+  $("wSend").disabled = false;
+};
+$("wVerify").onclick = async () => {
+  $("wVerify").disabled = true; $("wMsg").innerHTML = "";
+  try {
+    const a = await post("/api/account/verify", {email: $("wEmail").value.trim(), code: $("wCodeIn").value, newsletter: $("wNews").checked});
+    renderSideConn(a); show("wCode", false); show("wDone"); show("wSkip", false);
+    post("/api/config", {welcome_done: "1"}).catch(() => {});
+  } catch (e) { notice("wMsg", "err", esc(e.message)); }
+  $("wVerify").disabled = false;
+};
+$("wEmail").onkeydown = (e) => { if (e.key === "Enter") $("wSend").click(); };
+$("wCodeIn").onkeydown = (e) => { if (e.key === "Enter") $("wVerify").click(); };
+$("wBack").onclick = () => { show("wCode", false); show("wStart"); $("wMsg").innerHTML = ""; };
+$("wSkip").onclick = closeWelcome;
+$("wFinish").onclick = closeWelcome;
+document.addEventListener("keydown", (e) => { if (e.key === "Escape" && !$("welcome").classList.contains("hidden")) closeWelcome(); });
+
+$("usageStats").onchange = async () => {
+  await post("/api/config", {usage_stats: $("usageStats").checked ? "on" : "off"});
+  toast($("usageStats").checked ? "Thanks: the anonymous count is on" : "The anonymous count is off");
+};
+
 // ---------- start ----------
 const params = new URLSearchParams(location.search);
 if (params.get("login_error")) { $("loginErr").textContent = "Mendeley login failed: " + params.get("login_error"); show("loginErr"); }
 if (params.get("connected") || params.get("login_error")) document.querySelector('.side button.navb[data-tab="settings"]').click();
 if (params.toString()) history.replaceState(null, "", "/");
-loadStatus(); loadStyles(); loadLibrary();
+loadStatus().then(maybeWelcome); loadStyles(); loadLibrary();
 api("/api/account").then(renderSideConn).catch(() => {});
 </script>
 </body>

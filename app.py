@@ -40,12 +40,13 @@ import bridge_client
 import citrello_core as core
 import codex_config
 import latex
+import usage
 import word_addin
 
 VERSION = core.VERSION
 PORT = 8585
 REDIRECT = f"http://localhost:{PORT}/callback"
-USER_CONFIG = os.path.expanduser("~/.citrello_app.json")
+USER_CONFIG = os.environ.get("CITRELLO_APP_CONFIG") or os.path.expanduser("~/.citrello_app.json")
 if os.environ.get("CITRELLO_API"):  # for testing against a mock server
     core.API = os.environ["CITRELLO_API"]
 
@@ -692,7 +693,9 @@ class Handler(BaseHTTPRequestHandler):
             return self.send(200, {"version": VERSION, "configured": bool(cfg.get("client_id") and cfg.get("client_secret")),
                                    "connected": bool(name), "name": name, "email": cfg.get("email", ""),
                                    "style": cfg.get("style", citeformat.DEFAULT_STYLE),
-                                   "zotero_user": cfg.get("zotero_user", ""), "has_zotero_key": bool(cfg.get("zotero_key"))})
+                                   "zotero_user": cfg.get("zotero_user", ""), "has_zotero_key": bool(cfg.get("zotero_key")),
+                                   "welcome_done": cfg.get("welcome_done") == "1", "usage_stats": usage_enabled(),
+                                   "signed_in": bool(bridge_client.load_account())})
         if path == "/login":
             cfg = load_config()
             state = secrets.token_urlsafe(16)
@@ -1009,7 +1012,8 @@ class Handler(BaseHTTPRequestHandler):
         if path == "/api/config":
             b = self.json_body()
             save_user_config(**{k: (b.get(k) or "").strip() for k in
-                                ("client_id", "client_secret", "email", "style", "zotero_user", "zotero_key") if k in b})
+                                ("client_id", "client_secret", "email", "style", "zotero_user", "zotero_key",
+                                 "welcome_done", "usage_stats") if k in b})
             return self.send(200, {"ok": True})
         if path == "/api/logout":
             with contextlib.suppress(OSError):
@@ -1048,6 +1052,10 @@ class Handler(BaseHTTPRequestHandler):
         self.send(404, {"error": "not found"})
 
 
+def usage_enabled():
+    return load_config().get("usage_stats") != "off" and not os.environ.get("CITRELLO_NO_USAGE")
+
+
 def account_status():
     """Sign-in state, the bridge connection, and (when reachable) the account details."""
     st = bridge_client.CONNECTION.status()
@@ -1084,6 +1092,8 @@ def main():
     print(f"Citrello is running at {url}  (close it with the Quit button on the page)")
     if bridge_client.load_account():
         bridge_client.CONNECTION.start()  # link to ChatGPT / Claude on the web
+    # anonymous daily count (version and system only); off in Settings
+    usage.start(bridge_client.BRIDGE, usage_enabled, lambda: bool(bridge_client.load_account()), store_package)
     if not args.no_browser:
         threading.Timer(0.5, webbrowser.open, [url]).start()
     try:

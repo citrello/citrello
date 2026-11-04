@@ -98,3 +98,34 @@ def test_signed_out_status():
     assert not bc.load_account()
     st = bc.CONNECTION.status()
     assert st["signed_in"] is False and st["state"] == "signed_out"
+
+
+def test_usage_ping_once_a_day(tmp_path, monkeypatch):
+    import http.server
+    import usage
+    got = []
+
+    class H(http.server.BaseHTTPRequestHandler):
+        def do_POST(self):
+            got.append(json.loads(self.rfile.read(int(self.headers["Content-Length"]))))
+            self.send_response(200)
+            self.end_headers()
+            self.wfile.write(b"{}")
+
+        def log_message(self, *a):
+            pass
+
+    srv = http.server.HTTPServer(("127.0.0.1", 0), H)
+    threading.Thread(target=srv.serve_forever, daemon=True).start()
+    monkeypatch.setattr(usage, "INSTALL_FILE", str(tmp_path / "install.json"))
+    monkeypatch.delenv("CITRELLO_NO_USAGE", raising=False)
+    url = f"http://127.0.0.1:{srv.server_port}"
+    assert usage.ping_once(url, signed_in=True)
+    assert not usage.ping_once(url)                  # already sent today
+    assert len(got) == 1
+    p = got[0]
+    assert set(p) == {"install_id", "version", "os", "os_version", "store", "signed_in"}  # nothing personal
+    assert len(p["install_id"]) == 32 and p["signed_in"] is True
+    monkeypatch.setenv("CITRELLO_NO_USAGE", "1")
+    assert not usage.ping_once(url, force=True)      # switched off
+    srv.shutdown()
