@@ -50,7 +50,7 @@ if sys.platform == "darwin" and getattr(sys, "frozen", False) and not os.environ
     except ImportError:
         pass
 
-VERSION = "1.0.0"  # the one place the version is set
+VERSION = "1.0.1"  # the one place the version is set
 
 USER_AGENT = "Citrello/" + VERSION + " (https://citrello.app; mailto:{email})"
 CSL_KEEP = {"type", "title", "author", "editor", "container-title", "issued", "volume",
