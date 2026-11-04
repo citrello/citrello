@@ -77,9 +77,27 @@ def has_numbering(p):
     return ppr is not None and ppr.numPr is not None
 
 
+def body_paragraphs(document):
+    """Every paragraph of the main text in order, including those inside content controls (Mendeley Cite and
+    Word's own bibliography keep the reference list in one) - python-docx's document.paragraphs skips them."""
+    from docx.text.paragraph import Paragraph
+    out = []
+    for p in document.element.body.iter(qn("w:p")):
+        anc = p.getparent()
+        skip = False
+        while anc is not None:  # a text box's fallback copy would count twice
+            if anc.tag.endswith("}Fallback") or anc.tag == qn("w:txbxContent"):
+                skip = True
+                break
+            anc = anc.getparent()
+        if not skip:
+            out.append(Paragraph(p, document._body))
+    return out
+
+
 def find_bibliography(document):
     """Return (heading_paragraph, [(number, paragraph, text), ...])."""
-    paras = document.paragraphs
+    paras = body_paragraphs(document)
     start = None
     for i in range(len(paras) - 1, -1, -1):  # last matching heading wins
         if BIB_HEADING_RE.match(paras[i].text):

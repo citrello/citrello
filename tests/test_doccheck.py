@@ -228,3 +228,77 @@ def test_pdf_short_numbered_list(tmp_path):
     rep = doccheck.check(path, offline=True)
     assert rep["references"] == 2
     assert any("[4]" in i["text"] for i in rep["citation_issues"])
+
+
+def _mendeley_cite_citation(items, shown):
+    import base64 as b64
+    payload = {"citationID": "MENDELEY_CITATION_x", "properties": {"noteIndex": 0}, "isEdited": False,
+               "citationItems": [{"id": c["id"], "itemData": c, "isTemporary": False} for c in items]}
+    tag = "MENDELEY_CITATION_v3_" + b64.b64encode(json.dumps(payload).encode()).decode()
+    return parse_xml(f'<w:sdt {nsdecls("w")}><w:sdtPr><w:tag w:val="{tag}"/><w:id w:val="1"/></w:sdtPr>'
+                     f'<w:sdtContent><w:r><w:t>{escape(shown)}</w:t></w:r></w:sdtContent></w:sdt>')
+
+
+def make_mendeley_cite_doc(path):
+    d = docx.Document()
+    p = d.add_paragraph("Decommissioning is costly ")
+    p._p.append(_mendeley_cite_citation([TOPHAM], "(Topham, 2017)"))
+    p.add_run(" and reviewed ")
+    p._p.append(_mendeley_cite_citation([VETTERS, dict(TOPHAM, id="t2")], "(Vetters, 2024; Topham, 2017)"))
+    p.add_run(".")
+    d.add_heading("References", level=1)
+    bib = parse_xml(f'<w:sdt {nsdecls("w")}><w:sdtPr><w:tag w:val="MENDELEY_BIBLIOGRAPHY"/></w:sdtPr><w:sdtContent>'
+                    '<w:p><w:r><w:t>Topham, E. (2017). Sustainable decommissioning of an offshore wind farm.</w:t></w:r></w:p>'
+                    '<w:p><w:r><w:t>Vetters, J. (2024). Sailing through end-of-life challenges.</w:t></w:r></w:p>'
+                    '</w:sdtContent></w:sdt>')
+    d.element.body.insert(len(d.element.body) - 1, bib)
+    d.save(path)
+
+
+def test_mendeley_cite_document(tmp_path, monkeypatch):
+    import library
+    monkeypatch.setattr(library, "HOME", str(tmp_path / "lib"))
+    path, out = str(tmp_path / "mc.docx"), str(tmp_path / "mc_fixed.docx")
+    make_mendeley_cite_doc(path)
+    rep = doccheck.check(path, offline=True)
+    assert rep["source"] == "mendeley_cite" and rep["manager"] == "Mendeley Cite" and rep["references"] == 3
+    texts = " ".join(i["text"] for i in rep["citation_issues"])
+    assert "listed more than once" in texts
+    assert "No reference list" not in texts           # the list inside the content control was found
+    res = doccheck.fix(path, rep, out, "apa")
+    assert res["merged"] == ["[3] merged into [1]"] and res["entries"] == 2
+    d = docx.Document(out)
+    xml = d.element.xml
+    assert "MENDELEY_CITATION_v3" not in xml and xml.count("ADDIN CSL_CITATION") == 2 and "CSL_BIBLIOGRAPHY" in xml
+    text = "\n".join(p.text for p in doccheck.core.body_paragraphs(d))
+    assert "(Topham" in text and "Sailing through" in text
+
+
+def test_reference_list_inside_a_content_control_is_found(tmp_path):
+    d = docx.Document()
+    d.add_paragraph("Costs are high [1].")
+    d.add_heading("References", level=1)
+    bib = parse_xml(f'<w:sdt {nsdecls("w")}><w:sdtPr><w:tag w:val="Bibliography"/></w:sdtPr><w:sdtContent>'
+                    '<w:p><w:r><w:t>[1] Topham, E. and McMillan, D. (2017). Sustainable decommissioning of an offshore '
+                    'wind farm. Renewable Energy, 102, 470-480.</w:t></w:r></w:p></w:sdtContent></w:sdt>')
+    d.element.body.insert(len(d.element.body) - 1, bib)
+    path = str(tmp_path / "w.docx")
+    d.save(path)
+    rep = doccheck.check(path, offline=True)
+    assert rep["source"] == "typed" and rep["references"] == 1
+
+
+def test_markers_from_claude(tmp_path, monkeypatch):
+    import library
+    monkeypatch.setattr(library, "HOME", str(tmp_path / "lib"))
+    with library.editing() as data:
+        library.add_csl(data, dict(TOPHAM), key="Topham2017")
+    d = docx.Document()
+    d.add_paragraph("Decommissioning is costly [@Topham2017] and unknown [@Nobody1999].")
+    path, out = str(tmp_path / "claude.docx"), str(tmp_path / "claude_fixed.docx")
+    d.save(path)
+    rep = doccheck.check(path, offline=True)
+    assert rep["source"] == "citrello" and rep["references"] == 1
+    assert any("[@Nobody1999]" in i["text"] for i in rep["citation_issues"])
+    res = doccheck.fix(path, rep, out, "apa")
+    assert res["entries"] == 1 and "ADDIN CSL_CITATION" in docx.Document(out).element.xml

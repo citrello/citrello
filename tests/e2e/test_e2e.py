@@ -249,23 +249,28 @@ def test_06_export_bibtex(page):
     assert "pages = {470--480}" in text
 
 
-def test_07_update_word_document_with_markers(page, env):
+def _fix_and_download(page, style):
+    page.select_option("#chkStyle", style)
+    page.click("#chkFix")
+    link = page.locator("#chkResult a.btn.primary")
+    expect(link).to_be_visible(timeout=120000)
+    with page.expect_download() as dl:
+        link.click()
+    with zipfile.ZipFile(dl.value.path()) as z:
+        return z.read("word/document.xml").decode("utf-8")
+
+
+def test_07_markers_from_claude_become_live(page, env):
     import docx
     d = docx.Document()
     d.add_paragraph("Decommissioning is costly [@topham2017] and reviewed elsewhere [@vetters2024; @burton2011].")
     path = os.path.join(env["_TMP"], "draft.docx")
     d.save(path)
     tab(page, "documents")
-    page.select_option("#updStyle", "ieee")
-    page.set_input_files("#updFile", path)
-    link = page.locator("#updResult a.btn")
-    expect(link).to_be_visible(timeout=60000)
-    expect(page.locator("#updResult")).to_contain_text("2 citations")
-    shot(page, "word-updated")
-    with page.expect_download() as dl:
-        link.click()
-    with zipfile.ZipFile(dl.value.path()) as z:
-        xml = z.read("word/document.xml").decode("utf-8")
+    page.set_input_files("#chkFile", path)
+    expect(page.locator("#chkResult")).to_contain_text("[@Key] markers", timeout=120000)
+    xml = _fix_and_download(page, "ieee")
+    shot(page, "markers-fixed")
     assert "ADDIN CSL_CITATION" in xml and "CSL_BIBLIOGRAPHY" in xml
     assert "[@topham2017]" not in xml
 
@@ -336,7 +341,7 @@ def _latex_zip():
 
 def test_08_latex_check(page, env):
     tab(page, "documents")
-    page.set_input_files("#texFile", write(env, "paper.zip", _latex_zip()))
+    page.set_input_files("#chkFile", write(env, "paper.zip", _latex_zip()))   # the same drop zone
     res = page.locator("#texResult")
     expect(res).to_contain_text("Cited but not in the .bib", timeout=20000)
     expect(res).to_contain_text("missing2020")
@@ -443,7 +448,7 @@ def test_22_verify_online(page):
 
 
 @online
-def test_23_convert_typed_citations(page, env):
+def test_23_fix_typed_citations(page, env):
     import docx
     d = docx.Document()
     d.add_paragraph("Offshore wind decommissioning is costly [1] and needs planning [2].")
@@ -455,14 +460,12 @@ def test_23_convert_typed_citations(page, env):
     path = os.path.join(env["_TMP"], "typed.docx")
     d.save(path)
     tab(page, "documents")
-    page.set_input_files("#file", path)
-    expect(page.locator("#go")).to_be_visible(timeout=120000)
-    shot(page, "convert-review")
-    page.click("#go")
-    expect(page.locator("#doneMsg")).to_be_visible(timeout=120000)
-    shot(page, "convert-done")
-    links = page.locator("#downloads a")
-    assert links.count() >= 1
+    page.set_input_files("#chkFile", path)
+    expect(page.locator("#chkResult")).to_contain_text("typed by hand", timeout=180000)
+    shot(page, "typed-checked")
+    xml = _fix_and_download(page, "apa")
+    shot(page, "typed-fixed")
+    assert "ADDIN CSL_CITATION" in xml and "[1]" not in xml
 
 
 def test_98_delete_selected(page):

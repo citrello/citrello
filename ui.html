@@ -304,79 +304,17 @@
   <!-- ================= DOCUMENTS ================= -->
   <section id="tab-documents" class="hidden">
     <div class="card" id="chkCard">
-      <h2>Check the references in a document</h2>
-      <p class="muted">Any Word document or PDF, made with Zotero, Mendeley, EndNote, Word's own citations or typed by hand. Citrello checks every reference online and finds retracted papers, DOIs that are wrong or don't exist, the same paper listed twice, citations that point to a missing reference, and references that are never cited. Then add them all to your library in one click.</p>
-      <label class="drop" id="chkDrop"><input type="file" id="chkFile" accept=".docx,.pdf" hidden>
-        <div id="chkDropText"><strong>Choose a Word file or a PDF</strong> or drag it here</div></label>
+      <h2>Check and fix a document</h2>
+      <p class="muted">Drop in any paper: a Word document, a PDF, or a LaTeX project. It can come from Zotero, Mendeley (Desktop or Cite), EndNote or Word's own citations, be typed by hand, or be written with Claude using [@Key] markers. Citrello checks every reference online, finds retracted papers, wrong DOIs, duplicates and citation mistakes, adds the references to your library, and writes a corrected Word copy with live citations in any style.</p>
+      <label class="drop" id="chkDrop"><input type="file" id="chkFile" accept=".docx,.pdf,.tex,.ltx,.zip,.bib" hidden>
+        <div id="chkDropText"><strong>Choose a Word file, a PDF or a LaTeX project</strong> or drag it here
+          <div class="small muted" style="margin-top:4px">.docx, .pdf, .tex, or an Overleaf .zip (Menu → Download → Source)</div></div></label>
       <div id="chkResult"></div>
-    </div>
-
-    <div class="card">
-      <h2>Update or restyle a document</h2>
-      <p class="muted">For documents that contain <code class="key">[@Key]</code> markers (e.g. written with Claude) or live citations. Every citation and the bibliography are formatted in the style you choose; markers become live citations.</p>
-      <div class="row">
-        <label class="small">Style <select id="updStyle"></select></label>
-      </div>
-      <label class="drop" id="updDrop"><input type="file" id="updFile" accept=".docx" hidden>
-        <div><strong>Choose a Word file</strong> or drag it here</div></label>
-      <div id="updResult"></div>
-    </div>
-
-    <div class="card" id="convCard">
-      <h2>Convert a document with typed citations</h2>
-      <p class="muted">For papers whose citations were typed by hand, like [1], [2–5] or (Smith et al., 2020), with a typed reference list. The references are checked and added to your library, and the citations become live.</p>
-      <label class="drop" id="drop"><input type="file" id="file" accept=".docx" hidden>
-        <div id="dropText"><strong>Choose a Word file</strong> or drag it here</div></label>
-      <div id="uploadErr" class="notice err hidden"></div>
-
-      <div id="s3" class="hidden">
-        <div id="analysing"><p class="muted" id="aMsg">Reading the document…</p><div class="bar"><div id="aBar"></div></div></div>
-        <div id="review" class="hidden">
-          <div class="chips" id="chips"></div>
-          <div class="row" style="margin-top:4px">
-            <label class="small"><input type="checkbox" id="onlyIssues"> Only references that need attention</label>
-            <a id="checkCsv" class="hidden small" href="#">Download the reliability report (.csv)</a>
-          </div>
-          <div class="table-wrap"><table>
-            <thead><tr><th>#</th><th>Reference</th><th class="hide-sm">Details</th><th>Reliability</th><th>Library</th></tr></thead>
-            <tbody id="rows"></tbody>
-          </table></div>
-        </div>
-      </div>
-
-      <div id="s4" class="hidden">
-        <div id="convertBox">
-          <div class="opts">
-            <label>Project <input type="text" id="convProject" list="projectList"></label>
-            <label>Format as <select id="convStyle"></select></label>
-            <label id="pushOpt" class="hidden"><input type="checkbox" id="convPush"> Also add to my Mendeley account</label>
-          </div>
-          <div class="opts" id="numOpts">
-            <span class="muted">Numbered citation forms:</span>
-            <label><input type="checkbox" value="bracket" checked> [1], [2–4]</label>
-            <label><input type="checkbox" value="superscript" checked> superscript ¹˒²</label>
-            <label><input type="checkbox" value="paren"> (1), (2–4)</label>
-          </div>
-          <div class="row"><button class="primary" id="go">Convert</button></div>
-        </div>
-        <div id="converting" class="hidden"><p class="muted" id="cMsg"></p><div class="bar"><div id="cBar"></div></div></div>
-        <div id="done" class="hidden">
-          <div class="notice ok" id="doneMsg"></div>
-          <div class="row" id="downloads"></div>
-          <div id="warnings"></div>
-          <div class="row"><button class="link" id="again">Convert another document</button></div>
-        </div>
-        <div id="jobErr" class="notice err hidden"></div>
-      </div>
-    </div>
-    <div class="card" id="latexCard">
-      <h2>LaTeX and Overleaf</h2>
-      <p class="muted">Check a LaTeX paper for cited keys missing from the .bib, unused and duplicate entries, unreliable references (retracted, wrong DOI…), and hand-typed bibliographies that can be converted. Choose a .tex file, or the whole project as a .zip (Overleaf: <strong>Menu → Download → Source</strong>).</p>
-      <label class="drop" id="texDrop"><input type="file" id="texFile" accept=".tex,.ltx,.zip,.bib" hidden>
-        <div id="texDropText"><strong>Choose a .tex or .zip file</strong> or drag it here</div></label>
       <div id="texResult"></div>
+    </div>
 
-      <h3>Keep a .bib file up to date</h3>
+    <div class="card" id="latexCard">
+      <h2>Keep a .bib file up to date</h2>
       <p class="muted small" style="margin:0">Citrello rewrites the file whenever the project's references change, with the same keys as always. For LaTeX on your computer (VS Code, TeXstudio…) or a folder synced with Overleaf through Dropbox or Git.</p>
       <div id="bxList"></div>
       <div class="row">
@@ -646,7 +584,6 @@ async function loadStatus() {
   $("updCurrent").textContent = status.version;
   show("mSetup", !status.configured); show("mOut", status.configured && !status.connected); show("mIn", status.connected);
   $("who").textContent = status.name || "";
-  show("pushOpt", status.connected);
   $("email").value = status.email || "";
   $("zUser").value = status.zotero_user || "";
   $("zKey").placeholder = status.has_zotero_key ? "saved" : "";
@@ -656,8 +593,6 @@ async function loadStyles() {
   const r = await api("/api/styles"); styles = r.styles;
   const opts = (sel) => styles.map((s) => `<option value="${s.id}" ${s.id === sel ? "selected" : ""}>${esc(s.title)}</option>`).join("");
   $("defStyle").innerHTML = opts(r.default);
-  $("updStyle").innerHTML = opts(r.default);
-  $("convStyle").innerHTML = `<option value="keep">Keep citations as typed</option>` + opts("");
 }
 $("defStyle").onchange = async () => { await post("/api/config", {style: $("defStyle").value}); loadStyles(); toast("Default style saved"); };
 $("styleAdd").onclick = async () => {
@@ -1133,30 +1068,19 @@ $("expMendeley").onclick = async () => {
   catch (e) { notice("exportMsg", "err", esc(e.message)); }
 };
 
-// ---------- documents: update / restyle ----------
+// ---------- documents ----------
 function dropZone(zone, input, onFile) {
   ["dragenter", "dragover"].forEach((e) => zone.addEventListener(e, (ev) => { ev.preventDefault(); zone.classList.add("over"); }));
   ["dragleave", "drop"].forEach((e) => zone.addEventListener(e, (ev) => { ev.preventDefault(); zone.classList.remove("over"); }));
   zone.addEventListener("drop", (ev) => ev.dataTransfer.files[0] && onFile(ev.dataTransfer.files[0]));
   input.onchange = (ev) => { ev.target.files[0] && onFile(ev.target.files[0]); ev.target.value = ""; };
 }
-dropZone($("updDrop"), $("updFile"), async (file) => {
-  if (!file.name.toLowerCase().endsWith(".docx")) return notice("updResult", "err", "Please choose a .docx file.");
-  notice("updResult", "warn", `Formatting ${esc(file.name)}…`);
-  try {
-    const r = await api("/api/doc/update", {method: "POST", body: await file.arrayBuffer(),
-      headers: {"X-Filename": encodeURIComponent(file.name), "X-Style": encodeURIComponent($("updStyle").value)}});
-    const x = r.result, href = `/api/job/${r.id}/file/${encodeURIComponent(x.files.docx)}`;
-    $("updResult").innerHTML = `<div class="notice ${x.report.length ? "warn" : "ok"}">${x.citations} citation${x.citations === 1 ? "" : "s"} formatted in ${esc(x.style)}${x.markers ? ` (${x.markers} marker${x.markers > 1 ? "s" : ""} made live)` : ""}, ${x.entries} bibliography entries.
-      ${x.report.length ? `<ul class="issues">${x.report.map((m) => `<li class="check">${esc(m)}</li>`).join("")}</ul>` : ""}</div>
-      <div class="row"><a class="btn primary" href="${href}">Download formatted document</a></div>`;
-  } catch (e) { notice("updResult", "err", esc(e.message)); }
-});
-
 // ---------- documents: check references ----------
 let chk = null, chkTimer = null;
 dropZone($("chkDrop"), $("chkFile"), async (file) => {
-  if (!/\.(docx|pdf)$/i.test(file.name)) return notice("chkResult", "err", "Please choose a Word document (.docx) or a PDF. For LaTeX, use the LaTeX and Overleaf card.");
+  $("chkResult").innerHTML = ""; $("texResult").innerHTML = "";
+  if (/\.(tex|ltx|zip|bib)$/i.test(file.name)) return texUpload(file);
+  if (!/\.(docx|pdf)$/i.test(file.name)) return notice("chkResult", "err", "Please choose a Word document (.docx), a PDF, or a LaTeX .tex or .zip file.");
   $("chkDropText").innerHTML = `<strong>${esc(file.name)}</strong> · choose another file to check it`;
   notice("chkResult", "warn", "Reading the document…");
   try {
@@ -1209,8 +1133,8 @@ function renderCheck() {
       <a class="btn" href="/api/doccheck/${id}/report.csv">Download the report (.csv)</a></div>`;
   if (r.source !== "pdf") {
     const f = c.fixed;
-    h += `<div class="panel" style="margin-top:16px"><strong>Fix the document</strong>
-      <p class="small muted" style="margin:4px 0 0">Citrello writes a corrected copy: every citation becomes a live citation, details are corrected from the publisher's record, duplicates are merged, and the reference list is rebuilt in the style you choose, with correct numbering. Your original file isn't changed. The references are also added to your library (they're what the live citations use).</p>`;
+    h += `<div class="panel" style="margin-top:16px"><strong>Fix and format</strong>
+      <p class="small muted" style="margin:4px 0 0">Citrello writes a corrected Word copy: every citation (typed, [@Key] markers or from any reference manager) becomes a live citation, details are corrected from the publisher's record, duplicates are merged, and the reference list is rebuilt in the style you choose, with correct numbering. Your original file isn't changed. The references are also added to your library (they're what the live citations use).</p>`;
     if (f) {
       h += `<div class="notice ok">Fixed: ${f.citations} citations and ${f.entries} references in ${esc(f.style)}.</div>
         <div class="row"><a class="btn primary" href="/api/doccheck/${id}/fixed.docx">Download the fixed document</a></div>`;
@@ -1223,7 +1147,7 @@ function renderCheck() {
           ...f.unfixable.map((t) => `<li class="problem">${esc(t)}</li>`)]);
     } else {
       h += `<div class="row"><select id="chkStyle" aria-label="Citation style">${styles.map((st) => `<option value="${st.id}">${esc(st.title)}</option>`).join("")}</select>
-        <button class="primary" id="chkFix">Fix and download</button></div>`;
+        <button class="primary" id="chkFix">Fix and format</button></div>`;
     }
     h += `</div>`;
   } else {
@@ -1234,7 +1158,7 @@ function renderCheck() {
   if ($("chkFix")) $("chkFix").onclick = async () => {
     $("chkFix").disabled = true; $("chkFix").textContent = "Fixing…";
     try { chk = await post(`/api/doccheck/${id}/fix`, {style: $("chkStyle").value, project: name}); chk.id = id; renderCheck(); loadLibrary(); }
-    catch (e) { toast(e.message); $("chkFix").disabled = false; $("chkFix").textContent = "Fix and download"; }
+    catch (e) { toast(e.message); $("chkFix").disabled = false; $("chkFix").textContent = "Fix and format"; }
   };
   if ($("chkAdd")) $("chkAdd").onclick = async () => {
     $("chkAdd").disabled = true;
@@ -1245,15 +1169,14 @@ function renderCheck() {
 
 // ---------- documents: LaTeX ----------
 let texJob = null, texTimer = null;
-dropZone($("texDrop"), $("texFile"), async (file) => {
-  if (!/\.(tex|ltx|zip|bib)$/i.test(file.name)) return notice("texResult", "err", "Please choose a .tex, .zip or .bib file.");
-  $("texDropText").innerHTML = `<strong>${esc(file.name)}</strong> · choose another file to check it`;
+async function texUpload(file) {
+  $("chkDropText").innerHTML = `<strong>${esc(file.name)}</strong> · choose another file to check it`;
   notice("texResult", "warn", `Checking ${esc(file.name)}…`);
   try {
     texJob = await api("/api/latex/check", {method: "POST", body: await file.arrayBuffer(), headers: {"X-Filename": encodeURIComponent(file.name)}});
     renderTex();
   } catch (e) { notice("texResult", "err", esc(e.message)); }
-});
+}
 function texList(items, fmt) { return `<ul class="issues">${items.map(fmt).join("")}</ul>`; }
 function renderTex() {
   const r = texJob.report, c = texJob.convert, name = texJob.name.replace(/\.(zip|tex|ltx|bib)$/i, "");
@@ -1334,86 +1257,6 @@ $("bxAdd").onclick = async () => {
     $("bxPath").value = ""; $("bxMsg").innerHTML = ""; toast("The .bib file will stay up to date");
   } catch (e) { notice("bxMsg", "err", esc(e.message)); }
 };
-
-// ---------- documents: convert typed citations ----------
-dropZone($("drop"), $("file"), upload);
-async function upload(file) {
-  show("uploadErr", false); show("jobErr", false);
-  if (!file.name.toLowerCase().endsWith(".docx")) { $("uploadErr").textContent = "Please choose a .docx file."; show("uploadErr"); return; }
-  $("dropText").innerHTML = `<strong>${esc(file.name)}</strong> · choose another file to start over`;
-  $("convProject").value = file.name.replace(/\.docx$/i, "").replace(/_/g, " ");
-  try {
-    const {id} = await api("/api/upload", {method: "POST", headers: {"X-Filename": encodeURIComponent(file.name)}, body: await file.arrayBuffer()});
-    show("s3"); show("analysing"); show("review", false); show("s4", false); show("convertBox"); show("converting", false); show("done", false);
-    $("aBar").style.width = "0"; poll(id);
-  } catch (e) { $("uploadErr").textContent = e.message; show("uploadErr"); }
-}
-function poll(id) {
-  clearTimeout(timer);
-  timer = setTimeout(async () => {
-    try { job = await api(`/api/job/${id}`); } catch (e) { return; }
-    render();
-    if (["analysing", "converting"].includes(job.state)) poll(id);
-  }, 600);
-}
-function render() {
-  if (job.state === "error") {
-    const el = job.refs.length ? "jobErr" : "uploadErr";
-    $(el).textContent = job.error; show(el); show("converting", false); show("convertBox"); if (!job.refs.length) show("s3", false);
-    return;
-  }
-  if (job.state === "analysing") { $("aMsg").textContent = job.message; $("aBar").style.width = job.total ? `${100 * job.progress / job.total}%` : "5%"; return; }
-  show("analysing", false); show("review"); show("s4");
-  renderTable();
-  if (job.state === "ready") { show("numOpts", job.mode !== "author-year"); show("convertBox"); }
-  if (job.state === "converting") { show("convertBox", false); show("converting"); $("cMsg").textContent = job.message;
-    $("cBar").style.width = job.total ? `${100 * job.progress / job.total}%` : "10%"; }
-  if (job.state === "done") renderDone();
-}
-function renderTable() {
-  const refs = job.refs, count = (k) => refs.filter((r) => r.reliability === k).length;
-  const inLib = refs.filter((r) => r.library && r.library.status === "existing").length;
-  const uncited = refs.filter((r) => !r.cited);
-  const style = job.mode === "author-year" ? "author-year citations" : "numbered citations";
-  $("chips").innerHTML = `<span class="chip">${refs.length} references</span><span class="chip">${job.found} ${style}</span>` +
-    `<span class="chip ok">${inLib} already in your library</span><span class="chip new">${refs.length - inLib} new</span>` +
-    `<span class="chip ok">${count("verified")} verified</span>` +
-    (count("check") ? `<span class="chip warn">${count("check")} to check</span>` : "") +
-    (count("problem") ? `<span class="chip bad">${count("problem")} problem${count("problem") > 1 ? "s" : ""}</span>` : "") +
-    (uncited.length ? `<span class="chip warn">not cited in the text: ${uncited.map((r) => r.number).join(", ")}</span>` : "");
-  if (job.check_csv) { $("checkCsv").href = `/api/job/${job.id}/file/${encodeURIComponent(job.check_csv)}`; show("checkCsv"); }
-  const only = $("onlyIssues").checked;
-  $("rows").innerHTML = refs.filter((r) => !only || r.reliability !== "verified").map((r) => {
-    const libTag = r.library ? (r.library.status === "existing" ? `<span class="tag ok" title="${esc(r.library.how)}">In library</span>`
-      : (r.library.first ? '<span class="tag new">New</span>' : '<span class="tag ok">Listed twice</span>')) : "";
-    return `<tr class="${r.reliability}"><td class="n">${r.number}</td>
-      <td><div class="t">${esc(r.title || r.raw)}</div><div class="meta">${esc(r.authors)}${r.year ? " · " + esc(r.year) : ""}</div>${issuesList(r.checks)}</td>
-      <td class="hide-sm"><div class="meta">${esc(r.container)}</div>${r.doi ? `<div class="meta">${esc(r.doi)}</div>` : ""}</td>
-      <td>${relTag(r.reliability)}</td>
-      <td>${libTag}${r.cited ? "" : '<br><span class="tag warn">Not cited</span>'}</td></tr>`;
-  }).join("");
-}
-$("onlyIssues").onchange = () => job && renderTable();
-$("go").onclick = async () => {
-  show("jobErr", false);
-  const forms = [...document.querySelectorAll("#numOpts input:checked")].map((c) => c.value);
-  await post(`/api/job/${job.id}/convert`, {push: $("convPush").checked, styles: forms, style: $("convStyle").value, project: $("convProject").value});
-  show("convertBox", false); show("converting"); $("cMsg").textContent = "Starting…"; poll(job.id);
-};
-function renderDone() {
-  const r = job.result;
-  show("convertBox", false); show("converting", false); show("done");
-  let msg = `${r.converted} citation${r.converted === 1 ? "" : "s"} are now live${r.style ? `, formatted in ${r.style}` : ""}. ` +
-            `${r.library_added} reference${r.library_added === 1 ? "" : "s"} added to your library (${r.library_existing} already there).`;
-  if (r.pushed) msg += ` Mendeley: ${r.added} added, ${r.existing} already there.`;
-  $("doneMsg").textContent = msg;
-  const f = (name) => `/api/job/${job.id}/file/${encodeURIComponent(name)}`;
-  $("downloads").innerHTML = `<a class="btn primary" href="${f(r.files.docx)}">Download the document</a>
-    <a class="btn" href="${f(r.files.ris)}">References (.ris)</a> <a class="btn" href="${f(r.files.bib)}">BibTeX (.bib)</a>`;
-  $("warnings").innerHTML = r.report.length ? `<details><summary>${r.report.length} possible citation(s) were left unchanged, see why</summary>
-    <ul>${r.report.map((x) => `<li class="muted small">${esc(x)}</li>`).join("")}</ul></details>` : "";
-}
-$("again").onclick = () => $("file").click();
 
 // ---------- updates ----------
 let upd = null;

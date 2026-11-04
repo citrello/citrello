@@ -40,19 +40,16 @@ your computer and is shared by the Citrello app, Claude and Word:
   - **Click a citation** to see its reference in the status bar; **double-click** to edit it.
 - **Browser button:** a bookmark that adds the paper you're looking at, or a reference you've
   selected on the page, even on sites that block robots.
-- **Documents**
-  - **Check the references in any Word document or PDF:** whether it was made with Zotero, Mendeley, EndNote, Word's
-    own citations or typed by hand. Every reference is checked online (retracted, wrong or nonexistent DOI,
-    authors or year not matching the publisher). Citrello also finds the same paper listed twice, citations
-    pointing to a missing reference, references never cited, and reference lists that weren't refreshed. One
-    click adds them all to your library; the report downloads as a spreadsheet.
-  - **Fix and download (Word):** a corrected copy with live citations, details corrected from the publisher's
-    record, duplicates merged and the reference list rebuilt in any style, plus a list of every change.
-  - **Update:** turns `[@Key]` markers (what Claude writes) into live citations.
-  - **Convert:** converts papers whose citations were typed by hand, numbered `[1]`, `[2–5]` or
-    author-year `(Smith et al., 2020)`, into live citations.
-  - **Mendeley Cite compatible:** citations use the format of Mendeley's Word plugin, so Mendeley
-    Cite can take a document over.
+- **Documents: check and fix any paper.** Drop in a Word document, a PDF or a LaTeX project. It can come from
+  Zotero, Mendeley (Desktop or Cite), EndNote or Word's own citations, be typed by hand, or be written with Claude
+  using `[@Key]` markers. Citrello:
+  - checks every reference online: retracted, wrong or nonexistent DOI, authors or year not matching the publisher;
+  - finds the same paper listed twice, citations to references missing from the list, references never cited, and
+    reference lists that weren't refreshed;
+  - adds the references to your library in one click, and downloads the report as a spreadsheet;
+  - **fixes Word documents:** writes a corrected copy where every citation is live (Mendeley Cite compatible),
+    details come from the publisher's record, duplicates are merged, and the reference list is rebuilt in any of
+    ~10,000 styles, with a list of every change.
 - **LaTeX and Overleaf**
   - **Clean BibTeX and biblatex:** stable keys (the same as `[@Key]`), so `\cite{Key}` never breaks.
     Acronyms are brace-protected (`{LiDAR}`), special characters are escaped, and page ranges use `--`.

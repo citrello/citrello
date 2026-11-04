@@ -23,7 +23,7 @@ from docx.oxml.ns import qn
 import citeformat
 import citrello_core as core
 
-MANAGERS = {"zotero": "Zotero", "mendeley": "Mendeley or Citrello", "endnote": "EndNote", "word": "Word's own citations",
+MANAGERS = {"citrello": "Citrello [@Key] markers", "zotero": "Zotero", "mendeley": "Mendeley Desktop or Citrello", "mendeley_cite": "Mendeley Cite", "endnote": "EndNote", "word": "Word's own citations",
             "typed": "typed by hand", "pdf": "PDF", "other": "another reference manager"}
 
 
@@ -156,6 +156,45 @@ def _word_sources(path):
     return out
 
 
+def _b64json(text):
+    text = re.sub(r"\s+", "", text or "")
+    for dec in (base64.b64decode, base64.urlsafe_b64decode):
+        try:
+            return json.loads(dec(text + "=" * (-len(text) % 4)).decode("utf-8"))
+        except (ValueError, UnicodeDecodeError):
+            continue
+    return None
+
+
+def content_controls(body):
+    """Mendeley Cite keeps each citation in a content control tagged MENDELEY_CITATION_v3_<base64 JSON> and the
+    reference list in one tagged MENDELEY_BIBLIOGRAPHY. -> [(sdt element, "citation" | "bibliography", payload)]"""
+    out = []
+    for sdt in body.iter(qn("w:sdt")):
+        tag = sdt.find(qn("w:sdtPr") + "/" + qn("w:tag"))
+        val = tag.get(qn("w:val")) if tag is not None else ""
+        if not val:
+            continue
+        if val.upper().startswith("MENDELEY_CITATION"):
+            payload = _b64json(re.sub(r"^MENDELEY_CITATION(?:_v\d+)?_", "", val, flags=re.I))
+            if payload:
+                out.append((sdt, "citation", payload))
+        elif val.upper().startswith("MENDELEY_BIBLIOGRAPHY"):
+            out.append((sdt, "bibliography", None))
+    return out
+
+
+def _payload_csl(payload):
+    items = []
+    for ci in payload.get("citationItems", []):
+        d = dict(ci.get("itemData") or {})
+        ident = (ci.get("uris") or [None])[0] or ci.get("id") or d.get("id")
+        if d:
+            items.append((str(ident or ""), d, {k: ci[k] for k in ("locator", "label", "prefix", "suffix",
+                                                                    "suppress-author") if ci.get(k)}))
+    return items
+
+
 def read_citations(path):
     """-> {"manager", "citations": [[ids]], "items": {id: csl}, "bibliography_field": bool, "other": int}"""
     document = docx.Document(path)
@@ -188,6 +227,17 @@ def read_citations(path):
         elif re.search(r"ADDIN (RW\.|PAPERS2|REFMGR|CITAVI|F1000|EN\.)", up):
             other += 1
             managers.add("other")
+        if group:
+            citations.append(group)
+    for sdt, kind, payload in content_controls(document.element.body):  # Mendeley Cite (the newer add-in)
+        managers.add("mendeley_cite")
+        if kind == "bibliography":
+            bib_field = True
+            continue
+        group = []
+        for ident, c, _ in _payload_csl(payload):
+            items.setdefault(ident, c)
+            group.append(ident)
         if group:
             citations.append(group)
     return {"managers": sorted(managers), "citations": citations, "items": items, "bibliography_field": bib_field,
@@ -327,6 +377,28 @@ def check(path, offline=False, email=None, progress=None):
             _, entries = core.find_bibliography(document)
         except SystemExit:
             entries = []
+        # [@Key] markers (text written with Claude or ChatGPT): their references come from the library
+        import library
+        data = library.load()
+        unknown = []
+        for para in core.body_paragraphs(document):
+            for m in citeformat.MARKER_RE.finditer(para.text):
+                group = []
+                for g in citeformat.parse_marker(m.group(1)) or []:
+                    it = library.get(data, g["key"])
+                    if not it:
+                        unknown.append(g["key"])
+                        continue
+                    ident = "key:" + it["key"]
+                    fields["items"].setdefault(ident, dict(it["csl"]))
+                    group.append(ident)
+                if group:
+                    fields["citations"].append(group)
+                    if "citrello" not in fields["managers"]:
+                        fields["managers"].append("citrello")
+        if unknown:
+            citation_issues.append({"level": "problem", "text": "Markers for references that aren't in your library: "
+                                    + ", ".join(f"[@{k}]" for k in sorted(set(unknown))[:15]) + "."})
 
     if is_pdf:
         source = "pdf"
@@ -389,8 +461,10 @@ def check(path, offline=False, email=None, progress=None):
         except (SystemExit, Exception) as e:  # citations not recognised: still check the list itself
             citation_issues.append({"level": "check", "text": f"The citations in the text couldn't be matched ({e})."})
     else:
-        raise ValueError("No references found: the document has no citations from a reference manager and no "
-                         "'References' or 'Bibliography' heading with a list below it.")
+        raise ValueError("No references found. Citrello looks for citations made with Zotero, Mendeley (Desktop or "
+                         "Cite), EndNote or Word's own tool, for [@Key] markers, and for a typed list under a heading "
+                         "such as 'References' or 'Bibliography'. If your document has references, please send it to "
+                         "us (github.com/citrello/citrello/issues) so we can support its format.")
 
     # online check, one reference at a time
     for i, r in enumerate(refs, 1):
@@ -485,6 +559,67 @@ def _set_instr(field, text):
         fc.remove(fd)
 
 
+def _field_runs(instr, result_runs):
+    from docx.oxml import parse_xml
+    from docx.oxml.ns import nsdecls
+    from xml.sax.saxutils import escape as xesc
+    w = nsdecls("w")
+    runs = [parse_xml(f'<w:r {w}><w:fldChar w:fldCharType="begin"/></w:r>'),
+            parse_xml(f'<w:r {w}><w:instrText xml:space="preserve">{xesc(instr)}</w:instrText></w:r>'),
+            parse_xml(f'<w:r {w}><w:fldChar w:fldCharType="separate"/></w:r>')]
+    runs += result_runs or [parse_xml(f'<w:r {w}><w:t>[citation]</w:t></w:r>')]
+    runs.append(parse_xml(f'<w:r {w}><w:fldChar w:fldCharType="end"/></w:r>'))
+    return runs
+
+
+def _unwrap_mendeley_cite(body, by_ident, lib_items):
+    """Replace Mendeley Cite's content controls with live citation fields (and a bibliography field)."""
+    from docx.oxml import parse_xml
+    from docx.oxml.ns import nsdecls
+    for sdt, kind, payload in content_controls(body):
+        parent = sdt.getparent()
+        if parent is None:
+            continue
+        content = sdt.find(qn("w:sdtContent"))
+        if kind == "bibliography":
+            p = parse_xml(f'<w:p {nsdecls("w")}/>')
+            for r in _field_runs("ADDIN Mendeley Bibliography CSL_BIBLIOGRAPHY ", None):
+                p.append(r)
+            if sdt.getparent().tag == qn("w:p"):  # inline: replace the paragraph holding it
+                holder = sdt.getparent()
+                holder.addprevious(p)
+                holder.getparent().remove(holder)
+            else:
+                sdt.addprevious(p)
+                parent.remove(sdt)
+            continue
+        group = []
+        for ident, _, extra in _payload_csl(payload):
+            key = by_ident.get(ident)
+            if key and key in lib_items:
+                group.append({"id": key, "itemData": dict(lib_items[key]["csl"], id=key), "citrello-key": key, **extra})
+        result = [r for r in (content.iter(qn("w:r")) if content is not None else []) if r.find(qn("w:t")) is not None]
+        result = [parse_xml(r.xml) for r in result]  # copies
+        instr = "ADDIN CSL_CITATION " + json.dumps({"citationItems": group, "properties": {"noteIndex": 0}},
+                                                   ensure_ascii=False)
+        if parent.tag == qn("w:p"):  # an inline citation: put the field's runs where the control was
+            for r in _field_runs(instr, result):
+                sdt.addprevious(r)
+            parent.remove(sdt)
+        else:  # a block control holding a paragraph: unwrap its paragraphs, then fieldify the first one's runs
+            paras = list(content) if content is not None else []
+            for el in paras:
+                sdt.addprevious(el)
+            parent.remove(sdt)
+            if paras and paras[0].tag == qn("w:p"):
+                first = paras[0]
+                runs = [r for r in first if r.tag == qn("w:r")]
+                for r in runs:
+                    first.remove(r)
+                for r in _field_runs(instr, [parse_xml(r.xml) for r in runs]):
+                    first.append(r)
+
+
 def fix(path, report, out, style_id=None, project=None):
     """Write a corrected copy of the document: live citations, corrected details, duplicates merged, the
     reference list rebuilt in the chosen style. The references are added to the library (they're what the live
@@ -500,12 +635,13 @@ def fix(path, report, out, style_id=None, project=None):
     work = out + ".tmp.docx"
 
     if report["source"] == "typed":
-        core.convert_document(path, refs, ("bracket", "superscript", "paren"), "auto", work)
+        core.convert_document(path, refs, ("bracket", "superscript"), "auto", work)
     else:
         by_ident = {r.get("manager_id"): keys.get(r["number"]) for r in refs}
         lib_items = {it["key"]: it for it in data["items"]}
         document = docx.Document(path)
         body = document.element.body
+        _unwrap_mendeley_cite(body, by_ident, lib_items)
         for f in citeformat.find_fields(body):
             fc = f["begin"].find(qn("w:fldChar"))
             fd = fc.find(qn("w:fldData")) if fc is not None else None
