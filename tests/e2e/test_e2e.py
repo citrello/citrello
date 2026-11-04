@@ -223,6 +223,7 @@ def test_04b_filters_and_selecting_many(page):
     page.click('#projNav [data-proj-nav="Books"]')
     expect(page.locator('#libRows .ref[data-sel="burton2011"]')).to_be_visible()
     page.click('#projNav [data-proj-nav="*"]')
+    expect(page.locator("#libRows .ref")).to_have_count(3)   # wait for the list to switch back
     # select all, then clear
     page.check("#selAll")
     expect(page.locator("#selCount")).to_have_text("3 selected")
