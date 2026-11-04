@@ -41,6 +41,15 @@ try:
 except ImportError:  # pragma: no cover
     sys.exit("python-docx is required:  pip install python-docx")
 
+
+# The Mac app's bundled Python has no system certificates: use certifi's for HTTPS (Crossref, doi.org...).
+if sys.platform == "darwin" and getattr(sys, "frozen", False) and not os.environ.get("SSL_CERT_FILE"):
+    try:
+        import certifi
+        os.environ["SSL_CERT_FILE"] = certifi.where()
+    except ImportError:
+        pass
+
 VERSION = "1.0.0"  # the one place the version is set
 
 USER_AGENT = "Citrello/" + VERSION + " (https://citrello.app; mailto:{email})"

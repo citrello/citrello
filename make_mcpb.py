@@ -49,7 +49,7 @@ def _icon():
         return _icon_png()
 
 
-def manifest(tools):
+def manifest(tools, platform="win32"):
     return {
         "manifest_version": "0.3",
         "name": "citrello",
@@ -69,12 +69,12 @@ def manifest(tools):
         "icon": "icon.png",
         "server": {
             "type": "binary",
-            "entry_point": "server/CitrelloMCP.exe",
-            "mcp_config": {"command": "${__dirname}/server/CitrelloMCP.exe", "args": [], "env": {}},
+            "entry_point": "server/" + _server_name(platform),
+            "mcp_config": {"command": "${__dirname}/server/" + _server_name(platform), "args": [], "env": {}},
         },
         "tools": tools,
         "keywords": ["references", "citations", "bibliography", "word", "mendeley", "zotero", "academic"],
-        "compatibility": {"claude_desktop": ">=0.10.0", "platforms": ["win32"]},
+        "compatibility": {"claude_desktop": ">=0.10.0", "platforms": [platform]},
     }
 
 
@@ -96,13 +96,23 @@ def tool_list():
     return [{"name": n, "description": d.split(". ")[0].rstrip(".") + "."} for n, (_, d, _) in mcp_server.TOOLS.items()]
 
 
+def _server_name(platform):
+    return "CitrelloMCP.exe" if platform == "win32" else "CitrelloMCP"
+
+
 def build(exe, out):
+    """The platform follows the connector: CitrelloMCP.exe -> Windows, CitrelloMCP -> macOS."""
     if not os.path.isfile(exe):
         raise SystemExit(f"Connector not found: {exe}")
+    platform = "win32" if exe.lower().endswith(".exe") else "darwin"
     with zipfile.ZipFile(out, "w", zipfile.ZIP_DEFLATED) as z:
-        z.writestr("manifest.json", json.dumps(manifest(tool_list()), indent=2))
+        z.writestr("manifest.json", json.dumps(manifest(tool_list(), platform), indent=2))
         z.writestr("icon.png", _icon())
-        z.write(exe, "server/CitrelloMCP.exe")
+        info = zipfile.ZipInfo("server/" + _server_name(platform))
+        info.external_attr = 0o755 << 16  # keep it executable on macOS
+        info.compress_type = zipfile.ZIP_DEFLATED
+        with open(exe, "rb") as f:
+            z.writestr(info, f.read())
     return out
 
 

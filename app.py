@@ -377,10 +377,13 @@ def _read_cfg(path):
 def extension_path():
     """Citrello.mcpb, the one-click Claude Desktop extension, built next to Citrello.exe."""
     base = os.path.dirname(sys.executable) if getattr(sys, "frozen", False) else os.path.dirname(os.path.abspath(__file__))
+    mac_app = sys.platform == "darwin" and getattr(sys, "frozen", False)
+    if mac_app:  # Citrello.app/Contents/MacOS/Citrello -> Contents/Resources/Citrello.mcpb
+        base = os.path.join(os.path.dirname(base), "Resources")
     p = os.path.join(base, "Citrello.mcpb")
     if not os.path.exists(p):
         return None
-    if store_package():  # File Explorer can't show the Store's app folder, so hand over a copy
+    if store_package() or mac_app:  # the Store folder and the inside of a Mac .app aren't easy to drag from
         copy = os.path.join(library.HOME, "Citrello.mcpb")
         try:
             if not os.path.exists(copy) or os.path.getmtime(copy) < os.path.getmtime(p):
@@ -404,6 +407,11 @@ def extension_installed():
 
 
 def claude_running():
+    if sys.platform == "darwin":
+        try:
+            return subprocess.run(["pgrep", "-x", "Claude"], capture_output=True, timeout=10).returncode == 0
+        except Exception:
+            return False
     if not sys.platform.startswith("win"):
         return False
     try:
@@ -461,6 +469,11 @@ def show_in_explorer(path):
 
 def start_claude():
     """Start Claude Desktop if it isn't running (normal and Microsoft Store installs). Best effort."""
+    if sys.platform == "darwin" and not claude_running():
+        try:
+            return subprocess.run(["open", "-a", "Claude"], capture_output=True, timeout=20).returncode == 0
+        except Exception:
+            return False
     if not sys.platform.startswith("win") or claude_running():
         return claude_running()
     exe = os.path.join(os.environ.get("LOCALAPPDATA", ""), "AnthropicClaude", "claude.exe")
@@ -482,7 +495,7 @@ def install_extension():
     user can drag it onto Claude's Settings -> Extensions page (no confusing 'Open with' prompt)."""
     path = extension_path()
     if not path:
-        raise ValueError("Citrello.mcpb was not found next to Citrello.exe. Keep the files from the download together.")
+        raise ValueError("Citrello.mcpb was not found. Download Citrello again and keep its files together.")
     if not mcpb_associated():
         show_in_explorer(path)
         return {"manual": True, "path": path, "claude_started": start_claude()}

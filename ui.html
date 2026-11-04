@@ -386,10 +386,10 @@
         <button class="primary" id="claudeInstall">Connect to Claude Desktop</button>
       </div>
       <div class="panel hidden" id="claudeChoice">
-        <strong>Three quick steps</strong> <span class="muted small">(File Explorer is now showing Citrello.mcpb)</span>
+        <strong>Three quick steps</strong> <span class="muted small">(File Explorer or Finder is now showing Citrello.mcpb)</span>
         <ol style="margin:8px 0 0; padding-left:20px">
           <li>In Claude Desktop, open <strong>Settings → Extensions</strong>.</li>
-          <li><strong>Drag Citrello.mcpb</strong> from File Explorer onto that page. <button class="link" id="claudeShowFile">Show the file again</button></li>
+          <li><strong>Drag Citrello.mcpb</strong> from File Explorer (Finder on Mac) onto that page. <button class="link" id="claudeShowFile">Show the file again</button></li>
           <li>Click <strong>Install</strong>. Then ask Claude in a new chat: <em>“What's in my Citrello library?”</em></li>
         </ol>
       </div>
@@ -673,7 +673,7 @@ $("codexConnect").onclick = async () => {
 
 async function loadWord() {
   const w = await api("/api/word");
-  if (!w.windows) { $("wordStatus").innerHTML = `<div class="notice warn">The Word button is available on Windows.</div>`; $("wordInstall").disabled = true; return; }
+  if (!w.windows) { $("wordStatus").innerHTML = `<div class="notice warn">The Word tab is Windows-only for now; a Mac version is planned. Meanwhile, use <strong>Documents → Update or restyle a document</strong> to format citations in a Word file, including the [@Key] markers Claude writes.</div>`; $("wordInstall").disabled = true; return; }
   $("wordStatus").innerHTML = w.installed ? `<div class="notice ok">Installed. Restart Word: a <strong>Citrello</strong> tab appears in the ribbon.</div>`
                                           : `<div class="notice warn">Not installed.</div>`;
   $("wordInstall").textContent = w.installed ? "Reinstall Word button" : "Install Word button";
@@ -700,7 +700,7 @@ async function loadClaude() {
   else if (c.connected && c.up_to_date) html = `<div class="notice ok">Connected through Claude's settings file. For a cleaner setup, click Connect to Claude Desktop and install the extension.</div>`;
   else if (!c.claude_installed) html = `<div class="notice warn">Claude Desktop doesn't seem to be installed on this computer (get it from claude.ai/download).</div>`;
   else html = `<div class="notice warn">Not connected yet.</div>`;
-  if (!c.extension_file) html += `<div class="notice err">Citrello.mcpb was not found next to Citrello.exe. Run build_windows.bat again; it creates it in the dist folder.</div>`;
+  if (!c.extension_file) html += `<div class="notice err">Citrello.mcpb was not found. Download Citrello again and keep its files together.</div>`;
   $("claudeStatus").innerHTML = html;
   $("claudeInstall").disabled = !c.extension_file;
 }
