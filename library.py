@@ -10,6 +10,7 @@ import contextlib
 import json
 import os
 import re
+import sys
 import shutil
 import time
 import unicodedata
@@ -154,8 +155,10 @@ def _index(items):
     return idx
 
 
-def find_duplicate(data, csl):
-    hit, how = _index(data["items"]).find(csl)
+def find_duplicate(data, csl, index=None):
+    """index: a LibraryIndex of data's items, kept up to date by the caller (import_items), so a large import
+    doesn't rebuild it for every reference."""
+    hit, how = (index or _index(data["items"])).find(csl)
     if hit:
         return next(it for it in data["items"] if it["id"] == hit), how
     return None, None
@@ -200,13 +203,13 @@ def _now():
 KEY_OK_RE = re.compile(r"^[A-Za-z0-9_][\w:.+\-/]{0,79}$")
 
 
-def add_csl(data, csl, project=None, source="manual", raw=None, extra=None, key=None):
+def add_csl(data, csl, project=None, source="manual", raw=None, extra=None, key=None, index=None):
     """Add one CSL item (or return the existing copy). Returns (item, created, how_matched).
     `key`: the key to use if it is free (e.g. the BibTeX key from an imported .bib)."""
     csl = core.trim_csl(dict(csl)) if csl else {}
     if not csl.get("title"):
         raise ValueError("A reference needs at least a title.")
-    existing, how = find_duplicate(data, csl)
+    existing, how = find_duplicate(data, csl, index)
     if existing:
         if project and project not in existing.setdefault("projects", []):
             existing["projects"].append(project)
@@ -223,6 +226,8 @@ def add_csl(data, csl, project=None, source="manual", raw=None, extra=None, key=
         it["raw"] = raw
     it.update(extra or {})
     data["items"].append(it)
+    if index is not None:
+        index.add(it["id"], csl.get("title"), csl.get("DOI"), core.year_of(csl))
     if project and project not in data["projects"]:
         data["projects"].append(project)
     return it, True, None
@@ -609,6 +614,7 @@ def import_items(cslist, project=None, source="import", extra_key=None, keymap=N
     BibTeX keys are kept when free; `keymap` (a dict) collects {bib key: library key} where they differ."""
     added = skipped = 0
     with editing() as data:
+        index = _index(data["items"])  # built once, updated as items are added
         for c in cslist:
             extra = {}
             if extra_key and c.get("_id"):
@@ -617,11 +623,16 @@ def import_items(cslist, project=None, source="import", extra_key=None, keymap=N
             more = [p for p in (c.get("_projects") or []) if p]  # e.g. the item's Zotero collections
             c = {k: v for k, v in c.items() if not k.startswith("_")}
             rec = {"number": 0, "raw": "", "source": source, "csl": c, "typed": {}}
-            core.assess_references([rec])  # offline checks: DOI, date, author, web page, preprint
-            extra.update(checks=rec["checks"], reliability=rec["reliability"])
             try:
-                it, created, _ = add_csl(data, c, project, source, extra=extra, key=want)
-            except ValueError:
+                core.assess_references([rec])  # offline checks: DOI, date, author, web page, preprint
+                extra.update(checks=rec["checks"], reliability=rec["reliability"])
+            except Exception:
+                extra.update(checks=[], reliability="check")
+            try:
+                it, created, _ = add_csl(data, c, project, source, extra=extra, key=want, index=index)
+            except Exception as e:  # one odd reference (no title, unusual data) never stops a whole import
+                if not isinstance(e, ValueError):
+                    print(f"Skipped a reference that couldn't be read: {e!r}", file=sys.stderr)
                 skipped += 1
                 continue
             if keymap is not None and want and it["key"] != want:
@@ -690,18 +701,63 @@ def export_to_mendeley(items):
     return added, present
 
 
+ZOTERO_API = os.environ.get("CITRELLO_ZOTERO_API", "https://api.zotero.org")
+
+
+def _zotero_get(url, api_key, tries=6):
+    """One page from Zotero's web API, waiting when Zotero asks to slow down (429/503, Backoff, Retry-After)."""
+    wait = 2
+    for attempt in range(tries):
+        try:
+            res, headers = core.http_json(url, {"Zotero-API-Key": api_key, "Zotero-API-Version": "3"}, timeout=60)
+            backoff = headers.get("Backoff")
+            if backoff and backoff.isdigit():
+                time.sleep(min(int(backoff), 30))
+            return res, headers
+        except urllib.error.HTTPError as e:
+            if e.code in (403, 401):
+                raise ValueError("Zotero refused the API key. Create a key at zotero.org/settings/keys with "
+                                 "\u201cAllow library access\u201d ticked, then paste it in Settings \u2192 Zotero.")
+            if e.code == 404:
+                raise ValueError("Zotero didn't find that user ID. Use the number shown as \u201cYour user ID for use in "
+                                 "API calls\u201d at zotero.org/settings/keys (not your username).")
+            if e.code in (429, 500, 502, 503, 504) and attempt < tries - 1:
+                retry = e.headers.get("Retry-After") if e.headers else None
+                time.sleep(min(int(retry), 60) if retry and retry.isdigit() else wait)
+                wait = min(wait * 2, 30)
+                continue
+            raise ValueError(f"Zotero answered with an error ({e.code}). Please try again in a few minutes.")
+        except (urllib.error.URLError, TimeoutError, OSError) as e:
+            if attempt < tries - 1:
+                time.sleep(wait)
+                wait = min(wait * 2, 30)
+                continue
+            raise ValueError(f"Couldn't reach Zotero ({getattr(e, 'reason', e)}). Check your internet connection.")
+
+
 def import_from_zotero(user_id, api_key, project=None):
-    """Zotero web library -> Citrello (key from zotero.org/settings/keys, read access)."""
-    items, start = [], 0
+    """Zotero web library -> Citrello (key from zotero.org/settings/keys, read access). Any size: 100 per page."""
+    user_id = str(user_id).strip()
+    items, start, total = [], 0, None
     while True:
-        url = (f"https://api.zotero.org/users/{user_id}/items/top?format=csljson&limit=100&start={start}")
-        res, headers = core.http_json(url, {"Zotero-API-Key": api_key, "Zotero-API-Version": "3"})
-        batch = res.get("items", []) if isinstance(res, dict) else res
-        for c in batch:
-            c["_id"] = (c.get("id") or "").split("/")[-1]
+        url = f"{ZOTERO_API}/users/{urllib.parse.quote(user_id)}/items/top?format=json&include=csljson&limit=100&start={start}"
+        res, headers = _zotero_get(url, api_key)
+        batch = res if isinstance(res, list) else (res or {}).get("items", [])
+        for entry in batch:
+            data = entry.get("data") or {}
+            if data.get("itemType") in ("attachment", "note", "annotation"):
+                continue  # a PDF or note on its own, not a reference
+            c = dict(entry.get("csljson") or {})
+            if not c:
+                continue
+            c["_id"] = entry.get("key") or (c.get("id") or "").split("/")[-1]
             c.pop("id", None)
-        items += batch
-        total = int(headers.get("Total-Results", len(items)) or 0)
+            items.append(c)
+        if total is None:
+            try:
+                total = int(headers.get("Total-Results") or 0)
+            except ValueError:
+                total = 0
         start += 100
         if not batch or start >= total:
             break

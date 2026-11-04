@@ -236,3 +236,13 @@ def test_keys_from_nordic_and_other_letters():
     assert library.make_key({"author": [{"family": "Møller"}], "issued": {"date-parts": [[2019]]}, "title": "t"}, set()) == "Moller2019"
     assert library.make_key({"author": [{"family": "Weiß"}], "issued": {"date-parts": [[2020]]}, "title": "t"}, set()) == "Weiss2020"
     assert library.make_key({"type": "webpage", "title": "x", "container-title": "Ørsted"}, set()).startswith("Orsted")
+
+
+def test_duplicates_part1_part2_and_different_dois():
+    idx = core.LibraryIndex()
+    idx.add("a", "Offshore wind farm decommissioning costs: Part 1", "10.1/a", 2020)
+    assert idx.find({"title": "Offshore wind farm decommissioning costs: Part 2", "issued": {"date-parts": [[2020]]}})[0] is None
+    assert idx.find({"title": "Offshore wind farm decommissioning costs: Part 1", "DOI": "10.1/b"})[0] is None
+    assert idx.find({"title": "Offshore wind farm decommissioning costs - Part 1"})[0] == "a"   # same paper, punctuation
+    assert idx.find({"title": "Offshore wind farm decomissioning costs: Part 1"})[0] == "a"    # typo still matches
+    assert idx.find({"title": "something else", "DOI": "https://doi.org/10.1/A"})[0] == "a"     # same DOI

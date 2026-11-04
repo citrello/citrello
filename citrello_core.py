@@ -331,14 +331,23 @@ def norm(s):
 
 def trim_csl(csl):
     out = {k: v for k, v in csl.items() if k in CSL_KEEP and v}
+    for k, v in list(out.items()):  # other tools send numbers for volume, issue, page...: keep text
+        if isinstance(v, (int, float)) and not isinstance(v, bool):
+            out[k] = str(v)
     for k in ("container-title", "title", "ISSN", "ISBN"):
         if isinstance(out.get(k), list):
             out[k] = out[k][0] if out[k] else ""
     for k in ("author", "editor"):
         if k in out:
-            out[k] = [{x: a[x] for x in ("family", "given", "literal") if a.get(x)} for a in out[k]]
+            out[k] = [{x: str(a[x]) for x in ("family", "given", "literal") if a.get(x)} for a in out[k]
+                      if isinstance(a, dict)]
     if "issued" in out:
-        out["issued"] = {"date-parts": out["issued"].get("date-parts", [[None]])[:1]}
+        iss = out["issued"] if isinstance(out["issued"], dict) else {}
+        parts = iss.get("date-parts") or [[None]]
+        if not parts[0] or parts[0] == [None]:
+            y = re.search(r"\b(1[5-9]|20)\d{2}\b", str(iss.get("raw") or iss.get("literal") or ""))
+            parts = [[int(y.group(0))]] if y else [[None]]
+        out["issued"] = {"date-parts": [[int(p) if str(p).isdigit() else p for p in parts[0][:3]]]}
     return {k: v for k, v in out.items() if v}
 
 
@@ -803,17 +812,26 @@ def doi_candidates(doi):
 
 
 class LibraryIndex:
-    """Your Mendeley library, searchable by DOI and title, to avoid duplicates."""
+    """A library, searchable by DOI and title, to avoid duplicates.
+
+    Two references with different DOIs are never the same paper, and neither are titles that differ only in a
+    number ("... Part 1" / "... Part 2", "... 2019 report" / "... 2020 report")."""
 
     def __init__(self):
         self.by_doi, self.by_title, self.entries = {}, {}, []
 
     def add(self, doc_id, title, doi=None, year=None):
-        if norm_doi(doi):
-            self.by_doi[norm_doi(doi)] = doc_id
-        if norm(title):
-            self.by_title[norm(title)] = doc_id
-            self.entries.append((norm(title), str(year or ""), doc_id))
+        d = norm_doi(doi)
+        if d:
+            self.by_doi[d] = doc_id
+        t = norm(title)
+        if t:
+            self.by_title.setdefault(t, []).append((doc_id, d))
+            self.entries.append((t, str(year or ""), doc_id, d))
+
+    @staticmethod
+    def _numbers(t):
+        return re.findall(r"\d+", t)
 
     def find(self, csl):
         """Return (doc_id, how it matched) or (None, None)."""
@@ -823,17 +841,33 @@ class LibraryIndex:
         title = norm(csl.get("title", ""))
         if not title:
             return None, None
-        if title in self.by_title:
-            return self.by_title[title], "same title"
+        for doc_id, d in self.by_title.get(title, []):
+            if not (doi and d and doi != d):
+                return doc_id, "same title"
+        if len(title) <= 20:  # short titles only count when identical
+            return None, None
         year = year_of(csl)
+        nums = self._numbers(title)
         best, best_ratio = None, 0.0
-        for t, y, doc_id in self.entries:
+        sm = difflib.SequenceMatcher(None)
+        sm.set_seq2(title)  # difflib caches the second sequence: compare many titles against this one
+        n = len(title)
+        for t, y, doc_id, d in self.entries:
             if year and y and year != y:
                 continue
-            ratio = difflib.SequenceMatcher(None, title, t).ratio()
+            if doi and d and doi != d:
+                continue
+            if 2 * min(n, len(t)) / (n + len(t)) < 0.93:  # lengths too different to reach 93%
+                continue
+            if self._numbers(t) != nums:
+                continue
+            sm.set_seq1(t)
+            if sm.real_quick_ratio() < 0.93 or sm.quick_ratio() < 0.93:
+                continue
+            ratio = sm.ratio()
             if ratio > best_ratio:
                 best, best_ratio = doc_id, ratio
-        if best_ratio >= 0.93 and len(title) > 20:
+        if best_ratio >= 0.93:
             return best, f"near-identical title ({best_ratio:.0%})"
         return None, None
 
