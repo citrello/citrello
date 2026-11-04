@@ -40,6 +40,7 @@ import bridge_client
 import citrello_core as core
 import codex_config
 import latex
+import updater
 import usage
 import zotero_local
 import word_addin
@@ -691,7 +692,7 @@ class Handler(BaseHTTPRequestHandler):
         if path == "/api/status":
             cfg = load_config()
             name = profile_name() if logged_in() else None
-            return self.send(200, {"version": VERSION, "configured": bool(cfg.get("client_id") and cfg.get("client_secret")),
+            return self.send(200, {"version": VERSION, "pid": os.getpid(), "configured": bool(cfg.get("client_id") and cfg.get("client_secret")),
                                    "connected": bool(name), "name": name, "email": cfg.get("email", ""),
                                    "style": cfg.get("style", citeformat.DEFAULT_STYLE),
                                    "zotero_user": cfg.get("zotero_user", ""), "has_zotero_key": bool(cfg.get("zotero_key")),
@@ -805,6 +806,10 @@ class Handler(BaseHTTPRequestHandler):
             return self.send(200, codex_config.status(connector_command()))
         if path == "/api/account":
             return self.send(200, account_status())
+        if path == "/api/update":
+            return self.send(200, updater.public(updater.check(bool(qs.get("force")), store_package())))
+        if path == "/api/update/progress":
+            return self.send(200, updater.STATE)
         if path == "/api/bibexports":
             return self.send(200, {"exports": latex.list_exports()})
         m = re.fullmatch(r"/api/latex/(\w+)", path)
@@ -1049,6 +1054,11 @@ class Handler(BaseHTTPRequestHandler):
             return handled
         if path.startswith("/api/account/"):
             return self.account_post(path[len("/api/account/"):])
+        if path == "/api/update/install":
+            try:
+                return self.send(200, updater.install(store_package()))
+            except ValueError as e:
+                return self.send(400, {"error": str(e)})
         if path.startswith("/api/latex") or path.startswith("/api/bibexports/"):
             return self.latex_post(path)
         if path == "/api/quit":
@@ -1080,6 +1090,8 @@ def main():
     ap.add_argument("--no-browser", action="store_true")
     args = ap.parse_args()
     library.migrate_legacy_data()
+    if getattr(sys, "frozen", False) and sys.platform.startswith("win"):
+        updater.cleanup_old()  # files the last update replaced while they were running
     url = f"http://localhost:{PORT}/"
     server = None
     for attempt in range(20):

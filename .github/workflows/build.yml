@@ -94,6 +94,8 @@ jobs:
           New-Item -ItemType Directory -Force dist\zip\Citrello | Out-Null
           Copy-Item dist\Citrello.exe, dist\CitrelloMCP.exe, dist\Citrello.mcpb dist\zip\Citrello\
           Compress-Archive -Path dist\zip\Citrello -DestinationPath dist\Citrello-windows.zip -Force
+      - name: Update test (install the app, offer it as a new version, click Update)
+        run: python tests\update_smoke.py dist\Citrello-windows.zip
       - uses: actions/upload-artifact@v4
         with:
           name: Citrello-windows
@@ -159,6 +161,8 @@ jobs:
         with:
           name: e2e-screenshots-mac
           path: e2e-screenshots
+      - name: Update test (install the app, offer it as a new version, click Update)
+        run: python3 tests/update_smoke.py dist/Citrello-mac.zip
       - uses: actions/upload-artifact@v4
         with:
           name: Citrello-mac

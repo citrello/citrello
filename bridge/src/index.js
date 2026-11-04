@@ -522,6 +522,29 @@ async function usagePing(request, env) {
 }
 
 // ---------------------------------------------------------------------------
+// Latest release, for the app's update check (GitHub's answer, cached for everyone)
+// ---------------------------------------------------------------------------
+
+async function latestRelease(request, env, ctx) {
+  const cache = caches.default;
+  const key = new Request("https://cache.citrello.internal/latest-release");
+  const hit = await cache.match(key);
+  if (hit) return new Response(hit.body, hit);
+  const r = await fetch("https://api.github.com/repos/citrello/citrello/releases/latest", {
+    headers: { "User-Agent": "citrello-bridge", Accept: "application/vnd.github+json" } });
+  if (!r.ok) return json({ error: "unavailable" }, 502);
+  const rel = await r.json();
+  const body = {
+    tag_name: rel.tag_name, html_url: rel.html_url, published_at: rel.published_at,
+    assets: (rel.assets || []).map((a) => ({ name: a.name, size: a.size, digest: a.digest || "",
+                                             browser_download_url: a.browser_download_url })),
+  };
+  const res = json(body, 200, { "Cache-Control": "public, max-age=600" });
+  if (ctx) ctx.waitUntil(cache.put(key, res.clone()));
+  return res;
+}
+
+// ---------------------------------------------------------------------------
 // Unsubscribe and admin
 // ---------------------------------------------------------------------------
 
@@ -611,7 +634,7 @@ async function adminSubscribers(request, env) {
 // Router
 // ---------------------------------------------------------------------------
 
-async function route(request, env) {
+async function route(request, env, ctx) {
   // A fixed public address keeps OAuth issuer and resource URLs stable (wrangler dev rewrites the host).
   if (env.PUBLIC_URL) {
     const u = new URL(request.url);
@@ -637,6 +660,7 @@ async function route(request, env) {
   if (path === "/revoke" && m === "POST") return revoke(request, env);
 
   if (path === "/api/ping" && m === "POST") return usagePing(request, env);
+  if (path === "/api/latest" && m === "GET") return latestRelease(request, env, ctx);
   if (path === "/api/auth/start" && m === "POST") return apiAuthStart(request, env);
   if (path === "/api/auth/verify" && m === "POST") return apiAuthVerify(request, env);
   if (path === "/api/me" && (m === "GET" || m === "POST")) return apiMe(request, env);
@@ -655,9 +679,9 @@ async function route(request, env) {
 }
 
 export default {
-  async fetch(request, env) {
+  async fetch(request, env, ctx) {
     try {
-      return await route(request, env);
+      return await route(request, env, ctx);
     } catch (e) {
       if (e instanceof HttpError) return json({ error: e.code, error_description: e.message }, e.status);
       console.error(e && e.stack || e);

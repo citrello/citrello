@@ -143,6 +143,12 @@
   .empty-detail { color: var(--muted); text-align: center; padding: 40px 10px; }
   .empty-detail b { display: block; font: 400 22px var(--serif); color: var(--cobalt); margin-bottom: 6px; }
 
+  /* update banner */
+  .update { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; background: var(--lemon-soft); border: 1px solid var(--lemon);
+            border-radius: 12px; padding: 10px 14px; margin-bottom: 16px; font-size: 14.5px; }
+  .update b { font-weight: 700; }
+  .update .grow { flex: 1; min-width: 200px; }
+  .update .bar { flex-basis: 100%; margin-top: 2px; }
   /* welcome */
   .overlay { position: fixed; inset: 0; background: rgba(15, 23, 48, .55); display: grid; place-items: center; z-index: 10; padding: 16px; }
   .welcome { background: var(--card); color: var(--ink); border-radius: 22px; max-width: 560px; width: 100%; max-height: calc(100vh - 32px); overflow: auto;
@@ -186,6 +192,13 @@
   </div>
 </aside>
 <main class="main">
+  <div class="update hidden" id="updBanner" role="status" aria-live="polite">
+    <span class="grow" id="updText"></span>
+    <a id="updNotes" href="#" target="_blank" rel="noopener">What's new</a>
+    <button class="primary" id="updGo">Update now</button>
+    <button class="link" id="updLater">Later</button>
+    <div class="bar hidden" id="updBarWrap"><div id="updBar"></div></div>
+  </div>
   <!-- ================= LIBRARY ================= -->
   <section id="tab-library" class="lib">
     <div>
@@ -397,6 +410,12 @@
       <p class="small muted">Requests from the web can save Word files only in Citrello's Documents folder.</p>
     </div>
     <div class="card">
+      <h2>Updates</h2>
+      <p class="muted" style="margin:0">You have Citrello <b id="updCurrent"></b>. Citrello checks for new versions when it starts and offers to update itself.</p>
+      <div class="row"><button id="updCheck">Check for updates</button><span class="small muted" id="updCheckMsg"></span></div>
+    </div>
+
+    <div class="card">
       <h2>Claude</h2>
       <p class="muted">Connect Citrello to the Claude desktop app. Claude can then search and add to your library in every chat, cite with <code class="key">[@Key]</code> markers, and write Word documents with live citations.</p>
       <div id="claudeStatus"></div>
@@ -591,6 +610,7 @@ const issuesList = (checks) => checks && checks.length ? `<ul class="issues">${c
 async function loadStatus() {
   status = await api("/api/status");
   $("ver").textContent = "v" + status.version;
+  $("updCurrent").textContent = status.version;
   show("mSetup", !status.configured); show("mOut", status.configured && !status.connected); show("mIn", status.connected);
   $("who").textContent = status.name || "";
   show("pushOpt", status.connected);
@@ -1205,6 +1225,53 @@ function renderDone() {
 }
 $("again").onclick = () => $("file").click();
 
+// ---------- updates ----------
+let upd = null;
+function showUpdate(u) {
+  upd = u;
+  if (!u || !u.available || u.how === "store") return show("updBanner", false);  // the Store updates its apps itself
+  $("updText").innerHTML = `<b>Citrello ${esc(u.latest)}</b> is available. You have ${esc(u.current)}.`;
+  $("updNotes").href = u.notes_url;
+  const self = u.can_install;
+  $("updGo").textContent = self ? "Update now" : u.how === "store" ? "Open Microsoft Store" : "Download";
+  show("updGo", u.how !== "source");
+  show("updBanner", !sessionStorageGet("updLater-" + u.latest));
+}
+function sessionStorageGet(k) { try { return sessionStorage.getItem(k); } catch { return null; } }
+async function checkUpdate(force) {
+  try { const u = await api("/api/update" + (force ? "?force=1" : "")); showUpdate(u); return u; } catch { return null; }
+}
+$("updLater").onclick = () => { try { sessionStorage.setItem("updLater-" + upd.latest, "1"); } catch {} show("updBanner", false); };
+$("updGo").onclick = async () => {
+  if (!upd.can_install) { window.open(upd.how === "store" ? "ms-windows-store://pdp/?ProductId=citrello" : "https://citrello.app/download", "_blank"); return; }
+  $("updGo").disabled = true; show("updLater", false); show("updBarWrap");
+  try { await post("/api/update/install"); } catch (e) { $("updText").innerHTML = esc(e.message); $("updGo").disabled = false; return; }
+  const target = upd.latest;
+  const tick = async () => {
+    let s; try { s = await api("/api/update/progress"); } catch { s = {phase: "restarting"}; }
+    if (s.phase === "error") { $("updText").innerHTML = `The update didn't finish: ${esc(s.error)}`; $("updGo").disabled = false; show("updBarWrap", false); return; }
+    if (s.phase === "downloading") { $("updText").textContent = `Downloading Citrello ${target}…`; $("updBar").style.width = s.total ? `${100 * s.done / s.total}%` : "10%"; }
+    if (s.phase === "installing") { $("updText").textContent = "Installing…"; $("updBar").style.width = "100%"; }
+    if (s.phase === "restarting") { $("updText").textContent = "Restarting Citrello…"; return waitForNew(target); }
+    setTimeout(tick, 600);
+  };
+  tick();
+};
+async function waitForNew(target) {
+  for (let i = 0; i < 120; i++) {
+    await new Promise((r) => setTimeout(r, 1000));
+    try { const st = await api("/api/status"); if (st.version === target) { location.reload(); return; } } catch {}
+  }
+  $("updText").textContent = "Citrello was updated. If this page doesn't come back, start Citrello again.";
+}
+$("updCheck").onclick = async () => {
+  $("updCheckMsg").textContent = "Checking…";
+  const u = await checkUpdate(true);
+  $("updCheckMsg").textContent = !u ? "Couldn't check: no internet connection?" : u.available ? `Citrello ${u.latest} is available (see the banner above).`
+    : u.error ? "Couldn't check right now. Please try again later." : "You have the latest version.";
+  if (u && u.available) { try { sessionStorage.removeItem("updLater-" + u.latest); } catch {} showUpdate(u); }
+};
+
 // ---------- welcome (first launch) ----------
 function closeWelcome() { show("welcome", false); post("/api/config", {welcome_done: "1"}).catch(() => {}); $("q").focus(); }
 function maybeWelcome() {
@@ -1249,6 +1316,7 @@ if (params.get("connected") || params.get("login_error")) document.querySelector
 if (params.toString()) history.replaceState(null, "", "/");
 loadStatus().then(maybeWelcome); loadStyles(); loadLibrary();
 api("/api/account").then(renderSideConn).catch(() => {});
+setTimeout(() => checkUpdate(false), 3000);
 </script>
 </body>
 </html>
