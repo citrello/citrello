@@ -283,6 +283,13 @@ def t_check_latex(path):
     return rep
 
 
+def t_import_zotero(project=None):
+    import zotero_local
+    if _remote():
+        raise ValueError("Ask the user to import Zotero from the Citrello app (Library → Import).")
+    return zotero_local.import_library(project)
+
+
 def t_styles(query=""):
     styles = citeformat.list_styles()
     q = query.lower()
@@ -359,6 +366,9 @@ TOOLS = {
                             "unused and duplicate entries, unreliable references (retracted, wrong DOI, no DOI...), "
                             "and hand-typed bibliographies.",
                             S({"path": STR}, ["path"])),
+    "import_zotero_library": (t_import_zotero, "Import the user's Zotero library from Zotero on this computer (no account "
+                              "or key needed). Zotero collections become projects; duplicates are skipped.",
+                              S({"project": {"type": "string", "description": "Also put everything into this project (optional)"}})),
     "list_styles": (t_styles, "List citation styles available offline (search by name).", S({"query": STR})),
     "verify_references": (t_verify, "Check references online against Crossref (all not-yet-verified ones, or given keys "
                           "or a project): fixes their details from the publisher record and re-rates them as verified / "

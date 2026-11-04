@@ -61,6 +61,8 @@ your computer and is shared by the Citrello app, Claude and Word:
     LaTeX, or with Overleaf through Dropbox or Git sync.
   - **Claude and ChatGPT:** they can write `\cite{Key}`, give you the `.bib` for a project, and check a LaTeX
     project.
+- **Import from Zotero in one click:** reads the Zotero library on your computer directly (no account or key; Zotero
+  can stay open). Zotero collections become Citrello projects.
 - **Import / export:** RIS, BibTeX, biblatex and CSL-JSON (Mendeley, Zotero, EndNote and others), plus a
   Mendeley account (import and export) and a Zotero account (import).
 

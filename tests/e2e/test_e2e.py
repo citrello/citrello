@@ -62,7 +62,8 @@ def env():
     e = dict(os.environ, CITRELLO_HOME=os.path.join(tmp, "Citrello"), CITRELLO_ACCOUNT_FILE=os.path.join(tmp, "account.json"),
              CITRELLO_BIB_EXPORTS=os.path.join(tmp, "exports.json"), CODEX_HOME=os.path.join(tmp, "codex"),
              CITRELLO_LEGACY_HOME=os.path.join(tmp, "none"), CITRELLO_BRIDGE="http://127.0.0.1:9",
-             CITRELLO_APP_CONFIG=os.path.join(tmp, "app.json"), CITRELLO_INSTALL_FILE=os.path.join(tmp, "install.json"))
+             CITRELLO_APP_CONFIG=os.path.join(tmp, "app.json"), CITRELLO_INSTALL_FILE=os.path.join(tmp, "install.json"),
+             CITRELLO_ZOTERO_DIR=os.path.join(tmp, "Zotero"))
     if ONLINE:  # the unit tests' conftest points lookups at a dead address; use the real services here
         e.pop("CITRELLO_CROSSREF", None)
         e.pop("CITRELLO_DOIORG", None)
@@ -284,6 +285,22 @@ def test_11_settings_codex_and_claude(page, env):
     cfg = open(os.path.join(env["CODEX_HOME"], "config.toml"), encoding="utf-8").read()
     assert "[mcp_servers.citrello]" in cfg
     shot(page, "settings")
+
+
+def test_11b_import_zotero_on_this_computer(page, env):
+    import importlib.util
+    spec = importlib.util.spec_from_file_location("zfix", os.path.join(ROOT, "tests", "test_zotero_local.py"))
+    zfix = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(zfix)
+    os.makedirs(env["CITRELLO_ZOTERO_DIR"], exist_ok=True)
+    zfix.make_db(os.path.join(env["CITRELLO_ZOTERO_DIR"], "zotero.sqlite"))
+    tab(page, "library")
+    page.click("#openImport")
+    page.click("#impZoteroLocal")
+    expect(page.locator("#importMsg")).to_contain_text("2 Zotero collections are now in Projects", timeout=20000)
+    expect(page.locator('#projNav [data-proj-nav="Thesis / Chapter 2"]')).to_be_visible()
+    expect(page.locator('#libRows .ref[data-sel="Orsted"]').or_(page.locator("#libRows .ref", has_text="Our offshore wind farms"))).to_be_visible()
+    shot(page, "zotero-imported")
 
 
 def test_12_connector_answers(env, app):

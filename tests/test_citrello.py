@@ -230,3 +230,9 @@ def test_codex_config_keeps_other_settings(tmp_path, monkeypatch):
     assert cfg["model"] == "gpt-5.5" and cfg["profiles"]["fast"]["model"] == "m"
     assert cfg["mcp_servers"]["other"]["command"] == "npx"
     assert cfg["mcp_servers"]["citrello"] == {"command": entry["command"], "args": [], "startup_timeout_sec": 30}
+
+
+def test_keys_from_nordic_and_other_letters():
+    assert library.make_key({"author": [{"family": "Møller"}], "issued": {"date-parts": [[2019]]}, "title": "t"}, set()) == "Moller2019"
+    assert library.make_key({"author": [{"family": "Weiß"}], "issued": {"date-parts": [[2020]]}, "title": "t"}, set()) == "Weiss2020"
+    assert library.make_key({"type": "webpage", "title": "x", "container-title": "Ørsted"}, set()).startswith("Orsted")

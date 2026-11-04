@@ -41,6 +41,7 @@ import citrello_core as core
 import codex_config
 import latex
 import usage
+import zotero_local
 import word_addin
 
 VERSION = core.VERSION
@@ -906,6 +907,11 @@ class Handler(BaseHTTPRequestHandler):
                 items = library.search(data, b.get("q", ""), b.get("project") or None)
                 added, present = library.export_to_mendeley(items)
                 return self.send(200, {"added": added, "present": present})
+            if path == "/api/library/import-zotero-local":  # Zotero on this computer: no account or key
+                try:
+                    return self.send(200, zotero_local.import_library(self.json_body().get("project") or None))
+                except zotero_local.ZoteroNotFound as e:
+                    return self.send(400, {"error": str(e)})
             if path == "/api/library/import-zotero":
                 b = self.json_body()
                 cfg = load_config()

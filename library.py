@@ -118,8 +118,13 @@ def editing():
 # Keys, duplicates, search
 # --------------------------------------------------------------------------
 
+# letters that don't split into a plain letter plus an accent: Ørsted -> Orsted, Weiß -> Weiss, Łukasz -> Lukasz
+_LATIN = str.maketrans({"ø": "o", "Ø": "O", "æ": "ae", "Æ": "Ae", "œ": "oe", "Œ": "Oe", "ß": "ss", "ł": "l", "Ł": "L",
+                        "đ": "d", "Đ": "D", "ð": "d", "Ð": "D", "þ": "th", "Þ": "Th", "ı": "i", "ħ": "h", "Ħ": "H"})
+
+
 def _ascii(s):
-    return unicodedata.normalize("NFKD", s or "").encode("ascii", "ignore").decode()
+    return unicodedata.normalize("NFKD", (s or "").translate(_LATIN)).encode("ascii", "ignore").decode()
 
 
 def make_key(csl, taken):
@@ -609,6 +614,7 @@ def import_items(cslist, project=None, source="import", extra_key=None, keymap=N
             if extra_key and c.get("_id"):
                 extra[extra_key] = c["_id"]
             want = c.get("_key")
+            more = [p for p in (c.get("_projects") or []) if p]  # e.g. the item's Zotero collections
             c = {k: v for k, v in c.items() if not k.startswith("_")}
             rec = {"number": 0, "raw": "", "source": source, "csl": c, "typed": {}}
             core.assess_references([rec])  # offline checks: DOI, date, author, web page, preprint
@@ -620,6 +626,11 @@ def import_items(cslist, project=None, source="import", extra_key=None, keymap=N
                 continue
             if keymap is not None and want and it["key"] != want:
                 keymap[want] = it["key"]
+            for p in more:
+                if p not in it.setdefault("projects", []):
+                    it["projects"].append(p)
+                if p not in data["projects"]:
+                    data["projects"].append(p)
             added += created
             skipped += not created
     return added, skipped

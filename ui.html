@@ -229,9 +229,12 @@
             <div class="row"><input type="file" id="importFile" accept=".ris,.bib,.json,.txt"></div>
           </div>
           <div>
+            <h3>From Zotero on this computer</h3>
+            <div class="row"><button class="primary" id="impZoteroLocal">Import my Zotero library</button></div>
+            <p class="muted small" style="margin:6px 0 0">No account or key needed, and Zotero can stay open. Your collections become projects.</p>
             <h3>From an account</h3>
-            <div class="row"><button id="impMendeley">Import my Mendeley library</button></div>
-            <div class="row"><button id="impZotero">Import my Zotero library</button></div>
+            <div class="row"><button id="impMendeley">Import my Mendeley library</button>
+              <button id="impZotero">Zotero online library</button></div>
             <p class="muted small" style="margin:6px 0 0">Connect the accounts under Settings first.</p>
           </div>
         </div>
@@ -986,10 +989,22 @@ async function accountImport(path) {
 }
 $("impMendeley").onclick = () => accountImport("/api/library/import-mendeley");
 $("impZotero").onclick = () => accountImport("/api/library/import-zotero");
+$("impZoteroLocal").onclick = async () => {
+  notice("importMsg", "warn", "Reading your Zotero library…");
+  try {
+    const r = await post("/api/library/import-zotero-local", {project: $("importProject").value});
+    notice("importMsg", "ok", `${r.added} added, ${r.skipped} already in your library` +
+      (r.collections ? `. Your ${r.collections} Zotero collection${r.collections > 1 ? "s are" : " is"} now in Projects.` : ".") +
+      (r.from_backup ? " (Read from Zotero's latest automatic backup: close Zotero and import again to include today's changes.)" : ""));
+    loadLibrary();
+  } catch (e) { notice("importMsg", "err", esc(e.message)); }
+};
 function setExportLinks() {
   const q = encodeURIComponent($("q").value), p = encodeURIComponent($("projectFilter").value);
   ["ris", "bib", "biblatex", "json"].forEach((f) => $("exp" + f[0].toUpperCase() + f.slice(1)).href = `/api/library/export?fmt=${f}&q=${q}&project=${p}`);
 }
+// build the link at click time, so it always matches what is in the search box right now
+["expRis", "expBib", "expBiblatex", "expJson"].forEach((id) => $(id).addEventListener("click", setExportLinks));
 $("expMendeley").onclick = async () => {
   notice("exportMsg", "warn", "Sending…");
   const p = $("projectFilter").value;
