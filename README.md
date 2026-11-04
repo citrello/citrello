@@ -77,6 +77,22 @@ your computer and is shared by the Citrello app, Claude and Word:
 6. *Optional:* **Settings → Account:** sign in with your email to use ChatGPT or Claude on the web, then follow
    the steps under **ChatGPT and Claude on the web**.
 
+## Install (Mac, beta)
+For Macs with Apple silicon (M1 or newer). The Word tab is Windows-only for now.
+1. **Download** `Citrello-mac.zip` and `Citrello-mac.mcpb` from the
+   [latest release](https://github.com/citrello/citrello/releases/latest). Unzip `Citrello-mac.zip` and drag
+   **Citrello** into **Applications**.
+2. **Open it the first time.** The app isn't signed with an Apple developer certificate yet, so macOS blocks
+   the first launch:
+   1. Double-click Citrello and click **Done** in the warning.
+   2. Open **System Settings → Privacy & Security**, scroll down, and click **Open Anyway** next to "Citrello
+      was blocked". Confirm with your password.
+   3. Your browser opens Citrello's window. After this, Citrello opens normally.
+3. **Settings → Claude → Connect to Claude Desktop.** Finder shows `Citrello.mcpb`. Drag it onto
+   **Claude Desktop → Settings → Extensions** and click **Install**.
+4. Citrello has no Dock icon: it runs in your browser at `http://localhost:8585`. Close it with **Quit** in the
+   sidebar, and open the page again by starting Citrello.
+
 ## Using it with Claude
 Once installed, Citrello's tools are available in every Claude Desktop chat. For example:
 - "Add 10.1016/j.renene.2016.10.066 to my Citrello library, project *Decommissioning review*."
@@ -102,7 +118,7 @@ The account is optional. It stores your email, your computers and whether you wa
 [privacy policy](https://mcp.citrello.app/privacy). There is no other tracking.
 
 ## Build from source
-Requires Windows and Python 3.10+.
+Windows: requires Python 3.10+. Mac: `bash packaging/build_mac.sh` (builds `dist/Citrello.app`).
 ```
 build_windows.bat
 ```
@@ -121,7 +137,8 @@ pytest
 ```
 
 ## Limits
-- **Windows only:** the Word tab and the packaged app are Windows-only for now.
+- **Mac:** the Mac version is a beta for Apple silicon, without the Word tab. Use Documents → Update for Word
+  files on a Mac.
 - **Web connectors need the app running:** ChatGPT and Claude on the web reach your library through the app,
   so Citrello must be open on a computer that's signed in.
 - **Footnote styles** (e.g. Chicago notes) are not supported yet.
