@@ -809,6 +809,32 @@ def set_projects(key, projects):
         return it
 
 
+def change_projects(keys, add=(), remove=(), replace=None):
+    """Many references at once: add them to projects, take them out of projects, or (replace) give them exactly
+    these projects. Returns how many references changed."""
+    keys = {k.lstrip("@") for k in keys}
+    add = [p.strip() for p in add if p and p.strip()]
+    remove = {p.strip() for p in remove if p and p.strip()}
+    changed = 0
+    with editing() as data:
+        for it in data["items"]:
+            if it["key"] not in keys and it["id"] not in keys:
+                continue
+            before = list(it.get("projects", []))
+            projects = [p.strip() for p in replace if p and p.strip()] if replace is not None else list(before)
+            projects = [p for p in projects if p not in remove]
+            for p in add:
+                if p not in projects:
+                    projects.append(p)
+            if projects != before:
+                it["projects"] = projects
+                changed += 1
+            for p in projects:
+                if p not in data["projects"]:
+                    data["projects"].append(p)
+    return changed
+
+
 def update_item(key, csl):
     with editing() as data:
         it = get(data, key)

@@ -190,6 +190,46 @@ def test_04_projects_and_search(page):
     expect(page.locator("#libRows .ref")).to_have_count(3)
 
 
+def test_04b_filters_and_selecting_many(page):
+    tab(page, "library")
+    page.click('#projNav [data-proj-nav="*"]')
+    chips = page.locator("#libChips [data-rel]")
+    expect(chips.first).to_contain_text("3 references")
+    check = page.locator('#libChips [data-rel="check"]')
+    expect(check).to_be_visible()
+    check.click()                                   # show only "to check"
+    expect(check).to_have_attribute("aria-pressed", "true")
+    n_check = page.locator("#libRows .ref").count()
+    assert 0 < n_check < 3
+    page.locator('#libChips [data-rel="all"]').click()
+    expect(page.locator("#libRows .ref")).to_have_count(3)
+    # tick two references (the second with Shift: a range), add them to a project
+    page.locator('#libRows .ref[data-sel="topham2017"] .pick').click()
+    page.locator('#libRows .ref[data-sel="burton2011"] .pick').click(modifiers=["Shift"])
+    expect(page.locator("#selCount")).to_have_text("3 selected")   # the range covers the one in between
+    page.locator('#libRows .ref[data-sel="vetters2024"] .pick').click()
+    expect(page.locator("#selCount")).to_have_text("2 selected")
+    page.fill("#selProject", "Review")
+    page.click("#selAdd")
+    expect(page.locator('#projNav [data-proj-nav="Review"]')).to_be_visible()
+    shot(page, "selected-added-to-project")
+    page.click('#projNav [data-proj-nav="Review"]')
+    expect(page.locator("#libRows .ref")).to_have_count(2)
+    # inside a project: move one out of it into another
+    page.locator('#libRows .ref[data-sel="burton2011"] .pick').click()
+    page.fill("#selProject", "Books")
+    page.click("#selMove")
+    expect(page.locator("#libRows .ref")).to_have_count(1)
+    page.click('#projNav [data-proj-nav="Books"]')
+    expect(page.locator('#libRows .ref[data-sel="burton2011"]')).to_be_visible()
+    page.click('#projNav [data-proj-nav="*"]')
+    # select all, then clear
+    page.check("#selAll")
+    expect(page.locator("#selCount")).to_have_text("3 selected")
+    page.click("#selClear")
+    expect(page.locator("#selBar")).to_be_hidden()
+
+
 def test_05_search_box_offers_to_add_a_doi(page):
     page.fill("#q", "10.1038/s41565-017-0052-4")
     expect(page.locator("#qAdd")).to_be_visible()
@@ -369,6 +409,18 @@ def test_23_convert_typed_citations(page, env):
     shot(page, "convert-done")
     links = page.locator("#downloads a")
     assert links.count() >= 1
+
+
+def test_98_delete_selected(page):
+    tab(page, "library")
+    page.click('#projNav [data-proj-nav="*"]')
+    page.fill("#q", "blade recycling")
+    expect(page.locator("#libRows .ref")).to_have_count(1)
+    page.check("#selAll")
+    page.once("dialog", lambda d: d.accept())
+    page.click("#selDelete")
+    expect(page.locator("#libNoMatch")).to_be_visible()
+    page.fill("#q", "")
 
 
 def test_99_no_page_errors(page):

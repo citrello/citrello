@@ -124,7 +124,20 @@
   .searchbox input { flex: 1; border: 0; background: none; padding: 11px 0; outline: none; font-size: 15.5px; }
   .qadd { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; background: var(--lemon-soft); border-radius: 10px; padding: 8px 12px; margin: 8px 0 0; font-size: 14px; }
   .reflist { background: var(--card); border: 1px solid var(--line); border-radius: 14px; overflow: hidden; }
-  .ref { display: grid; grid-template-columns: 4px minmax(0, 1fr) auto; gap: 14px; padding: 12px 16px; border-bottom: 1px solid var(--line); align-items: center; cursor: pointer; }
+  .filterbar { display: flex; align-items: center; gap: 12px; margin: 0 0 12px; }
+  .filterbar .chips { margin: 0; }
+  .selall { display: grid; place-items: center; width: 20px; padding-left: 16px; box-sizing: content-box; }
+  .chips button.chip { cursor: pointer; font: 700 12.5px Figtree, sans-serif; }
+  .chips button.chip:hover { filter: brightness(.96); }
+  .chips button.chip[aria-pressed="true"] { box-shadow: inset 0 0 0 2px currentColor; }
+  .chips button.chip.dim { opacity: .45; }
+  .selbar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; background: var(--lemon-soft); border: 1px solid var(--lemon);
+            border-radius: 12px; padding: 8px 12px; margin: 0 0 12px; font-size: 14px; }
+  .selbar input { width: 190px; padding: 7px 10px; }
+  .selbar button { padding: 7px 12px; }
+  .ref .pick { width: 16px; height: 16px; margin: 0; cursor: pointer; accent-color: var(--cobalt); }
+  .ref.picked { background: var(--sky); }
+  .ref { display: grid; grid-template-columns: 16px 4px minmax(0, 1fr) auto; gap: 14px; padding: 12px 16px; border-bottom: 1px solid var(--line); align-items: center; cursor: pointer; }
   .ref:last-child { border-bottom: 0; }
   .ref:hover { background: var(--bg); }
   .ref.sel { background: var(--sel); }
@@ -267,11 +280,23 @@
         <div id="exportMsg"></div>
       </div>
 
-      <div class="chips" id="libChips"></div>
+      <div class="filterbar">
+        <label class="selall" title="Select all shown"><input type="checkbox" id="selAll" aria-label="Select all references shown"></label>
+        <div class="chips" id="libChips" role="group" aria-label="Show only"></div>
+      </div>
+      <div class="selbar hidden" id="selBar" role="region" aria-label="Selected references">
+        <b id="selCount"></b>
+        <input type="text" id="selProject" list="projectList" placeholder="Project name" aria-label="Project name">
+        <button id="selAdd" title="Keep their other projects too">Add to project</button>
+        <button id="selMove" title="Take them out of their other projects">Move to project</button>
+        <button id="selRemove" class="hidden">Remove from this project</button>
+        <button id="selDelete" class="danger">Delete</button>
+        <button class="link" id="selClear">Clear</button>
+      </div>
       <div class="reflist" id="libRows"></div>
       <p class="muted small" id="libEmpty" style="display:none">Your library is empty. Paste a DOI or a link in the box above, import your Mendeley or Zotero library, or convert a document (Documents).</p>
       <p class="muted small" id="libNoMatch" style="display:none">Nothing in your library matches. To add it, paste its DOI, a link, or the full reference.</p>
-      <label class="small muted" style="display:inline-flex;gap:6px;margin-top:12px"><input type="checkbox" id="libOnlyIssues"> Only references that need attention</label>
+      <p class="small muted" style="margin-top:10px">Tick references to add them to a project, move them or delete them. Shift-click ticks a range.</p>
     </div>
     <aside class="detail" id="detail" aria-live="polite"><div class="empty-detail"><b>Pick a reference</b>Its details, citation marker and formatted reference appear here.</div></aside>
   </section>
@@ -810,25 +835,31 @@ async function loadLibrary() {
   $("navCount").textContent = lib.total || "";
   renderProjects();
   $("libTitle").textContent = sel === "*" ? "Library" : sel === "-" ? "References without a project" : sel;
-  const count = (k) => lib.items.filter((i) => i.reliability === k).length;
-  $("libChips").innerHTML = `<span class="chip">${lib.items.length}${lib.items.length !== lib.total ? " of " + lib.total : ""} references</span>` +
-    (count("verified") ? `<span class="chip ok">${count("verified")} verified</span>` : "") +
-    (count("complete") ? `<span class="chip">${count("complete")} complete</span>` : "") +
-    (count("check") ? `<span class="chip warn">${count("check")} to check</span>` : "") +
-    (count("problem") ? `<span class="chip bad">${count("problem")} problem${count("problem") > 1 ? "s" : ""}</span>` : "");
-  const only = $("libOnlyIssues").checked;
-  const items = lib.items.filter((i) => !only || ["check", "problem"].includes(i.reliability));
+  const relOf = (i) => i.reliability || "complete";
+  const count = (k) => lib.items.filter((i) => relOf(i) === k).length;
+  const chip = (k, cls, label) => (count(k) || relFilter.has(k))
+    ? `<button class="chip ${cls} ${relFilter.size && !relFilter.has(k) ? "dim" : ""}" data-rel="${k}" aria-pressed="${relFilter.has(k)}"
+         title="Show only these (click again to show all)">${count(k)} ${label(count(k))}</button>` : "";
+  $("libChips").innerHTML =
+    `<button class="chip" data-rel="all" aria-pressed="${!relFilter.size}" title="Show all">${lib.items.length}${lib.items.length !== lib.total ? " of " + lib.total : ""} references</button>` +
+    chip("verified", "ok", () => "verified") + chip("complete", "", () => "complete") +
+    chip("check", "warn", () => "to check") + chip("problem", "bad", (n) => n === 1 ? "problem" : "problems");
+  const items = lib.items.filter((i) => !relFilter.size || relFilter.has(relOf(i)));
+  shown = items.map((i) => i.key);
+  for (const k of [...picked]) if (!shown.includes(k)) picked.delete(k);  // never act on references you can't see
   $("libEmpty").style.display = lib.total ? "none" : "block";
   $("libNoMatch").style.display = lib.total && !items.length ? "block" : "none";
   show("libRows", items.length > 0);
   $("libRows").innerHTML = items.map((i) => {
     const issue = (i.checks || []).find((c) => c.level === "problem") || (i.checks || [])[0];
-    return `<div class="ref ${i.reliability || ""} ${i.key === selKey ? "sel" : ""}" data-sel="${esc(i.key)}" tabindex="0" role="button" aria-label="${esc(i.title)}">
+    return `<div class="ref ${i.reliability || ""} ${i.key === selKey ? "sel" : ""} ${picked.has(i.key) ? "picked" : ""}" data-sel="${esc(i.key)}" tabindex="0" role="button" aria-label="${esc(i.title)}">
+      <input type="checkbox" class="pick" data-pick="${esc(i.key)}" ${picked.has(i.key) ? "checked" : ""} aria-label="Select ${esc(i.title)}">
       <div class="rb" title="${esc(REL_TEXT[i.reliability] || "")}"></div>
       <div style="min-width:0"><div class="t">${esc(i.title)}</div>
         <div class="m">${[i.authors, i.year, i.container].filter(Boolean).map(esc).join(" · ")}${issue ? ` · <span class="${issue.level}">${esc(issue.text)}</span>` : ""}</div></div>
       <code class="key" data-key="${esc(i.key)}" title="Copy [@${esc(i.key)}]">${esc(i.key)}</code></div>`;
   }).join("");
+  renderSelection();
   if (!items.some((i) => i.key === selKey)) selKey = items.length ? items[0].key : null;
   $("libRows").querySelectorAll(".ref").forEach((r) => r.classList.toggle("sel", r.dataset.sel === selKey));
   renderDetail();
@@ -917,7 +948,67 @@ let qTimer; $("q").oninput = () => { updateQAdd(); clearTimeout(qTimer); qTimer 
 $("q").onkeydown = (e) => { if (e.key === "Enter" && looksAddable($("q").value.trim())) { e.preventDefault(); addFromSearch(); } };
 $("qAddBtn").onclick = addFromSearch;
 $("qAddResult").onclick = async (ev) => { const k = ev.target.dataset.key; if (k) { await navigator.clipboard.writeText(`[@${k}]`).catch(() => {}); toast(`Copied [@${k}]`); } };
-$("projectFilter").onchange = loadLibrary; $("libOnlyIssues").onchange = loadLibrary;
+$("projectFilter").onchange = loadLibrary;
+
+// ---------- filters and selecting many ----------
+const relFilter = new Set(), picked = new Set();
+let shown = [], lastPick = null;
+$("libChips").onclick = (ev) => {
+  const b = ev.target.closest("[data-rel]"); if (!b) return;
+  const k = b.dataset.rel;
+  if (k === "all") relFilter.clear(); else if (relFilter.has(k)) relFilter.delete(k); else relFilter.add(k);
+  loadLibrary();
+};
+function renderSelection() {
+  const n = picked.size, cur = $("projectFilter").value, inProject = !["*", "-"].includes(cur);
+  show("selBar", n > 0);
+  $("selCount").textContent = `${n} selected`;
+  $("selRemove").textContent = `Remove from ${cur}`;
+  show("selRemove", inProject);
+  $("selAll").checked = n > 0 && n === shown.length;
+  $("selAll").indeterminate = n > 0 && n < shown.length;
+  $("libRows").querySelectorAll(".ref").forEach((r) => {
+    const on = picked.has(r.dataset.sel);
+    r.classList.toggle("picked", on);
+    const cb = r.querySelector(".pick"); if (cb) cb.checked = on;
+  });
+}
+function togglePick(key, on, range) {
+  const keys = range && lastPick && shown.includes(lastPick)
+    ? shown.slice(Math.min(shown.indexOf(lastPick), shown.indexOf(key)), Math.max(shown.indexOf(lastPick), shown.indexOf(key)) + 1)
+    : [key];
+  keys.forEach((k) => on ? picked.add(k) : picked.delete(k));
+  lastPick = key;
+  renderSelection();
+}
+$("selAll").onchange = () => { picked.clear(); if ($("selAll").checked) shown.forEach((k) => picked.add(k)); renderSelection(); };
+$("selClear").onclick = () => { picked.clear(); renderSelection(); };
+async function bulk(body, done) {
+  try {
+    const r = await post("/api/library/projects-bulk", {keys: [...picked], ...body});
+    toast(done(r.changed)); picked.clear(); await loadLibrary(); renderDetail();
+  } catch (e) { toast(e.message); }
+}
+const selTarget = () => { const p = $("selProject").value.trim(); if (!p) { $("selProject").focus(); toast("Type or choose a project name"); } return p; };
+$("selAdd").onclick = () => { const p = selTarget(); if (p) bulk({add: [p]}, (n) => `Added ${picked.size} to ${p}`); };
+$("selMove").onclick = () => {
+  const p = selTarget(); if (!p) return;
+  const cur = $("projectFilter").value, inProject = !["*", "-"].includes(cur);
+  // inside a project: move from that project; elsewhere: this becomes their only project
+  bulk(inProject ? {add: [p], remove: [cur]} : {replace: [p]}, () => `Moved ${picked.size} to ${p}`);
+};
+$("selRemove").onclick = () => { const cur = $("projectFilter").value; bulk({remove: [cur]}, () => `Removed ${picked.size} from ${cur}`); };
+$("selDelete").onclick = async () => {
+  const n = picked.size;
+  if (!confirm(`Delete ${n} reference${n > 1 ? "s" : ""} from your library? This can't be undone.`)) return;
+  await post("/api/library/delete", {keys: [...picked]});
+  picked.clear(); selKey = null; toast(`Deleted ${n}`); loadLibrary();
+};
+document.addEventListener("keydown", (e) => {
+  if ($("tab-library").classList.contains("hidden") || /INPUT|TEXTAREA|SELECT/.test(document.activeElement.tagName)) return;
+  if (e.key === "Escape" && picked.size) { picked.clear(); renderSelection(); }
+  if ((e.key === "Delete" || e.key === "Backspace") && picked.size) { e.preventDefault(); $("selDelete").click(); }
+});
 function pick(key) {
   selKey = key;
   $("libRows").querySelectorAll(".ref").forEach((r) => r.classList.toggle("sel", r.dataset.sel === key));
@@ -925,6 +1016,7 @@ function pick(key) {
 }
 $("libRows").onclick = async (ev) => {
   const t = ev.target;
+  if (t.dataset.pick) { togglePick(t.dataset.pick, t.checked, ev.shiftKey); return; }
   if (t.dataset.key) { await navigator.clipboard.writeText(`[@${t.dataset.key}]`).catch(() => {}); toast(`Copied [@${t.dataset.key}]`); }
   const row = t.closest(".ref"); if (row) pick(row.dataset.sel);
 };

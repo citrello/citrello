@@ -246,3 +246,18 @@ def test_duplicates_part1_part2_and_different_dois():
     assert idx.find({"title": "Offshore wind farm decommissioning costs - Part 1"})[0] == "a"   # same paper, punctuation
     assert idx.find({"title": "Offshore wind farm decomissioning costs: Part 1"})[0] == "a"    # typo still matches
     assert idx.find({"title": "something else", "DOI": "https://doi.org/10.1/A"})[0] == "a"     # same DOI
+
+
+def test_change_projects_for_many(tmp_path, monkeypatch):
+    monkeypatch.setattr(library, "HOME", str(tmp_path / "lib"))
+    with library.editing() as d:
+        for i, t in enumerate(["Alpha study of wind farms", "Beta study of turbines", "Gamma study of blades"]):
+            library.add_csl(d, {"type": "article-journal", "title": t, "issued": {"date-parts": [[2020 + i]]},
+                                "author": [{"family": f"X{i}"}]}, "Old")
+    keys = [it["key"] for it in library.load()["items"]]
+    assert library.change_projects(keys[:2], add=["New"]) == 2
+    assert library.change_projects(keys[:2], remove=["Old"]) == 2
+    assert library.change_projects(keys[2:], replace=["Moved"]) == 1
+    by = {it["key"]: it["projects"] for it in library.load()["items"]}
+    assert by[keys[0]] == ["New"] and by[keys[2]] == ["Moved"]
+    assert {"New", "Moved"} <= set(library.load()["projects"])

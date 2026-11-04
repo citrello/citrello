@@ -891,6 +891,14 @@ class Handler(BaseHTTPRequestHandler):
                 return self.send(200, {"key": key, "created": created})
             if path == "/api/library/delete":
                 return self.send(200, {"deleted": library.delete(self.json_body().get("keys", []))})
+            if path == "/api/library/projects-bulk":  # selection bar: add to / move to / remove from a project
+                b = self.json_body()
+                keys = [str(k) for k in b.get("keys", [])]
+                if not keys:
+                    return self.send(400, {"error": "Select some references first."})
+                n = library.change_projects(keys, b.get("add") or [], b.get("remove") or [],
+                                            b.get("replace") if isinstance(b.get("replace"), list) else None)
+                return self.send(200, {"changed": n})
             if path == "/api/library/projects":
                 b = self.json_body()
                 return self.send(200, item_public(library.set_projects(b["key"], b.get("projects", []))))
