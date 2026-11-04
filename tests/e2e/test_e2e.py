@@ -49,7 +49,11 @@ BIB = r"""@article{topham2017,
 
 def _cmd(var, script):
     v = os.environ.get(var)
-    return shlex.split(v, posix=not sys.platform.startswith("win")) if v else [sys.executable, os.path.join(ROOT, script)]
+    if not v:
+        return [sys.executable, os.path.join(ROOT, script)]
+    cmd = shlex.split(v, posix=not sys.platform.startswith("win"))
+    cmd[0] = os.path.abspath(cmd[0]) if os.path.exists(cmd[0]) else cmd[0]  # the app runs in a temporary folder
+    return cmd
 
 
 @pytest.fixture(scope="module")
