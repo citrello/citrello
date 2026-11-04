@@ -88,10 +88,17 @@ jobs:
           $out
           if (-not ($out -match '"citrello"') -or -not ($out -match 'search_references')) { throw "the packaged connector did not answer" }
           Remove-AppxPackage (Get-AppxPackage *Citrello*).PackageFullName
+      - name: Zip the Windows download (one folder with the three files)
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force dist\zip\Citrello | Out-Null
+          Copy-Item dist\Citrello.exe, dist\CitrelloMCP.exe, dist\Citrello.mcpb dist\zip\Citrello\
+          Compress-Archive -Path dist\zip\Citrello -DestinationPath dist\Citrello-windows.zip -Force
       - uses: actions/upload-artifact@v4
         with:
           name: Citrello-windows
           path: |
+            dist/Citrello-windows.zip
             dist/Citrello.exe
             dist/CitrelloMCP.exe
             dist/Citrello.mcpb
@@ -104,6 +111,7 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           files: |
+            dist/Citrello-windows.zip
             dist/Citrello.exe
             dist/CitrelloMCP.exe
             dist/Citrello.mcpb
