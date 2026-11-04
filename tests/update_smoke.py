@@ -105,7 +105,13 @@ def main(zip_path):
             break
         time.sleep(0.5)
     assert not phase or phase["phase"] != "error", phase
-    second = wait_status(lambda st: st["pid"] != first["pid"])
+    try:
+        second = wait_status(lambda st: st["pid"] != first["pid"])
+    except SystemExit:
+        log.flush()
+        print("--- app log ---\n" + open(log.name, encoding="utf-8", errors="replace").read()[-4000:])
+        print("--- files ---", os.listdir(os.path.dirname(exe)))
+        raise
     print("restarted:", second["version"], "pid", second["pid"])
     if sys.platform == "darwin":
         assert not os.path.exists(marker), "the .app bundle wasn't replaced"

@@ -20,6 +20,7 @@ import os
 import re
 import secrets
 import shutil
+import socket
 import subprocess
 import sys
 import tempfile
@@ -1085,6 +1086,17 @@ def account_status():
     return st
 
 
+class Server(ThreadingHTTPServer):
+    """On Windows, SO_REUSEADDR lets a second program take a port that is still in use, so a newly started (or
+    updated) Citrello would never ask the running one to quit. Claim the port exclusively instead."""
+    allow_reuse_address = not sys.platform.startswith("win")
+
+    def server_bind(self):
+        if sys.platform.startswith("win") and hasattr(socket, "SO_EXCLUSIVEADDRUSE"):
+            self.socket.setsockopt(socket.SOL_SOCKET, socket.SO_EXCLUSIVEADDRUSE, 1)
+        super().server_bind()
+
+
 def main():
     ap = argparse.ArgumentParser(description="Citrello app")
     ap.add_argument("--no-browser", action="store_true")
@@ -1096,7 +1108,7 @@ def main():
     server = None
     for attempt in range(20):
         try:
-            server = ThreadingHTTPServer(("127.0.0.1", PORT), Handler)
+            server = Server(("127.0.0.1", PORT), Handler)
             break
         except OSError:
             if attempt == 0:  # an older copy is still running: ask it to quit, then take its place
@@ -1117,6 +1129,7 @@ def main():
     try:
         server.serve_forever()
     finally:
+        server.server_close()  # free the port right away for the copy that replaces this one
         for job in JOBS.values():
             shutil.rmtree(job.dir, ignore_errors=True)
 
