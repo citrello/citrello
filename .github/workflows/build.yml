@@ -99,8 +99,10 @@ jobs:
         run: python tests\update_smoke.py dist\Citrello-windows.zip
       - uses: actions/upload-artifact@v4
         with:
-          name: Citrello-windows
-          path: dist/Citrello-windows.zip
+          name: Citrello-windows   # GitHub zips these two files itself: same as the release download
+          path: |
+            dist/Citrello.exe
+            dist/CitrelloMCP.exe
       - uses: actions/upload-artifact@v4
         with:
           name: Citrello-store-package
