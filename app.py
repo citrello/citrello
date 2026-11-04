@@ -40,6 +40,7 @@ import library
 import bridge_client
 import citrello_core as core
 import codex_config
+import doccheck
 import latex
 import updater
 import usage
@@ -102,6 +103,7 @@ def profile_name():
 
 JOBS = {}
 OAUTH_STATES = set()
+CHECKS = {}  # document checks: id -> {"state", "i", "n", "step", "report", "error", "dir", "name"}
 LATEX = {}   # LaTeX checks: id -> {"files", "report", "name", "convert": {...}}
 VERIFY = {}  # verification runs: id -> {"done", "i", "n", "key", "result", "error"}
 
@@ -122,6 +124,48 @@ def start_verify(keys, include_verified):
         state["done"] = True
     threading.Thread(target=run, daemon=True).start()
     return vid
+
+
+def check_public(cid):
+    c = CHECKS[cid]
+    out = {k: c[k] for k in ("state", "i", "n", "step", "error", "name", "added")}
+    rep = c.get("report")
+    if rep:
+        index = library._index(library.load()["items"])
+        refs = []
+        for r in rep["refs"]:
+            hit, _ = index.find(r["csl"])
+            refs.append({"number": r["number"], "title": r["csl"].get("title", ""), "authors": short_authors(r["csl"]),
+                         "year": core.year_of(r["csl"]), "container": r["csl"].get("container-title", ""),
+                         "doi": r["csl"].get("DOI", ""), "reliability": r.get("reliability"), "checks": r.get("checks", []),
+                         "cited": r.get("cited"), "in_library": bool(hit)})
+        out["report"] = {k: rep[k] for k in ("source", "manager", "references", "counts", "citation_issues", "online")}
+        out["report"]["duplicates"] = len(rep["duplicates"])
+        out["report"]["refs"] = refs
+    return out
+
+
+def start_check(name, data):
+    cid = secrets.token_hex(6)
+    folder = tempfile.mkdtemp(prefix="citrello_check_")
+    path = os.path.join(folder, re.sub(r"[^\w\-. ]", "_", os.path.basename(name)) or "document.docx")
+    with open(path, "wb") as f:
+        f.write(data)
+    state = CHECKS[cid] = {"state": "checking", "i": 0, "n": 0, "step": "Reading the document", "report": None,
+                           "error": None, "dir": folder, "path": path, "name": os.path.basename(name), "added": None}
+
+    def progress(i, n, step):
+        state.update(i=i, n=n, step=step)
+
+    def run():
+        try:
+            state["report"] = doccheck.check(path, False, load_config().get("email"), progress)
+            state["state"] = "done"
+        except Exception as e:
+            traceback.print_exc()
+            state.update(state="error", error=str(e))
+    threading.Thread(target=run, daemon=True).start()
+    return cid
 
 
 def latex_public(lid):
@@ -807,6 +851,17 @@ class Handler(BaseHTTPRequestHandler):
             return self.send(200, codex_config.status(connector_command()))
         if path == "/api/account":
             return self.send(200, account_status())
+        m = re.fullmatch(r"/api/doccheck/(\w+)", path)
+        if m and m.group(1) in CHECKS:
+            return self.send(200, check_public(m.group(1)))
+        m = re.fullmatch(r"/api/doccheck/(\w+)/report\.csv", path)
+        if m and m.group(1) in CHECKS and CHECKS[m.group(1)].get("report"):
+            c = CHECKS[m.group(1)]
+            out = os.path.join(c["dir"], "report.csv")
+            core.write_check_csv(c["report"]["refs"], out)
+            name = os.path.splitext(c["name"])[0] + "_reference_check.csv"
+            return self.send(200, open(out, "rb").read(), "text/csv; charset=utf-8",
+                             {"Content-Disposition": "attachment; filename*=UTF-8''" + urllib.parse.quote(name)})
         if path == "/api/update":
             return self.send(200, updater.public(updater.check(bool(qs.get("force")), store_package())))
         if path == "/api/update/progress":
@@ -1063,6 +1118,19 @@ class Handler(BaseHTTPRequestHandler):
             return handled
         if path.startswith("/api/account/"):
             return self.account_post(path[len("/api/account/"):])
+        if path == "/api/doccheck":
+            data = self.body()
+            if not data.startswith(b"PK"):
+                return self.send(400, {"error": "Choose a Word document (.docx). For LaTeX, use LaTeX and Overleaf below."})
+            return self.send(200, {"id": start_check(urllib.parse.unquote(self.headers.get("X-Filename", "document.docx")), data)})
+        m = re.fullmatch(r"/api/doccheck/(\w+)/add", path)
+        if m and m.group(1) in CHECKS and CHECKS[m.group(1)].get("report"):
+            c = CHECKS[m.group(1)]
+            project = (self.json_body().get("project") or "").strip() or None
+            before = len(library.load()["items"])
+            library.add_records([r for r in c["report"]["refs"] if r["csl"].get("title")], project)
+            c["added"] = len(library.load()["items"]) - before
+            return self.send(200, check_public(m.group(1)))
         if path == "/api/update/install":
             try:
                 return self.send(200, updater.install(store_package()))

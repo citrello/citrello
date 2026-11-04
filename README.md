@@ -41,6 +41,11 @@ your computer and is shared by the Citrello app, Claude and Word:
 - **Browser button:** a bookmark that adds the paper you're looking at, or a reference you've
   selected on the page, even on sites that block robots.
 - **Documents**
+  - **Check the references in any Word document:** whether it was made with Zotero, Mendeley, EndNote, Word's
+    own citations or typed by hand. Every reference is checked online (retracted, wrong or nonexistent DOI,
+    authors or year not matching the publisher). Citrello also finds the same paper listed twice, citations
+    pointing to a missing reference, references never cited, and reference lists that weren't refreshed. One
+    click adds them all to your library; the report downloads as a spreadsheet.
   - **Update:** turns `[@Key]` markers (what Claude writes) into live citations.
   - **Convert:** converts papers whose citations were typed by hand, numbered `[1]`, `[2–5]` or
     author-year `(Smith et al., 2020)`, into live citations.

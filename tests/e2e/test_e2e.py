@@ -270,6 +270,30 @@ def test_07_update_word_document_with_markers(page, env):
     assert "[@topham2017]" not in xml
 
 
+def test_07b_check_a_document(page, env):
+    import importlib.util
+    spec = importlib.util.spec_from_file_location("dfix", os.path.join(ROOT, "tests", "test_doccheck.py"))
+    dfix = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(dfix)
+    import docx
+    d = docx.Document()
+    p = d.add_paragraph("Decommissioning is costly ")
+    dfix.add_field(p, dfix.csl_field([dfix.TOPHAM], zotero=True))
+    p = d.add_paragraph("and reviewed ")
+    dfix.add_field(p, dfix.csl_field([dfix.VETTERS, dict(dfix.TOPHAM, id="t2")], zotero=True))
+    path = os.path.join(env["_TMP"], "zotero-paper.docx")
+    d.save(path)
+    tab(page, "documents")
+    page.set_input_files("#chkFile", path)
+    res = page.locator("#chkResult")
+    expect(res).to_contain_text("Zotero", timeout=120000)
+    expect(res).to_contain_text("listed more than once")
+    shot(page, "document-check")
+    with page.expect_download() as dl:
+        page.click('#chkResult a.btn')
+    assert "Sustainable decommissioning" in open(dl.value.path(), encoding="utf-8-sig").read()
+
+
 def _latex_zip():
     buf = io.BytesIO()
     with zipfile.ZipFile(buf, "w") as z:

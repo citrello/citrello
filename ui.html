@@ -303,6 +303,14 @@
 
   <!-- ================= DOCUMENTS ================= -->
   <section id="tab-documents" class="hidden">
+    <div class="card" id="chkCard">
+      <h2>Check the references in a document</h2>
+      <p class="muted">Any Word document, made with Zotero, Mendeley, EndNote, Word's own citations or typed by hand. Citrello checks every reference online and finds retracted papers, DOIs that are wrong or don't exist, the same paper listed twice, citations that point to a missing reference, and references that are never cited. Then add them all to your library in one click.</p>
+      <label class="drop" id="chkDrop"><input type="file" id="chkFile" accept=".docx" hidden>
+        <div id="chkDropText"><strong>Choose a Word file</strong> or drag it here</div></label>
+      <div id="chkResult"></div>
+    </div>
+
     <div class="card">
       <h2>Update or restyle a document</h2>
       <p class="muted">For documents that contain <code class="key">[@Key]</code> markers (e.g. written with Claude) or live citations. Every citation and the bibliography are formatted in the style you choose; markers become live citations.</p>
@@ -1144,6 +1152,69 @@ dropZone($("updDrop"), $("updFile"), async (file) => {
       <div class="row"><a class="btn primary" href="${href}">Download formatted document</a></div>`;
   } catch (e) { notice("updResult", "err", esc(e.message)); }
 });
+
+// ---------- documents: check references ----------
+let chk = null, chkTimer = null;
+dropZone($("chkDrop"), $("chkFile"), async (file) => {
+  if (!/\.docx$/i.test(file.name)) return notice("chkResult", "err", "Please choose a Word document (.docx). For LaTeX, use the LaTeX and Overleaf card.");
+  $("chkDropText").innerHTML = `<strong>${esc(file.name)}</strong> · choose another file to check it`;
+  notice("chkResult", "warn", "Reading the document…");
+  try {
+    const {id} = await api("/api/doccheck", {method: "POST", body: await file.arrayBuffer(), headers: {"X-Filename": encodeURIComponent(file.name)}});
+    chk = {id}; pollCheck();
+  } catch (e) { notice("chkResult", "err", esc(e.message)); }
+});
+function pollCheck() {
+  clearTimeout(chkTimer);
+  chkTimer = setTimeout(async () => {
+    const id = chk.id;
+    try { chk = await api(`/api/doccheck/${id}`); chk.id = id; } catch { return; }
+    renderCheck();
+    if (chk.state === "checking") pollCheck();
+  }, 700);
+}
+function renderCheck() {
+  const c = chk, id = c.id;
+  if (c.state === "error") return notice("chkResult", "err", esc(c.error));
+  if (c.state === "checking") {
+    $("chkResult").innerHTML = `<p class="muted small" style="margin:12px 0 0">${esc(c.step)}${c.n ? `: ${c.i} of ${c.n}` : "…"}</p>
+      <div class="bar"><div style="width:${c.n ? Math.round(100 * c.i / c.n) : 3}%"></div></div>`;
+    return;
+  }
+  const r = c.report, problems = r.counts.problem + r.citation_issues.filter((x) => x.level === "problem").length;
+  const name = c.name.replace(/\.docx$/i, "");
+  const newOnes = r.refs.filter((x) => !x.in_library).length;
+  let h = `<div class="chips" style="margin-top:14px">
+      <span class="chip">${r.references} references · ${esc(r.manager)}</span>
+      ${r.counts.verified ? `<span class="chip ok">${r.counts.verified} verified</span>` : ""}
+      ${r.counts.check ? `<span class="chip warn">${r.counts.check} to check</span>` : ""}
+      ${r.counts.problem ? `<span class="chip bad">${r.counts.problem} with problems</span>` : ""}
+      ${r.duplicates ? `<span class="chip bad">${r.duplicates} duplicate${r.duplicates > 1 ? "s" : ""}</span>` : ""}</div>`;
+  if (!r.online) h += `<div class="notice warn">Citrello couldn't go online, so the references weren't checked against the publishers' records. The other checks below still apply.</div>`;
+  h += r.citation_issues.length ? `<h3>Citations and the reference list</h3><ul class="issues">${r.citation_issues.map((x) => `<li class="${x.level}">${esc(x.text)}</li>`).join("")}</ul>`
+       : `<div class="notice ok">Every citation matches the reference list, and there are no duplicates.</div>`;
+  const flagged = r.refs.filter((x) => ["problem", "check"].includes(x.reliability) && x.checks.length);
+  if (flagged.length) h += `<h3>References to look at</h3><ul class="issues">${flagged.sort((a, b) => (a.reliability === "problem" ? 0 : 1) - (b.reliability === "problem" ? 0 : 1))
+      .map((x) => `<li class="${x.reliability}"><b>[${x.number}]</b> ${esc(x.authors)} (${esc(x.year || "n.d.")}) ${esc(x.title)}: ${x.checks.map((k) => esc(k.text)).join("; ")}</li>`).join("")}</ul>`;
+  h += `<details><summary>All ${r.references} references</summary><div class="table-wrap"><table>
+      <thead><tr><th>#</th><th>Reference</th><th>Reliability</th><th class="hide-sm">Library</th></tr></thead><tbody>
+      ${r.refs.map((x) => `<tr class="${x.reliability || ""}"><td class="n">${x.number}</td>
+        <td><div class="t">${esc(x.title)}</div><div class="meta">${[x.authors, x.year, x.container, x.doi].filter(Boolean).map(esc).join(" · ")}</div>${issuesList(x.checks)}</td>
+        <td>${relTag(x.reliability)}</td><td class="hide-sm">${x.in_library ? '<span class="tag ok">In library</span>' : '<span class="tag new">New</span>'}</td></tr>`).join("")}
+      </tbody></table></div></details>`;
+  h += `<div class="row" style="margin-top:14px">
+      ${c.added !== null ? `<div class="notice ok" style="margin:0">${c.added} added to your library${c.added < r.references ? "; the rest were already there" : ""}.</div>`
+        : `<input type="text" id="chkProject" list="projectList" value="${esc(name)}" placeholder="Project">
+           <button class="primary" id="chkAdd" ${newOnes ? "" : "disabled"}>${newOnes ? `Add ${newOnes} new reference${newOnes > 1 ? "s" : ""} to my library` : "All are in your library"}</button>`}
+      <a class="btn" href="/api/doccheck/${id}/report.csv">Download the report (.csv)</a></div>`;
+  if (r.source === "typed") h += `<p class="small muted">The citations are typed by hand. To make them live citations, use <b>Convert a document with typed citations</b> below.</p>`;
+  $("chkResult").innerHTML = h;
+  if ($("chkAdd")) $("chkAdd").onclick = async () => {
+    $("chkAdd").disabled = true;
+    try { chk = await post(`/api/doccheck/${id}/add`, {project: $("chkProject").value}); chk.id = id; renderCheck(); toast("Added to your library"); loadLibrary(); }
+    catch (e) { toast(e.message); $("chkAdd").disabled = false; }
+  };
+}
 
 // ---------- documents: LaTeX ----------
 let texJob = null, texTimer = null;
