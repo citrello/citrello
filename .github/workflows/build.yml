@@ -23,7 +23,7 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-      - run: pip install python-docx citeproc-py pypdf pytest playwright
+      - run: pip install python-docx citeproc-py pypdf pybtex pytest playwright
       - run: python -m playwright install --with-deps chromium
       - run: pytest -q
 
@@ -35,7 +35,9 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-      - run: pip install python-docx citeproc-py pypdf pyinstaller pillow
+      - run: pip install python-docx citeproc-py pypdf pybtex pyinstaller pillow
+      - name: Refresh the list of citation styles (keeps the committed one if GitHub can't be reached)
+        run: python packaging/build_style_catalog.py || echo "Using the committed styles/catalog.json.gz"
       - name: Draw the icons
         run: |
           python brand_icon.py citrello.ico

@@ -19,7 +19,7 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-      - run: pip install python-docx citeproc-py pypdf pytest playwright
+      - run: pip install python-docx citeproc-py pypdf pybtex pytest playwright
       - run: python -m playwright install --with-deps chromium
       - name: Build the in-browser checker
         run: python packaging/build_web_check.py

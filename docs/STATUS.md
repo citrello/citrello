@@ -3,7 +3,12 @@
 ## Released
 - **Citrello 1.0.1** is the latest GitHub release (Windows `Citrello-windows.zip`, Mac beta `Citrello-mac.zip`,
   Apple silicon). Downloads: citrello.app/download. In-app updates work from 1.0.1 on; 1.0.0 users must download once.
-- After 1.0.1, `main` also has: Citrello™ in the app sidebar, TRADEMARKS.md. Next release would be 1.0.2.
+- After 1.0.1, `main` also has: Citrello™ in the app sidebar, TRADEMARKS.md; **style search** (all ~10,150 usable CSL
+  styles searchable by journal name in Settings and in "Check and fix"; unusable ones refused with a clear message);
+  **"Make an arXiv-ready .zip"** for LaTeX projects (makes the .bbl arXiv needs, strips comments, checks for arXiv
+  failures; also the connector tool `prepare_arxiv`). New dependency: pybtex. Next release would be 1.0.2.
+- Style numbers (checked Nov 2026): CSL repository 10,869 styles, 720 footnote (not supported), so ~10,150 usable;
+  a 300-style sample rendered fine except ~2% that crash in citeproc-py (refused when added). "10,000 styles" is fair.
 
 ## Live services
 - **citrello.app** (Cloudflare): home, /download, /check (in-browser paper checker), /privacy.
@@ -51,6 +56,8 @@
    linking to Refmee for applications.
 6. Store submission, SignPath signing step, Mac notarisation (see above).
 7. Web version of the full app with cloud sync ("Citrello Plus") later.
+8. Footnote styles (Chicago notes, OSCOLA: 720 styles, humanities and law). biblatex projects for arXiv (needs
+   Biber's .bbl format; today Citrello points to Overleaf's Submit → arXiv). Style search inside the Word tab.
 
 ## Known limits
 - Windows SmartScreen and Mac Gatekeeper warnings until signing.

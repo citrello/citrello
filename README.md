@@ -5,7 +5,7 @@
 Citrello is a free, open-source reference manager built for writing with AI. Your library lives on
 your computer and is shared by the Citrello app, Claude and Word:
 - **Claude:** every reference you or Claude adds is there in every Claude chat.
-- **Word:** documents get live citations in any of ~10,000 journal styles.
+- **Word:** documents get live citations in any of ~10,000 journal styles. Search them by journal name in Settings.
 - **Mendeley and Zotero:** import from and export to both, so nobody is locked in.
 
 > *Citron* hides "cit" for citation; *-ello* is the sweet Italian ending of limoncello, the
@@ -61,10 +61,14 @@ your computer and is shared by the Citrello app, Claude and Word:
     - retracted papers, wrong DOIs and missing DOIs.
   - **Convert a hand-typed bibliography:** turns `\begin{thebibliography}` / `\bibitem` into `references.bib`
     plus matching `\cite` keys. Each reference is checked on Crossref and added to your library.
+  - **Make an arXiv-ready `.zip`:** arXiv never runs BibTeX, so uploads without a `.bbl` show `[?]` for every
+    citation. Citrello makes the `.bbl` in the project's own `\bibliographystyle` (no LaTeX installation needed),
+    removes comments and build files, and lists what would make arXiv fail: missing figures, file names that differ
+    only in capitals, biblatex, citations missing from the `.bib`, file names arXiv refuses, more than 50 MB.
   - **Keep a `.bib` file up to date:** Citrello rewrites it whenever a project changes. Use it with local
     LaTeX, or with Overleaf through Dropbox or Git sync.
-  - **Claude and ChatGPT:** they can write `\cite{Key}`, give you the `.bib` for a project, and check a LaTeX
-    project.
+  - **Claude and ChatGPT:** they can write `\cite{Key}`, give you the `.bib` for a project, check a LaTeX
+    project, and (Claude Code / Claude Desktop) make the arXiv `.zip`.
 - **Import from Zotero in one click:** reads the Zotero library on your computer directly (no account or key; Zotero
   can stay open). Zotero collections become Citrello projects.
 - **Import / export:** RIS, BibTeX, biblatex and CSL-JSON (Mendeley, Zotero, EndNote and others), plus a

@@ -11,6 +11,7 @@ Formatting and live Word documents for Citrello.
 - create_document(): text with markers (light Markdown) -> new .docx with live citations.
 """
 import copy
+import glob
 import html
 import json
 import os
@@ -70,6 +71,58 @@ def list_styles():
     return sorted(out, key=lambda s: s["title"].lower())
 
 
+_CATALOG = None
+
+
+def _fold(s):
+    """Lowercase, no accents, '&' as 'and', punctuation as spaces: for matching style names."""
+    import unicodedata
+    s = unicodedata.normalize("NFKD", s or "").encode("ascii", "ignore").decode().lower().replace("&", " and ")
+    return re.sub(r"[^a-z0-9]+", " ", s).strip()
+
+
+def catalog():
+    """Every style in the CSL repository (styles/catalog.json.gz, built by packaging/build_style_catalog.py):
+    [{"id", "title", "short", "format"}]. Empty if the file is missing."""
+    global _CATALOG
+    if _CATALOG is None:
+        import gzip
+        try:
+            with gzip.open(os.path.join(_bundled_dir(), "catalog.json.gz"), "rt", encoding="utf-8") as f:
+                raw = json.load(f)
+            cols = raw["columns"]
+            _CATALOG = [dict(zip(cols, row)) for row in raw["styles"]]
+            for s in _CATALOG:
+                s["_t"], s["_s"], s["_i"] = _fold(s["title"]), _fold(s["short"]), s["id"].replace("-", " ")
+        except (OSError, ValueError, KeyError):
+            _CATALOG = []
+    return _CATALOG
+
+
+def search_styles(query, limit=40):
+    """Styles whose name matches every word of the query (a journal name, an abbreviation such as "IEEE" or
+    "J Clin Oncol", or a style id). Installed styles first, then the closest names."""
+    q = _fold(query)
+    if not q:
+        return []
+    words = q.split()
+    installed = {s["id"] for s in list_styles()}
+    out = []
+    for s in catalog():
+        hay = (s["_t"] + " " + s["_s"] + " " + s["_i"]).split()
+        if not all(any(h.startswith(w) for h in hay) for w in words):
+            continue
+        t = s["_t"]
+        score = (0 if s["id"] in installed else 1,
+                 0 if q in (t, s["_s"], s["_i"]) else 1 if t.startswith(q) or s["_s"].startswith(q) else
+                 2 if (" " + q) in (" " + t) else 3,
+                 s["format"] == "note", len(t))
+        out.append((score, s))
+    out.sort(key=lambda x: x[0])
+    return [{"id": s["id"], "title": s["title"], "short": s["short"], "format": s["format"],
+             "installed": s["id"] in installed, "usable": s["format"] != "note"} for _, s in out[:limit]]
+
+
 def style_path(style_id):
     """Local path of a style, downloading it (and its parent) if needed."""
     style_id = re.sub(r"[^a-z0-9\-]", "", (style_id or DEFAULT_STYLE).lower().strip())
@@ -92,6 +145,42 @@ def style_path(style_id):
             if e.code != 404:
                 raise
     raise ValueError(f"Unknown citation style '{style_id}'. Find style ids at https://www.zotero.org/styles")
+
+
+_SAMPLE = {"type": "article-journal", "title": "A sample article", "container-title": "Journal of Examples",
+           "author": [{"family": "Smith", "given": "Jane"}, {"family": "Lee", "given": "Kim"}],
+           "issued": {"date-parts": [[2020]]}, "volume": "3", "issue": "2", "page": "10-20", "DOI": "10.1000/xyz"}
+
+
+def install_style(style_id):
+    """Download a style (once) and make sure Citrello can format with it. Returns its info, with "id" being the
+    journal's own id and name (a journal alias keeps its name; the rules come from its parent style).
+    Raises ValueError with a plain message otherwise."""
+    sid = re.sub(r"[^a-z0-9\-]", "", (style_id or "").lower().strip())
+    path = style_path(sid)
+    info = style_info(path)
+    for d in (_user_dir(), _bundled_dir()):
+        own = os.path.join(d, sid + ".csl")
+        if os.path.exists(own) and own != path:
+            mine = style_info(own)
+            info = dict(mine, format="note" if mine["format"] == "note" else info["format"])
+            break
+    try:
+        if info["format"] == "note":
+            raise ValueError("Footnote styles are not supported yet.")
+        try:
+            r = Renderer(sid, {"sample": _SAMPLE})
+            r.render(r.add([{"key": "sample"}]))
+            r.bibliography()
+        except Exception:
+            raise ValueError(f"Citrello can't format with “{info['title']}” yet. Pick a similar style, such as "
+                             "the publisher's general one.")
+    except ValueError:
+        own = os.path.join(_user_dir(), sid + ".csl")  # don't leave an unusable style in the list
+        if os.path.exists(own):
+            os.remove(own)
+        raise
+    return info
 
 
 def _independent(path):

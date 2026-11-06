@@ -51,7 +51,8 @@ LaTeX / Overleaf:
   Keys are the same as in [@Key] markers and never change.
 - Give the user the bibliography with get_bibtex (a project or keys; format bibtex or biblatex) to save as references.bib.
 - check_citations also checks \\cite commands. check_latex_project checks a .tex file, folder or Overleaf .zip on disk:
-  cited keys missing from the .bib, unused and duplicate entries, unreliable references, hand-typed bibliographies."""
+  cited keys missing from the .bib, unused and duplicate entries, unreliable references, hand-typed bibliographies.
+- prepare_arxiv turns a LaTeX project into an arXiv-ready .zip (with the .bbl arXiv needs) and lists what to fix."""
 
 
 def _email():
@@ -283,6 +284,23 @@ def t_check_latex(path):
     return rep
 
 
+def t_prepare_arxiv(path, output_path=None, remove_comments=True):
+    import arxiv
+    if _remote():
+        raise ValueError("Ask the user to use the Citrello app (Documents → Check and fix, then 'Make an "
+                         "arXiv-ready .zip'), or Claude Code / Claude Desktop on their computer.")
+    src = os.path.abspath(os.path.expanduser(path))
+    if not os.path.exists(src):
+        raise ValueError(f"Not found: {src}")
+    res = arxiv.prepare(arxiv.read_all(path=src), strip=remove_comments)
+    stem = src.rstrip(os.sep) if os.path.isdir(src) else os.path.splitext(src)[0]
+    out = os.path.abspath(os.path.expanduser(output_path)) if output_path else stem + "_arxiv.zip"
+    with open(out, "wb") as f:
+        f.write(arxiv.zip_bytes(res["files"]))
+    return {"output": out, **res["report"],
+            "note": "Upload the .zip on arXiv's Files page. The original project is unchanged."}
+
+
 def t_import_zotero(project=None):
     import zotero_local
     if _remote():
@@ -291,11 +309,14 @@ def t_import_zotero(project=None):
 
 
 def t_styles(query=""):
-    styles = citeformat.list_styles()
-    q = query.lower()
-    hits = [s for s in styles if q in s["id"] or q in s["title"].lower()] if q else styles
-    return {"styles": hits, "note": "Any other journal style can be used by its id from "
-                                    "https://www.zotero.org/styles (e.g. 'elsevier-harvard'); it is downloaded once."}
+    if not query.strip():
+        return {"styles": citeformat.list_styles(),
+                "note": "These are ready offline. Search by a journal or publisher name to find any of the "
+                        "10,000+ others; pass its id as `style` and it is downloaded once."}
+    hits = [s for s in citeformat.search_styles(query, 25) if s["usable"]]
+    return {"styles": [{k: s[k] for k in ("id", "title", "format", "installed")} for s in hits],
+            "note": "Pass the id as `style`. Styles not installed are downloaded once (needs internet). "
+                    "Footnote styles are not supported yet."}
 
 
 def t_verify(keys=None, project=None, include_verified=False):
@@ -366,10 +387,16 @@ TOOLS = {
                             "unused and duplicate entries, unreliable references (retracted, wrong DOI, no DOI...), "
                             "and hand-typed bibliographies.",
                             S({"path": STR}, ["path"])),
+    "prepare_arxiv": (t_prepare_arxiv, "Make an arXiv-ready .zip from a LaTeX project on disk (folder, Overleaf "
+                      "source .zip or main .tex): adds the .bbl arXiv needs (it never runs BibTeX), removes comments "
+                      "and build files, adds \\pdfoutput=1, and reports what would make arXiv fail (missing figures, "
+                      "case mismatches, biblatex, citations missing from the .bib, bad file names, >50 MB). Writes "
+                      "<name>_arxiv.zip next to the project unless output_path is given; the project is not changed.",
+                      S({"path": STR, "output_path": STR, "remove_comments": {"type": "boolean"}}, ["path"])),
     "import_zotero_library": (t_import_zotero, "Import the user's Zotero library from Zotero on this computer (no account "
                               "or key needed). Zotero collections become projects; duplicates are skipped.",
                               S({"project": {"type": "string", "description": "Also put everything into this project (optional)"}})),
-    "list_styles": (t_styles, "List citation styles available offline (search by name).", S({"query": STR})),
+    "list_styles": (t_styles, "Find a citation style: with no query, the styles ready offline; with a journal, publisher or style name (e.g. 'Journal of Cleaner Production', 'IEEE'), matching styles from the full set of 10,000+.", S({"query": STR})),
     "verify_references": (t_verify, "Check references online against Crossref (all not-yet-verified ones, or given keys "
                           "or a project): fixes their details from the publisher record and re-rates them as verified / "
                           "check / problem (retracted, wrong DOI...). Takes about a second per reference.",

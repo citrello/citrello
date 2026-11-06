@@ -105,7 +105,8 @@ def app(env):
 def page(app):
     os.makedirs(SHOTS, exist_ok=True)
     with sync_playwright() as p:
-        browser = p.chromium.launch()
+        exe = os.environ.get("CITRELLO_E2E_CHROMIUM")  # a Chromium that isn't Playwright's own
+        browser = p.chromium.launch(**({"executable_path": exe, "args": ["--no-sandbox"]} if exe else {}))
         ctx = browser.new_context(viewport={"width": 1366, "height": 860}, accept_downloads=True)
         ctx.grant_permissions(["clipboard-read", "clipboard-write"], origin=URL.rstrip("/"))
         pg = ctx.new_page()
@@ -347,6 +348,56 @@ def test_08_latex_check(page, env):
     expect(res).to_contain_text("missing2020")
     expect(res).to_contain_text("The same reference under different keys")
     shot(page, "latex-check")
+
+
+def test_08b_arxiv_ready_zip(page, env):
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w") as z:
+        z.writestr("paper/main.tex", "\\documentclass{article}\\usepackage{natbib}\n% private note\n\\begin{document}\n"
+                                     "Costs \\citep{topham2017}.\n\\bibliographystyle{plainnat}\\bibliography{refs}\\end{document}")
+        z.writestr("paper/refs.bib", BIB)
+        z.writestr("paper/main.aux", "leftover")
+    page.set_input_files("#chkFile", write(env, "arxiv-paper.zip", buf.getvalue()))
+    expect(page.locator("#axGo")).to_be_visible(timeout=20000)
+    page.click("#axGo")
+    res = page.locator("#axResult")
+    expect(res).to_contain_text("Ready for arXiv", timeout=20000)
+    expect(res).to_contain_text("Added main.bbl")
+    shot(page, "arxiv-ready")
+    with page.expect_download() as dl:
+        page.click("#axResult a.btn")
+    with zipfile.ZipFile(dl.value.path()) as z:
+        names = set(z.namelist())
+        assert names == {"main.tex", "main.bbl"}, names
+        assert "private note" not in z.read("main.tex").decode()
+        assert "\\bibitem[Topham and McMillan(2017)]{topham2017}" in z.read("main.bbl").decode()
+
+
+def test_08c_find_a_journal_style(page):
+    tab(page, "settings")
+    page.fill("#styleFind", "nature")
+    first = page.locator("#styleFindList li").first
+    expect(first).to_contain_text("Nature", timeout=10000)
+    expect(page.locator("#styleFindList")).to_contain_text("Nature Methods")  # from the full catalogue
+    shot(page, "style-search")
+    first.locator("button").click()
+    expect(page.locator("#defStyle")).to_have_value("nature", timeout=10000)
+    page.fill("#styleFind", "oscola")
+    expect(page.locator("#styleFindList")).to_contain_text("not supported yet", timeout=10000)
+    page.fill("#styleFind", "")
+    tab(page, "documents")  # where the next scenario continues
+
+
+@online
+def test_24_add_a_journal_style_online(page):
+    tab(page, "settings")
+    page.fill("#styleFind", "Journal of Cleaner Production")
+    item = page.locator("#styleFindList li").first
+    expect(item).to_contain_text("Journal of Cleaner Production", timeout=10000)
+    item.locator("button").click()
+    expect(page.locator("#styleMsg")).to_contain_text("Using", timeout=30000)
+    expect(page.locator("#defStyle")).to_have_value("journal-of-cleaner-production")
+    page.select_option("#defStyle", "apa")
 
 
 def test_09_keep_bib_updated(page, env):

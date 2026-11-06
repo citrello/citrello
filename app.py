@@ -41,6 +41,7 @@ import bridge_client
 import citrello_core as core
 import codex_config
 import doccheck
+import arxiv
 import latex
 import updater
 import usage
@@ -685,9 +686,10 @@ class Handler(BaseHTTPRequestHandler):
         try:
             if path == "/api/latex/check":
                 name = urllib.parse.unquote(self.headers.get("X-Filename", "main.tex"))
-                files = latex.read_project(self.body(), name)
+                raw = self.body()
+                files = latex.read_project(raw, name)
                 lid = secrets.token_hex(6)
-                LATEX[lid] = {"files": files, "name": os.path.basename(name), "convert": None,
+                LATEX[lid] = {"files": files, "name": os.path.basename(name), "convert": None, "raw": raw,
                               "report": latex.check_project(files, library.load())}
                 return self.send(200, latex_public(lid))
             if path == "/api/bibexports/add":
@@ -696,6 +698,12 @@ class Handler(BaseHTTPRequestHandler):
                                                                    b.get("format") or "bibtex")})
             if path == "/api/bibexports/remove":
                 return self.send(200, {"exports": latex.remove_export(str(self.json_body().get("path", "")))})
+            m = re.fullmatch(r"/api/latex/(\w+)/arxiv", path)
+            if m and m.group(1) in LATEX:
+                lj = LATEX[m.group(1)]
+                res = arxiv.prepare(arxiv.read_all(lj["raw"], lj["name"]), strip=self.json_body().get("strip", True))
+                lj["arxiv"] = res["files"]
+                return self.send(200, {"report": res["report"]})
             m = re.fullmatch(r"/api/latex/(\w+)/(import|convert)", path)
             if not m or m.group(1) not in LATEX:
                 return self.send(404, {"error": "not found"})
@@ -801,9 +809,7 @@ class Handler(BaseHTTPRequestHandler):
             return self.send(200, "ok", "text/plain; charset=utf-8")
         if path == "/api/styles/check":  # Word's style dialog: is this a usable style id?
             try:
-                info = citeformat.style_info(citeformat.style_path(qs.get("id", [""])[0]))
-                if info["format"] == "note":
-                    raise ValueError("Footnote styles are not supported yet.")
+                info = citeformat.install_style(qs.get("id", [""])[0])
             except Exception as e:
                 return self.send(400, str(e), "text/plain; charset=utf-8")
             return self.send(200, info["title"], "text/plain; charset=utf-8")
@@ -859,6 +865,8 @@ class Handler(BaseHTTPRequestHandler):
             name = re.sub(r"[^\w\-. ]", "_", name)
             return self.send(200, body, "application/octet-stream",
                              {"Content-Disposition": "attachment; filename*=UTF-8''" + urllib.parse.quote(name)})
+        if path == "/api/styles/search":
+            return self.send(200, {"styles": citeformat.search_styles(qs.get("q", [""])[0])})
         if path == "/api/styles":
             return self.send(200, {"styles": citeformat.list_styles(),
                                    "default": load_config().get("style", citeformat.DEFAULT_STYLE)})
@@ -893,10 +901,15 @@ class Handler(BaseHTTPRequestHandler):
         m = re.fullmatch(r"/api/latex/(\w+)", path)
         if m and m.group(1) in LATEX:
             return self.send(200, latex_public(m.group(1)))
-        m = re.fullmatch(r"/api/latex/(\w+)/(bib|converted|renamed)", path)
+        m = re.fullmatch(r"/api/latex/(\w+)/(bib|converted|renamed|arxiv\.zip)", path)
         if m and m.group(1) in LATEX:
             lj = LATEX[m.group(1)]
-            if m.group(2) == "bib":
+            if m.group(2) == "arxiv.zip":
+                if not lj.get("arxiv"):
+                    return self.send(404, {"error": "Not prepared yet"})
+                body, ctype = arxiv.zip_bytes(lj["arxiv"]), "application/zip"
+                fname = re.sub(r"\.zip$|\.tex$", "", lj["name"], flags=re.I) + "_arxiv.zip"
+            elif m.group(2) == "bib":
                 name, text, _ = latex.fixed_bib(lj["files"], lj["report"], library.load(), qs.get("fmt", ["bibtex"])[0])
                 body, fname, ctype = text.encode("utf-8"), os.path.basename(name), "application/x-bibtex"
             elif m.group(2) == "renamed":
@@ -1026,11 +1039,15 @@ class Handler(BaseHTTPRequestHandler):
                               "entries": res["entries"], "style": res["style"]["title"], "report": res["report"]}
                 return self.send(200, {"id": job.id, "result": job.result})
             if path == "/api/styles/add":
-                sid = self.json_body().get("id", "").strip()
-                info = citeformat.style_info(citeformat.style_path(sid))  # downloads it once
-                if info["format"] == "note":
-                    return self.send(400, {"error": "Footnote styles are not supported yet."})
-                save_user_config(style=os.path.basename(citeformat.style_path(sid))[:-4])
+                b = self.json_body()
+                try:
+                    info = citeformat.install_style(str(b.get("id", "")))  # downloads it once, tries it
+                except ValueError as e:
+                    return self.send(400, {"error": str(e)})
+                except OSError:
+                    return self.send(400, {"error": "Couldn't download the style. Check your internet connection."})
+                if b.get("default", True):
+                    save_user_config(style=info["id"])
                 return self.send(200, info)
             if path == "/api/library/verify":
                 b = self.json_body()

@@ -101,6 +101,14 @@
   code.key { font: 600 12.5px Figtree, sans-serif; color: var(--cobalt); background: var(--sky); padding: 2px 8px; border-radius: 6px; cursor: pointer; white-space: nowrap; }
   ul.issues { margin: 4px 0 0; padding-left: 16px; font-size: 12.5px; }
   ul.issues li.problem { color: var(--err); } ul.issues li.check { color: var(--warn); } ul.issues li.ok { color: var(--ok); }
+  .spick { margin-top: 8px; }
+  .spick-list { list-style: none; margin: 6px 0 0; padding: 0; border: 1px solid var(--line); border-radius: 12px; max-height: 300px; overflow-y: auto; background: var(--card); }
+  .spick-list:empty { display: none; }
+  .spick-list li { display: flex; gap: 10px; align-items: center; justify-content: space-between; padding: 8px 12px; border-bottom: 1px solid var(--line); }
+  .spick-list li:last-child { border-bottom: 0; }
+  .spick-list li .t { min-width: 0; } .spick-list li .t b { font-weight: 600; }
+  .spick-list li.off { color: var(--muted); }
+  .spick-list li button { flex: none; padding: 4px 12px; }
   .notice { padding: 10px 14px; border-radius: 10px; margin-top: 12px; font-size: 14px; }
   .notice.err { background: var(--err-soft); color: var(--err); }
   .notice.warn { background: var(--warn-soft); color: var(--warn); }
@@ -471,9 +479,10 @@
       <div>
         <h2>Citation style</h2>
         <label class="field">Default style <select id="defStyle"></select></label>
-        <label class="field">Use another journal's style (its id from <a href="https://www.zotero.org/styles" target="_blank" rel="noopener">zotero.org/styles</a>)
-          <input type="text" id="styleId" placeholder="e.g. elsevier-harvard or renewable-energy"></label>
-        <div class="row"><button id="styleAdd">Add style</button><span class="small muted" id="styleMsg"></span></div>
+        <label class="field">Find a journal's style (more than 10,000: journals, publishers, universities)
+          <input type="search" id="styleFind" placeholder="e.g. Journal of Cleaner Production, IEEE, Harvard" autocomplete="off"></label>
+        <ul class="spick-list" id="styleFindList" aria-label="Matching styles"></ul>
+        <div class="small muted" id="styleMsg" role="status"></div>
       </div>
       <div>
         <h2>Library</h2>
@@ -595,13 +604,32 @@ async function loadStyles() {
   $("defStyle").innerHTML = opts(r.default);
 }
 $("defStyle").onchange = async () => { await post("/api/config", {style: $("defStyle").value}); loadStyles(); toast("Default style saved"); };
-$("styleAdd").onclick = async () => {
-  const id = $("styleId").value.trim(); if (!id) return;
-  $("styleMsg").textContent = "Downloading…";
-  try { const info = await post("/api/styles/add", {id}); await loadStyles();
-        $("styleMsg").textContent = `Added “${info.title}” and made it the default.`; $("styleId").value = ""; }
-  catch (e) { $("styleMsg").textContent = e.message; }
-};
+// Search all CSL styles; picking one downloads it once (onPick gets its info)
+const FORMAT_NAMES = {"numeric": "Numbered", "author-date": "Author-date", "author": "Author", "label": "Label", "note": "Footnotes"};
+function stylePicker(input, list, msg, onPick) {
+  let t = null, seq = 0;
+  const run = async () => {
+    const q = input.value.trim(), mine = ++seq;
+    if (q.length < 2) { list.innerHTML = ""; return; }
+    const r = await api("/api/styles/search?q=" + encodeURIComponent(q)).catch(() => ({styles: []}));
+    if (mine !== seq) return;
+    list.innerHTML = r.styles.length ? r.styles.map((st) => `<li class="${st.usable ? "" : "off"}"><span class="t"><b>${esc(st.title)}</b>
+        <span class="small muted"> · ${FORMAT_NAMES[st.format] || esc(st.format)}${st.usable ? "" : ", not supported yet"}</span></span>
+        ${st.usable ? `<button data-id="${esc(st.id)}">${st.installed ? "Use" : "Add"}</button>` : ""}</li>`).join("")
+      : `<li class="off">No style matches “${esc(q)}”. Try fewer words or the publisher's name.</li>`;
+  };
+  input.addEventListener("input", () => { clearTimeout(t); t = setTimeout(run, 150); });
+  list.addEventListener("click", async (ev) => {
+    const b = ev.target.closest("button[data-id]"); if (!b) return;
+    b.disabled = true; msg.textContent = "Getting the style…";
+    try { const info = await onPick(b.dataset.id); msg.textContent = info ? `Using “${info.title}”.` : "";
+          input.value = ""; list.innerHTML = ""; }
+    catch (e) { msg.textContent = e.message; b.disabled = false; }
+  });
+}
+stylePicker($("styleFind"), $("styleFindList"), $("styleMsg"), async (id) => {
+  const info = await post("/api/styles/add", {id}); await loadStyles(); toast("Default style saved"); return info;
+});
 $("saveEmail").onclick = async () => { await post("/api/config", {email: $("email").value}); toast("Saved"); };
 $("saveCfg").onclick = async () => { await post("/api/config", {client_id: $("cid").value, client_secret: $("csec").value}); loadStatus(); };
 $("logout").onclick = async () => { await post("/api/logout"); loadStatus(); };
@@ -1147,14 +1175,22 @@ function renderCheck() {
           ...f.unfixable.map((t) => `<li class="problem">${esc(t)}</li>`)]);
     } else {
       h += `<div class="row"><select id="chkStyle" aria-label="Citation style">${styles.map((st) => `<option value="${st.id}">${esc(st.title)}</option>`).join("")}</select>
-        <button class="primary" id="chkFix">Fix and format</button></div>`;
+        <button class="primary" id="chkFix">Fix and format</button></div>
+        <div class="spick"><input type="search" id="chkFind" placeholder="Another journal? Type its name" aria-label="Find a journal's style" autocomplete="off">
+        <ul class="spick-list" id="chkFindList" aria-label="Matching styles"></ul><div class="small muted" id="chkFindMsg" role="status"></div></div>`;
     }
     h += `</div>`;
   } else {
     h += `<p class="small muted">A PDF can't be changed. To get a fixed document, check the Word version.</p>`;
   }
   $("chkResult").innerHTML = h;
-  if ($("chkStyle")) { const def = $("defStyle").value; if (def) $("chkStyle").value = def; }
+  if ($("chkStyle")) { const def = $("defStyle").value; if (def) $("chkStyle").value = def;
+    stylePicker($("chkFind"), $("chkFindList"), $("chkFindMsg"), async (sid) => {
+      const info = await post("/api/styles/add", {id: sid, default: false}); const keep = $("defStyle").value;
+      await loadStyles(); $("defStyle").value = keep;
+      $("chkStyle").innerHTML = styles.map((st) => `<option value="${st.id}">${esc(st.title)}</option>`).join("");
+      $("chkStyle").value = info.id; return info;
+    }); }
   if ($("chkFix")) $("chkFix").onclick = async () => {
     $("chkFix").disabled = true; $("chkFix").textContent = "Fixing…";
     try { chk = await post(`/api/doccheck/${id}/fix`, {style: $("chkStyle").value, project: name}); chk.id = id; renderCheck(); loadLibrary(); }
@@ -1220,7 +1256,19 @@ function renderTex() {
   if (r.ok && !r.typed_bibliography.length && !r.issues.length) h += `<div class="notice ok">All citations are in the .bib, with no duplicates or problems.</div>`;
   if (r.bib_entries) h += `<div class="row" style="margin-top:12px"><input type="text" id="texImpProject" list="projectList" value="${esc(name)}" placeholder="Project">
     <button id="texImport">Import the .bib into Citrello</button><span class="muted small">Then Citrello keeps it clean and can keep a .bib file up to date (below).</span></div>`;
+  if (/\.(zip|tex|ltx)$/i.test(texJob.name)) h += `<div class="panel" style="margin-top:18px"><strong>Submitting to arXiv?</strong>
+    <p class="small muted" style="margin:4px 0 0">arXiv doesn't run BibTeX, so an upload without a <code>.bbl</code> file shows [?] for every citation. Citrello makes the <code>.bbl</code> in your journal's style, removes comments (anyone can download your source files on arXiv) and build files, and checks for what makes arXiv fail.</p>
+    <div class="row"><button class="primary" id="axGo">Make an arXiv-ready .zip</button>
+    <label class="small"><input type="checkbox" id="axStrip" ${texJob.axStrip === false ? "" : "checked"}> Remove comments</label></div>
+    <div id="axResult">${texJob.arxiv ? arxivHtml(texJob.arxiv) : ""}</div></div>`;
   $("texResult").innerHTML = h;
+  if ($("axGo")) $("axGo").onclick = async () => {
+    $("axGo").disabled = true; $("axGo").textContent = "Preparing…";
+    try { texJob.axStrip = $("axStrip").checked;
+          texJob.arxiv = (await post(`/api/latex/${texJob.id}/arxiv`, {strip: texJob.axStrip})).report; }
+    catch (e) { texJob.arxiv = {error: e.message}; }
+    renderTex();
+  };
   if ($("texConvert")) $("texConvert").onclick = async () => {
     try { texJob = await post(`/api/latex/${texJob.id}/convert`, {project: $("texProject").value, format: $("texFormat").value}); renderTex(); pollTex(); }
     catch (e) { notice("texResult", "err", esc(e.message)); }
@@ -1234,6 +1282,17 @@ function renderTex() {
             <div class="row"><a class="btn" href="/api/latex/${texJob.id}/renamed">Download the .tex with the keys updated</a></div>`); }
     catch (e) { notice("texResult", "err", esc(e.message)); }
   };
+}
+function arxivHtml(a) {
+  if (a.error) return `<div class="notice err">${esc(a.error)}</div>`;
+  const li = (arr, cls) => arr.map((t) => `<li class="${cls}">${esc(t)}</li>`).join("");
+  const single = /\.(tex|ltx)$/i.test(texJob.name);
+  return (a.errors.length ? `<h3>Fix before uploading</h3><ul class="issues">${li(a.errors, "problem")}</ul>` +
+      (single ? `<p class="small muted">Checked a single .tex file. Choose the whole project as a .zip (Overleaf: Menu → Download → Source) so Citrello can see the figures and the .bib.</p>` : "")
+    : `<div class="notice ok">Ready for arXiv: ${a.files} files, ${a.size >= 1048576 ? (a.size / 1048576).toFixed(1) + " MB" : Math.max(1, Math.round(a.size / 1024)) + " KB"}. Upload the .zip on arXiv's Files page, then check the PDF arXiv builds.</div>`) +
+    (a.warnings.length ? `<h3>Worth a look</h3><ul class="issues">${li(a.warnings, "check")}</ul>` : "") +
+    (a.changes.length ? `<h3>What Citrello changed</h3><ul class="issues">${li(a.changes, "ok")}</ul>` : "") +
+    `<div class="row"><a class="btn ${a.errors.length ? "" : "primary"}" href="/api/latex/${texJob.id}/arxiv.zip">${a.errors.length ? "Download anyway" : "Download the arXiv .zip"}</a></div>`;
 }
 function pollTex() {
   clearTimeout(texTimer);
