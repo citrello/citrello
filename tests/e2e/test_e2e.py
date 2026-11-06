@@ -388,18 +388,6 @@ def test_08c_find_a_journal_style(page):
     tab(page, "documents")  # where the next scenario continues
 
 
-@online
-def test_24_add_a_journal_style_online(page):
-    tab(page, "settings")
-    page.fill("#styleFind", "Journal of Cleaner Production")
-    item = page.locator("#styleFindList li").first
-    expect(item).to_contain_text("Journal of Cleaner Production", timeout=10000)
-    item.locator("button").click()
-    expect(page.locator("#styleMsg")).to_contain_text("Using", timeout=30000)
-    expect(page.locator("#defStyle")).to_have_value("journal-of-cleaner-production")
-    page.select_option("#defStyle", "apa")
-
-
 def test_09_keep_bib_updated(page, env):
     folder = os.path.join(env["_TMP"], "overleaf")
     os.makedirs(folder)
@@ -517,6 +505,19 @@ def test_23_fix_typed_citations(page, env):
     xml = _fix_and_download(page, "apa")
     shot(page, "typed-fixed")
     assert "ADDIN CSL_CITATION" in xml and "[1]" not in xml
+
+
+@online
+def test_24_add_a_journal_style_online(page):
+    tab(page, "settings")
+    page.fill("#styleFind", "Journal of Cleaner Production")
+    item = page.locator("#styleFindList li").first
+    expect(item).to_contain_text("Journal of Cleaner Production", timeout=10000)
+    item.locator("button").click()
+    expect(page.locator("#styleMsg")).to_contain_text("Using", timeout=30000)
+    expect(page.locator("#defStyle")).to_have_value("journal-of-cleaner-production")
+    page.select_option("#defStyle", "apa")
+    tab(page, "library")
 
 
 def test_98_delete_selected(page):
