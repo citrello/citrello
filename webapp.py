@@ -44,6 +44,7 @@ PROGRESS_EVERY = 0.25  # seconds between progress updates
 
 
 import app  # noqa: E402
+import bridge_client  # noqa: E402
 import library  # noqa: E402
 
 WEB_ONLY_MISSING = "This needs Citrello for desktop. In the web app, use the connector link in Settings instead."
@@ -119,12 +120,9 @@ class WebHandler(app.Handler):
                                    "zotero_user": cfg.get("zotero_user", ""),
                                    "has_zotero_key": bool(cfg.get("zotero_key")),
                                    "welcome_done": cfg.get("welcome_done") == "1", "usage_stats": False,
-                                   "signed_in": False})
+                                   "signed_in": bool(bridge_client.load_account())})
         if path == "/api/update":
             return self.send(200, {"available": False, "current": app.VERSION, "web": True})
-        if path == "/api/account":  # sign-in in the web app comes with the connector (next step)
-            return self.send(200, {"signed_in": False, "web": True, "connected": False,
-                                   "connector_url": app.bridge_client.BRIDGE + "/mcp"})
         if path in ("/api/claude", "/api/codex", "/api/word", "/api/bibexports"):
             return self.send(200, {"web": True, "exports": []})
         if path == "/api/web/backup":
@@ -133,6 +131,16 @@ class WebHandler(app.Handler):
             name = "citrello-library-" + time.strftime("%Y-%m-%d") + ".json"
             return self.send(200, json.dumps(data, ensure_ascii=False, indent=1), "application/json",
                              {"Content-Disposition": "attachment; filename=" + name})
+        if path == "/api/web/documents":
+            return self.send(200, {"documents": documents()})
+        if path.startswith("/api/web/documents/"):
+            name = urllib.parse.unquote(path[len("/api/web/documents/"):])
+            if name in {d["name"] for d in documents()}:  # only files that are there: no paths
+                with open(os.path.join(library.HOME, "Documents", name), "rb") as f:
+                    data = f.read()
+                return self.send(200, data, "application/octet-stream",
+                                 {"Content-Disposition": "attachment; filename*=UTF-8''" + urllib.parse.quote(name)})
+            return self.send(404, {"error": "That file isn't there any more."})
         if path == "/api/web/state":
             data = library.load()
             st = _web_state()
@@ -152,9 +160,108 @@ class WebHandler(app.Handler):
         if path in ("/api/quit", "/api/update/install", "/api/library/import-zotero-local",
                     "/api/library/import-mendeley", "/api/library/export-mendeley", "/api/doc/update-file") \
                 or path.startswith(("/api/claude/", "/api/codex/", "/api/word/install", "/api/word/remove",
-                                    "/api/bibexports/", "/api/account/")):
+                                    "/api/bibexports/")):
             return self.send(400, {"error": WEB_ONLY_MISSING})
         return super().do_POST()
+
+
+# ---------------------------------------------------------------------------
+# The connector: this browser tab is the "device" ChatGPT and Claude reach through the bridge
+# ---------------------------------------------------------------------------
+
+class WebConnection:
+    """Stands in for bridge_client.CONNECTION. The WebSocket itself is in worker.js (browsers have their own);
+    this tells the worker when to connect or disconnect (plan()) and keeps the state the page shows."""
+
+    def __init__(self):
+        self.state, self.error, self.since = "signed_out", "", None
+        self.generation = 0  # goes up whenever the worker should start over (signed in, signed out…)
+
+    def start(self):
+        pass
+
+    def wake(self):
+        self.generation += 1
+
+    def disconnect(self):
+        self.generation += 1
+
+    def status(self):
+        a = bridge_client.load_account()
+        return {"signed_in": bool(a), "email": a and a.get("email"), "state": self.state if a else "signed_out",
+                "error": self.error, "online_since": self.since, "bridge": bridge_client.BRIDGE, "web": True}
+
+    def plan(self):
+        a = bridge_client.load_account()
+        url = bridge_client.BRIDGE.replace("https://", "wss://").replace("http://", "ws://") + "/device/connect"
+        return json.dumps({"generation": self.generation, "token": a and a.get("token"), "url": url})
+
+    def set_state(self, state, error=""):
+        self.state, self.error = state, error
+        self.since = time.time() if state == "online" else None
+
+
+CONNECTION = WebConnection()
+
+
+class _Browser:
+    """What bridge_client tells the server about this "computer" when signing in: the browser, not Pyodide."""
+    name = "Web browser"
+
+    def node(self):
+        return self.name
+
+    def system(self):
+        return "Web app"
+
+    def release(self):
+        return ""
+
+
+def hello():
+    """The first message on the WebSocket: the connector's tools, so ChatGPT sees them even while the tab is
+    closed (the same as the desktop app sends)."""
+    m = bridge_client._mcp()
+    return json.dumps({"type": "hello", "version": app.VERSION, "instructions": m.INSTRUCTIONS,
+                       "serverInfo": {"name": "citrello", "version": app.VERSION},
+                       "tools": m.handle({"jsonrpc": "2.0", "id": 0, "method": "tools/list"})["result"]["tools"]})
+
+
+def answer_rpc(text):
+    """One request from ChatGPT or Claude ({"type": "rpc", "id", "msg"}) -> the reply to send back. Same code and
+    same limits as on the desktop (remote_call: Word files only in Citrello's Documents folder)."""
+    try:
+        frame = json.loads(text)
+    except ValueError:
+        return ""
+    msg = frame.get("msg") or {}
+    m = bridge_client._mcp()
+    try:
+        with m.remote_call():
+            reply = m.handle(msg)
+    except Exception as e:  # never leave the remote side waiting
+        reply = {"jsonrpc": "2.0", "id": msg.get("id"), "error": {"code": -32603, "message": f"Citrello error: {e}"}}
+    return json.dumps({"type": "reply", "id": frame.get("id"), "msg": reply}, ensure_ascii=False)
+
+
+def check_account():
+    """After the bridge refused the connection: is this browser still signed in? (Signs out if not.)"""
+    try:
+        bridge_client.account_info()
+    except bridge_client.BridgeError as e:
+        CONNECTION.set_state("offline", str(e))
+
+
+def documents():
+    """Word files the connector saved (in Citrello's Documents folder, inside this browser)."""
+    folder = os.path.join(library.HOME, "Documents")
+    try:
+        names = [n for n in os.listdir(folder) if os.path.isfile(os.path.join(folder, n))]
+    except OSError:
+        return []
+    names.sort(key=lambda n: os.path.getmtime(os.path.join(folder, n)), reverse=True)
+    return [{"name": n, "size": os.path.getsize(os.path.join(folder, n)),
+             "time": os.path.getmtime(os.path.join(folder, n))} for n in names]
 
 
 def _running():
@@ -234,8 +341,18 @@ def handle(method, path, headers, body):
     return h.response
 
 
-def start():
+def use_web_connection(device_name="Web browser"):
+    """bridge_client signs in as this browser and leaves the WebSocket to worker.js."""
+    bridge_client.CONNECTION = CONNECTION
+    browser = _Browser()
+    browser.name = device_name[:80]
+    bridge_client.platform = browser
+    app.bridge_client = bridge_client
+
+
+def start(device_name="Web browser"):
     """Called once when the worker has loaded the code (not by the desktop app or the tests)."""
+    use_web_connection(device_name)
     threading.Thread = _LaterThread  # app.py looks it up each time it starts a job
     import doccheck
     import latex

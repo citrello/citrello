@@ -210,7 +210,7 @@
   <h4>Projects</h4>
   <div id="projNav"></div>
   <div class="side-foot">
-    <div class="conn desktop-only"><i id="connDot"></i><span id="connText">Web connectors: not signed in</span></div>
+    <div class="conn"><i id="connDot"></i><span id="connText">Web connectors: not signed in</span></div>
     <div>Citrello™ <span id="ver"></span><span class="desktop-only"> · <button class="link" id="quit">Quit</button></span></div>
   </div>
 </aside>
@@ -344,7 +344,7 @@
 
   <!-- ================= SETTINGS ================= -->
   <section id="tab-settings" class="hidden">
-    <div class="card desktop-only">
+    <div class="card">
       <h2>Account</h2>
       <div id="acctOut">
         <p class="muted">Sign in to use your library from <strong>ChatGPT</strong> and <strong>Claude on the web and phone</strong>, and to use the same account on all your computers. Citrello works without an account; your library always stays on your computer.</p>
@@ -364,9 +364,9 @@
         <p>Signed in as <strong id="acctWho"></strong></p>
         <div id="acctConn"></div>
         <label class="small" style="display:block;margin-top:10px"><input type="checkbox" id="acctNewsIn"> Email me about new features</label>
-        <details><summary>Computers signed in to this account</summary><div id="acctDevices" class="small"></div></details>
+        <details><summary>Computers and browsers signed in to this account</summary><div id="acctDevices" class="small"></div></details>
         <div class="row">
-          <button id="acctSignOut">Sign out of this computer</button>
+          <button id="acctSignOut">Sign out of this <span class="desktop-only">computer</span><span class="web-only">browser</span></button>
           <button class="link" id="acctDelete">Delete my account</button>
         </div>
       </div>
@@ -374,9 +374,10 @@
       <label class="small desktop-only" style="display:block;margin-top:14px"><input type="checkbox" id="usageStats"> Send an anonymous daily count (app version and system only) so we know how many people use Citrello</label>
     </div>
 
-    <div class="card desktop-only">
+    <div class="card" id="connCard">
       <h2>ChatGPT and Claude on the web</h2>
-      <p class="muted">Use your library from ChatGPT, or from Claude in the browser and on your phone. Requests go through Citrello's secure bridge to the Citrello app on this computer, so Citrello needs to be running. Sign in above first.</p>
+      <p class="muted desktop-only">Use your library from ChatGPT, or from Claude in the browser and on your phone. Requests go through Citrello's secure bridge to the Citrello app on this computer, so Citrello needs to be running. Sign in above first.</p>
+      <p class="muted web-only">Use your library from ChatGPT, or from Claude in the browser, the desktop app and on your phone. Requests go through Citrello's secure bridge to <strong>this browser tab</strong>, so keep a Citrello tab open while you use them (it can stay in the background). Sign in above first.</p>
       <p class="small">Connector address: <code id="connUrl">https://mcp.citrello.app/mcp</code> <button class="link" id="connCopy">Copy</button></p>
       <details><summary>Add it to ChatGPT</summary>
         <ol class="small">
@@ -393,7 +394,10 @@
           <li>It then works on claude.ai, in the Claude phone apps, and in Claude Desktop too.</li>
         </ol>
       </details>
-      <p class="small muted">Requests from the web can save Word files only in Citrello's Documents folder.</p>
+      <p class="small muted desktop-only">Requests from the web can save Word files only in Citrello's Documents folder.</p>
+      <div class="web-only"><h3>Word files ChatGPT and Claude made</h3>
+        <p class="small muted" style="margin:0">They're saved in this browser. Download them here.</p>
+        <div id="webDocs" class="small"></div></div>
     </div>
     <div class="card desktop-only">
       <h2>Updates</h2>
@@ -548,6 +552,7 @@
         <ul class="perks">
           <li><b>Paste a DOI, a link or a reference</b> in the search box to add it.</li>
           <li><b>Check and fix a paper</b> (Word, PDF or LaTeX) under Documents.</li>
+          <li><b>Use it from ChatGPT and Claude:</b> sign in with your email under Settings (free).</li>
           <li><b>Keep a backup file</b> (Settings → Library), because clearing the browser's data deletes the library.</li>
         </ul>
         <div class="wrow"><button class="primary" id="wWebStart">Start using Citrello</button></div>
@@ -606,7 +611,7 @@ document.querySelectorAll(".side button.navb").forEach((b) => b.onclick = () => 
   ["library", "documents", "settings"].forEach((t) => show("tab-" + t, t === b.dataset.tab));
   if (b.dataset.tab === "library") loadLibrary();
   if (b.dataset.tab === "documents") loadBibExports();
-  if (b.dataset.tab === "settings" && !status.web) { loadAccount(); loadClaude(); loadCodex(); loadWord(); }
+  if (b.dataset.tab === "settings") { loadAccount(); if (!status.web) { loadClaude(); loadCodex(); loadWord(); } }
 });
 
 const relTag = (r) => ({verified: '<span class="tag ok" title="Found by DOI; matches the publisher record">✓ Verified</span>',
@@ -683,7 +688,9 @@ $("bmCopy").onclick = async () => { await navigator.clipboard.writeText(BOOKMARK
 
 
 // ---------- account ----------
-const STATE_TEXT = {online: ["ok", "Connected: ChatGPT and Claude on the web can reach your library while Citrello is running."],
+const STATE_TEXT = {online: ["ok", document.documentElement.classList.contains("web")
+    ? "Connected: ChatGPT and Claude can reach your library while this tab is open."
+    : "Connected: ChatGPT and Claude on the web can reach your library while Citrello is running."],
   connecting: ["warn", "Connecting to the Citrello bridge…"], offline: ["warn", "Not connected to the Citrello bridge. Retrying…"]};
 let acctTimer = null;
 function renderSideConn(a) {

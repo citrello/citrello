@@ -4,6 +4,9 @@
 (function () {
   "use strict";
   document.documentElement.classList.add("web");
+  // a locally served copy can be pointed at a local test bridge: /app/?bridge=http://localhost:8787 (read now:
+  // the page tidies the address bar when it starts)
+  const bridge = new URLSearchParams(location.search).get("bridge");
 
   // ---------- loading screen ----------
   const cover = document.createElement("div");
@@ -42,13 +45,18 @@
   let nextId = 0;
 
   function startWorker() {
-    worker = new Worker("worker.js");
+    worker = new Worker("worker.js" + (bridge ? "?bridge=" + encodeURIComponent(bridge) : ""));
     worker.onmessage = (ev) => {
       const m = ev.data;
       if (m.type === "status") coverText(m.text);
       else if (m.type === "ready") { cover.remove(); readyResolve(); }
       else if (m.type === "error") { coverText(m.text + " Try reloading the page, or use another browser.", true); readyReject(new Error(m.text)); }
       else if (m.type === "progress") { if (m.body) progress.set(m.path, m.body); else progress.delete(m.path); }
+      else if (m.type === "library-changed") {
+        if (typeof loadLibrary === "function") loadLibrary();
+        webDocuments().catch(() => {});
+      }
+      else if (m.type === "connection") window.dispatchEvent(new CustomEvent("citrello-connection", { detail: m.state }));
       else if (m.type === "storage-error") console.warn("Citrello: couldn't save to the browser's storage:", m.text);
       else if (m.type === "response" && pending.has(m.id)) { pending.get(m.id)(m); pending.delete(m.id); }
     };
@@ -166,11 +174,39 @@
         : "Your library is kept in this browser only. Save a backup file in case the browser's data is cleared.";
     }
   }
+  // Word files the connector saved (Settings → ChatGPT and Claude)
+  async function webDocuments() {
+    const box = document.getElementById("webDocs");
+    if (!box) return;
+    const { documents } = await (await fetch("/api/web/documents")).json();
+    box.innerHTML = "";
+    if (!documents.length) { box.innerHTML = '<p class="muted">None yet.</p>'; return; }
+    for (const d of documents) {
+      const row = document.createElement("div");
+      row.className = "row";
+      row.style.margin = "4px 0";
+      const a = document.createElement("a");
+      a.href = "/api/web/documents/" + encodeURIComponent(d.name);
+      a.textContent = d.name;
+      const when = document.createElement("span");
+      when.className = "muted";
+      when.textContent = " · " + new Date(d.time * 1000).toLocaleString();
+      row.append(a, when);
+      box.appendChild(row);
+    }
+  }
+  // when the connection changes, the sidebar shows it straight away
+  window.addEventListener("citrello-connection", () => {
+    if (typeof renderSideConn === "function") fetch("/api/account").then((r) => r.json()).then(renderSideConn).catch(() => {});
+  });
   window.addEventListener("citrello-downloaded", (e) => { if (e.detail === "/api/web/backup") backupState(); });
   document.addEventListener("DOMContentLoaded", () => {
     ready.then(backupState).catch(() => {});
     document.addEventListener("click", (e) => {
-      if (e.target.closest && e.target.closest('.side button.navb')) setTimeout(() => backupState().catch(() => {}), 300);
+      if (e.target.closest && e.target.closest('.side button.navb')) setTimeout(() => {
+        backupState().catch(() => {});
+        webDocuments().catch(() => {});
+      }, 300);
     });
     const file = document.getElementById("webRestoreFile");
     if (file) file.addEventListener("change", async () => {

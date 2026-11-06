@@ -131,4 +131,4 @@ def test_end_to_end():
     time.sleep(1)
     assert len(json.loads(rpc(access, "tools/list")[2])["result"]["tools"]) == len(mcp_server.TOOLS)  # remembered while offline
     res = json.loads(rpc(access, "tools/call", {"name": "search_references", "arguments": {}})[2])["result"]
-    assert res["isError"] and "isn't running" in res["content"][0]["text"]
+    assert res["isError"] and "isn't open" in res["content"][0]["text"]

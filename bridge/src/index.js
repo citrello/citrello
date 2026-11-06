@@ -85,6 +85,14 @@ function bearer(request) {
   return h.toLowerCase().startsWith("bearer ") ? h.slice(7).trim() : "";
 }
 
+// Browsers can't add headers to a WebSocket, so the web app (citrello.app/app) sends its device token as a
+// WebSocket subprotocol instead: new WebSocket(url, ["citrello", token]).
+const WS_PROTOCOL = "citrello";
+function wsProtocolToken(request) {
+  const offered = (request.headers.get("Sec-WebSocket-Protocol") || "").split(",").map((s) => s.trim());
+  return offered.includes(WS_PROTOCOL) ? offered.find((p) => p.startsWith("cdt_")) || "" : "";
+}
+
 // ---------------------------------------------------------------------------
 // Email
 // ---------------------------------------------------------------------------
@@ -180,8 +188,8 @@ async function setNewsletter(env, userId, on) {
     .bind(on ? 1 : 0, on ? now() : null, userId).run();
 }
 
-async function deviceFromRequest(env, request) {
-  const token = bearer(request);
+async function deviceFromRequest(env, request, allowWsProtocol = false) {
+  const token = bearer(request) || (allowWsProtocol ? wsProtocolToken(request) : "");
   if (!token.startsWith("cdt_")) throw new HttpError(401, "unauthorized", "Not signed in");
   const row = await env.DB.prepare(`SELECT d.id AS device_id, d.name AS device_name, d.last_seen AS device_seen,
       u.id AS user_id, u.email, u.newsletter, u.last_seen
@@ -287,7 +295,7 @@ async function apiDeleteAccount(request, env) {
 
 async function deviceConnect(request, env) {
   if (request.headers.get("Upgrade") !== "websocket") return new Response("expected websocket", { status: 426 });
-  const d = await deviceFromRequest(env, request);
+  const d = await deviceFromRequest(env, request, true);
   await env.DB.batch([
     env.DB.prepare("UPDATE devices SET last_seen = ? WHERE id = ?").bind(now(), d.device_id),
     env.DB.prepare("UPDATE users SET last_seen = ? WHERE id = ?").bind(now(), d.user_id),
@@ -295,6 +303,8 @@ async function deviceConnect(request, env) {
   const headers = new Headers(request.headers);
   headers.set("X-Device-Id", d.device_id);
   headers.set("X-Device-Name", d.device_name || "");
+  headers.set("X-Device-Protocol", bearer(request) ? "" : WS_PROTOCOL);
+  headers.delete("Sec-WebSocket-Protocol"); // the token must not travel further than this
   return relay(env, d.user_id).fetch(new Request("https://relay/connect", { headers }));
 }
 

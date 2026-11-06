@@ -408,6 +408,39 @@ TOOLS = {
 }
 
 
+# What each tool does to the user's things, for ChatGPT and Claude (they ask before tools that change things, and their
+# directories require these): title, read-only, destructive (overwrites something), open world (goes online).
+ANNOTATIONS = {
+    "search_references": ("Search the library", True, False, False),
+    "get_reference": ("Show a reference", True, False, True),            # formatting may download a style
+    "add_reference": ("Add a reference", False, False, True),            # looked up on Crossref / doi.org
+    "add_references": ("Add several references", False, False, True),
+    "list_projects": ("List projects", True, False, False),
+    "add_to_project": ("Put references into a project", False, False, False),
+    "format_references": ("Format references", True, False, True),
+    "check_citations": ("Check citation markers", True, False, False),
+    "create_word_document": ("Create a Word document", False, False, True),
+    "update_word_document": ("Update a Word document", False, True, True),  # rewrites the file unless told not to
+    "get_bibtex": ("Get BibTeX", False, False, False),                      # can save a .bib file
+    "check_latex_project": ("Check a LaTeX project", True, False, True),
+    "prepare_arxiv": ("Make an arXiv-ready .zip", False, False, False),
+    "import_zotero_library": ("Import from Zotero", False, False, False),
+    "list_styles": ("Find a citation style", True, False, True),
+    "verify_references": ("Verify references online", False, False, True),  # corrects details from Crossref
+    "import_references": ("Import a reference file", False, False, False),
+}
+
+
+def tool_list():
+    out = []
+    for n, (_, d, s) in TOOLS.items():
+        title, read_only, destructive, online = ANNOTATIONS[n]
+        out.append({"name": n, "title": title, "description": d, "inputSchema": s,
+                    "annotations": {"title": title, "readOnlyHint": read_only, "destructiveHint": destructive,
+                                    "idempotentHint": read_only, "openWorldHint": online}})
+    return out
+
+
 # --------------------------------------------------------------------------
 # JSON-RPC over stdio
 # --------------------------------------------------------------------------
@@ -426,8 +459,7 @@ def handle(msg):
     if method == "ping":
         return {"jsonrpc": "2.0", "id": mid, "result": {}}
     if method == "tools/list":
-        return {"jsonrpc": "2.0", "id": mid, "result": {"tools": [
-            {"name": n, "description": d, "inputSchema": s} for n, (_, d, s) in TOOLS.items()]}}
+        return {"jsonrpc": "2.0", "id": mid, "result": {"tools": tool_list()}}
     if method == "tools/call":
         name, args = params.get("name"), params.get("arguments") or {}
         if name not in TOOLS:

@@ -13,8 +13,9 @@ const DEFAULT_INSTRUCTIONS =
   "by DOI, and cite with [@Key] markers.";
 
 const OFFLINE_TEXT =
-  "Citrello isn't running on the user's computer, so the library can't be reached right now. " +
-  "Ask the user to open the Citrello app on their computer (signed in as {who}) and try again.";
+  "Citrello isn't open on the user's computer, so the library can't be reached right now. " +
+  "Ask the user to open Citrello (the app, or citrello.app/app in a browser tab), signed in as {who}, " +
+  "and try again.";
 
 export class Relay extends DurableObject {
   constructor(ctx, env) {
@@ -55,7 +56,10 @@ export class Relay extends DurableObject {
     const pair = new WebSocketPair();
     this.ctx.acceptWebSocket(pair[1]);
     pair[1].serializeAttachment({ deviceId, name, connectedAt: Date.now() });
-    return new Response(null, { status: 101, webSocket: pair[0] });
+    // a browser that offered the "citrello" subprotocol (the web app) must get it back, or it drops the connection
+    const protocol = request.headers.get("X-Device-Protocol");
+    return new Response(null, { status: 101, webSocket: pair[0],
+                                headers: protocol ? { "Sec-WebSocket-Protocol": protocol } : {} });
   }
 
   openSockets() {

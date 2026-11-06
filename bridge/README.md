@@ -83,3 +83,10 @@ Point the app at it by setting `CITRELLO_BRIDGE=http://localhost:8787` before st
 - Access tokens last 1 hour. Refresh tokens last 180 days and change every time they're used.
 - Requests that arrive from a web connector can save Word files only in the user's Citrello Documents folder,
   and can read only Word and reference files.
+
+## The web app as a device
+
+citrello.app/app connects like the desktop app, but browsers can't put headers on a WebSocket, so it sends its
+device token as a subprotocol: `new WebSocket("wss://mcp.citrello.app/device/connect", ["citrello", token])`.
+`/device/connect` accepts that (only there), and the Relay answers with `Sec-WebSocket-Protocol: citrello`.
+`tests/test_web_bridge_e2e.py` tests it in Chromium and WebKit against a local bridge.

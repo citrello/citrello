@@ -8,7 +8,7 @@ name: Deploy bridge (mcp.citrello.app)
 on:
   push:
     branches: [main]
-    paths: ["bridge/**", ".github/workflows/bridge.yml"]
+    paths: ["bridge/**", ".github/workflows/bridge.yml", "tests/test_bridge_e2e.py", "tests/test_web_bridge_e2e.py"]
   workflow_dispatch:
 
 concurrency: bridge-deploy
@@ -29,13 +29,20 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-      - run: pip install python-docx citeproc-py pypdf pybtex pytest
-      - name: End-to-end test against a local copy of the bridge
+      - run: pip install python-docx citeproc-py pypdf pybtex pytest playwright
+      - run: python -m playwright install --with-deps chromium webkit
+      - name: Build the web app (the browser tab is a device too)
+        run: python packaging/build_web_check.py
+        working-directory: .
+      - name: End-to-end tests against a local copy of the bridge (the desktop app, and the web app in Chromium and WebKit)
         run: |
           npx wrangler d1 migrations apply citrello --local
           npx wrangler dev --port 8787 --var DEV_RETURN_CODES:1 --var ADMIN_TOKEN:testadmin --var PUBLIC_URL:http://localhost:8787 > wrangler.log 2>&1 &
           for i in $(seq 60); do curl -sf http://localhost:8787/ > /dev/null && break; sleep 1; done
-          cd .. && CITRELLO_BRIDGE_E2E=1 CITRELLO_BRIDGE=http://localhost:8787 pytest -q tests/test_bridge_e2e.py || { cat bridge/wrangler.log; exit 1; }
+          (cd ../site/public && python -m http.server 8099 > /dev/null 2>&1 &)
+          sleep 1
+          cd .. && CITRELLO_BRIDGE_E2E=1 CITRELLO_BRIDGE=http://localhost:8787 CITRELLO_WEB_CHECK=http://localhost:8099 \
+            pytest -q tests/test_bridge_e2e.py tests/test_web_bridge_e2e.py || { cat bridge/wrangler.log; exit 1; }
 
   deploy:
     needs: check

@@ -147,3 +147,73 @@ def test_jobs_report_progress_while_they_run(web, monkeypatch, tmp_path):
     assert steps[-1] is None  # finished: the page asks Python again
     final = call(web, "GET", poll)[1]
     assert final["state"] == "done" and final["report"]["references"] == 2
+
+
+@pytest.fixture
+def web_conn(web, monkeypatch, tmp_path):
+    """The web app's stand-in for the desktop's bridge connection (the WebSocket itself is in worker.js)."""
+    import bridge_client
+    monkeypatch.setattr(bridge_client, "ACCOUNT_FILE", str(tmp_path / "account.json"))
+    monkeypatch.setattr(bridge_client, "CONNECTION", bridge_client.CONNECTION)
+    monkeypatch.setattr(bridge_client, "platform", bridge_client.platform)
+    conn = web.WebConnection()
+    monkeypatch.setattr(web, "CONNECTION", conn)
+    web.use_web_connection("Safari on Mac (web app)")
+    return conn
+
+
+def test_signing_in_tells_the_worker_to_connect(web, web_conn, monkeypatch):
+    import bridge_client
+    sent = {}
+
+    def fake_api(method, path, body=None, token=None, timeout=25):
+        sent[path] = body
+        if path == "/api/auth/verify":
+            return {"token": "cdt_secret", "device_id": "d_1", "user": {"id": "u1", "email": "a@b.org", "newsletter": False}}
+        if path == "/api/me":
+            return {"user": {"email": "a@b.org", "newsletter": False}, "devices": [], "connector_url": "x/mcp"}
+        return {"ok": True}
+    monkeypatch.setattr(bridge_client, "api", fake_api)
+    plan = json.loads(web_conn.plan())
+    assert plan["token"] is None and plan["url"].endswith("/device/connect")
+    st, out, _ = call(web, "POST", "/api/account/verify", {"email": "a@b.org", "code": "123456"})
+    assert st == 200 and out["signed_in"] and out["web"]
+    # the server is told this is a browser, not "emscripten"
+    assert sent["/api/auth/verify"]["device_name"] == "Safari on Mac (web app)"
+    assert sent["/api/auth/verify"]["platform"] == "Web app"
+    new = json.loads(web_conn.plan())
+    assert new["token"] == "cdt_secret" and new["generation"] > plan["generation"]
+    web_conn.set_state("online")
+    st, out, _ = call(web, "GET", "/api/account")
+    assert out["state"] == "online" and out["email"] == "a@b.org"
+    assert call(web, "GET", "/api/status")[1]["signed_in"] is True
+    st, out, _ = call(web, "POST", "/api/account/signout", {})
+    assert st == 200 and not out["signed_in"]
+    assert json.loads(web_conn.plan())["token"] is None
+
+
+def test_the_tab_answers_the_connector_like_the_desktop(web, web_conn):
+    hello = json.loads(web.hello())
+    assert hello["type"] == "hello" and any(t["name"] == "search_references" for t in hello["tools"])
+    with library.editing() as data:
+        data.update(items=[], projects=[])
+    call(web, "POST", "/api/library/import", BIB, {"X-Filename": "refs.bib"})
+    frame = {"type": "rpc", "id": "r1", "msg": {"jsonrpc": "2.0", "id": 7, "method": "tools/call",
+                                                 "params": {"name": "search_references", "arguments": {"query": "offshore"}}}}
+    reply = json.loads(web.answer_rpc(json.dumps(frame)))
+    assert reply["type"] == "reply" and reply["id"] == "r1" and reply["msg"]["id"] == 7
+    assert "Topham2017" in reply["msg"]["result"]["content"][0]["text"]
+    # the same safeguard as on the desktop: a web request can't write outside Citrello's Documents folder
+    frame["msg"]["params"] = {"name": "create_word_document", "arguments": {
+        "text": "Costs [@Topham2017].", "output_path": "/tmp/elsewhere.docx"}}
+    reply = json.loads(web.answer_rpc(json.dumps(frame)))
+    assert reply["msg"]["result"]["isError"] and "Documents" in reply["msg"]["result"]["content"][0]["text"]
+    frame["msg"]["params"] = {"name": "create_word_document", "arguments": {"text": "Costs [@Topham2017].", "title": "Draft"}}
+    reply = json.loads(web.answer_rpc(json.dumps(frame)))
+    assert not reply["msg"]["result"].get("isError"), reply
+    docs = call(web, "GET", "/api/web/documents")[1]["documents"]
+    assert docs[0]["name"] == "Draft.docx"  # newest first (other tests save files there too)
+    st, data, hdrs = call(web, "GET", "/api/web/documents/Draft.docx")
+    assert st == 200 and data[:2] == b"PK" and "Draft.docx" in hdrs["Content-Disposition"]
+    assert call(web, "GET", "/api/web/documents/..%2Flibrary.json")[0] == 404
+    assert web.answer_rpc("not json") == ""

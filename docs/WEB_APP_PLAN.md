@@ -151,7 +151,12 @@ jobs run after their request is answered (no threads in Pyodide; see step 2). On
    right after their request is answered (`webapp.run_pending`), and while one runs the page answers its own
    progress polls from what the job posts (`webapp.PUBLISH`), because Python is busy. Other requests wait for the
    job to finish.
-3. Connector Phase A (tab as device) + sign-in in the web app; directory applications (Claude, ChatGPT).
+3. **Done (6 Nov 2026), except the directory applications (Armin):** connector Phase A + sign-in in the web app.
+   worker.js keeps the WebSocket (token sent as the subprotocol `["citrello", token]`, which the bridge accepts
+   since this step) and answers with `mcp_server.handle` under `remote_call()` via `webapp.answer_rpc`. Word files
+   the connector makes are listed for download in Settings. Tools now carry MCP annotations (title, read-only,
+   destructive, open world), which both directories require. Tested with a local bridge in Chromium and WebKit
+   (`tests/test_web_bridge_e2e.py`, also run by bridge.yml before deploying).
 4. Clip button for the web app; Zotero (web API + sqlite file); Mendeley through the bridge.
 5. Claim check (section 4, step 1).
 6. Cloud copy (Phase B) → Overleaf live link → Word add-in (Office.js) on AppSource.

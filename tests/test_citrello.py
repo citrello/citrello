@@ -206,6 +206,11 @@ def test_connector_protocol():
     assert init["result"]["serverInfo"]["name"] == "citrello"
     tools = mcp_server.handle({"jsonrpc": "2.0", "id": 2, "method": "tools/list"})["result"]["tools"]
     assert {"search_references", "add_reference", "create_word_document", "verify_references"} <= {t["name"] for t in tools}
+    # every tool says what it does to the user's things (ChatGPT's and Claude's directories require it)
+    assert set(mcp_server.ANNOTATIONS) == set(mcp_server.TOOLS)
+    by_name = {t["name"]: t["annotations"] for t in tools}
+    assert by_name["search_references"]["readOnlyHint"] and not by_name["add_reference"]["readOnlyHint"]
+    assert by_name["update_word_document"]["destructiveHint"] and by_name["add_reference"]["openWorldHint"]
     library.import_items(library.parse_any(RIS, "x.ris"))
     res = mcp_server.handle({"jsonrpc": "2.0", "id": 3, "method": "tools/call",
                              "params": {"name": "search_references", "arguments": {"query": "Topham"}}})
