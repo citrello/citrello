@@ -55,8 +55,9 @@
 **Progress:** steps 1 and 2 are live at citrello.app/app and tested in Chromium and WebKit: library in the browser,
 import/export, backup/restore, check and fix Word/PDF/LaTeX, arXiv .zip, style search, progress bars. Step 3 too:
 sign in in the web app and the open citrello.app tab answers ChatGPT/Claude (the bridge accepts the browser's token).
-Armin still has to apply to Claude's connector directory and ChatGPT's app directory. Next: step 4 (clip button,
-Zotero, Mendeley in the web app). Armin's section 3 decisions are recorded in the plan: free
+Armin still has to apply to Claude's connector directory and ChatGPT's app directory. Step 4 too: the browser button
+and Zotero (online, or its zotero.sqlite file) in the web app; Mendeley through an exported file. Next: step 5
+(claim check). Armin's section 3 decisions are recorded in the plan: free
 cloud copy with a limit, EU storage; Word add-in later; desktop app kept, web app leads.
 
 **docs/WEB_APP_PLAN.md** is the plan: everything in the browser at citrello.app/app so nobody hits install

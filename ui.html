@@ -273,10 +273,16 @@
             <div class="row"><button class="primary" id="impZoteroLocal">Import my Zotero library</button></div>
             <p class="muted small" style="margin:6px 0 0">No account or key needed, and Zotero can stay open. Your collections become projects.</p>
             </div>
+            <div class="web-only">
+            <h3>From Zotero on this computer</h3>
+            <div class="row"><label class="btn primary" for="impZoteroFile">Choose zotero.sqlite…</label>
+              <input type="file" id="impZoteroFile" accept=".sqlite,.bak" hidden></div>
+            <p class="muted small" style="margin:6px 0 0">Zotero's library file is in your Zotero folder: on Windows <code>C:\Users\<i>you</i>\Zotero</code>, on a Mac your home folder → Zotero (in Zotero: Settings → Advanced → Files and Folders → Show Data Directory). It's read in this browser, not uploaded. Your collections become projects.</p>
+            </div>
             <h3>From an account</h3>
             <div class="row"><button id="impMendeley" class="desktop-only">Import my Mendeley library</button>
               <button id="impZotero">Zotero online library</button></div>
-            <p class="muted small" style="margin:6px 0 0">Connect the accounts under Settings first.</p>
+            <p class="muted small" style="margin:6px 0 0"><span class="desktop-only">Connect the accounts under Settings first.</span><span class="web-only">For Zotero online, add your user ID and key under Settings first. From <b>Mendeley</b>: in Mendeley Reference Manager select all references, then File → Export (BibTeX or RIS), and choose that file under “From a file”.</span></p>
           </div>
         </div>
         <div class="row"><input type="text" id="importProject" list="projectList" placeholder="Put into project (optional)"></div>
@@ -450,7 +456,7 @@
       </details>
     </div>
 
-    <div class="card desktop-only">
+    <div class="card">
       <h2>Browser button</h2>
       <p class="muted">Add the paper you're looking at, from any website, with one click. It reads the page in your own browser, so sites that block robots (ScienceDirect, IEEE…) and your university login work too.</p>
       <ol class="small">
@@ -459,7 +465,7 @@
         <li>On a paper's page, click <strong>Add to Citrello</strong>. A small window shows what was found; click <strong>Add</strong>.</li>
         <li>To add a paper the page <em>mentions</em> (e.g. one in its reference list): <strong>select that reference's title or whole entry</strong>, then click the button. Citrello adds the selected reference instead of the page's own paper.</li>
       </ol>
-      <p class="muted small">Citrello must be running. Can't drag it? <button class="link" id="bmCopy">Copy the button's code</button>, create a new bookmark, and paste it as the address.</p>
+      <p class="muted small"><span class="desktop-only">Citrello must be running.</span><span class="web-only">It works whether or not a Citrello tab is open, in this browser.</span> Can't drag it? <button class="link" id="bmCopy">Copy the button's code</button>, create a new bookmark, and paste it as the address.</p>
     </div>
 
     <div class="card desktop-only">
@@ -674,12 +680,14 @@ $("quit").onclick = async () => {
 };
 
 // ---------- browser button (bookmarklet) ----------
+// the pop-up: the desktop app's local server, or the web app's own page (it works without a Citrello tab open)
+const CLIP_URL = document.documentElement.classList.contains("web") ? location.origin + "/app/clip.html" : "http://localhost:8585/clip";
 const BOOKMARKLET_CODE = "(function(){var m={},n=0;document.querySelectorAll('meta[name],meta[property]').forEach(function(e){" +
   "var k=(e.getAttribute('name')||e.getAttribute('property')||'').toLowerCase();" +
   "if(/^(citation_|dc\\.|prism\\.|og:|bepress_|article:published_time$)/.test(k)&&k!=='citation_reference'){" +
   "m[k]=m[k]||[];if(m[k].length<30&&n<400){m[k].push((e.content||'').slice(0,400));n++;}}});" +
   "var d={url:location.href,title:document.title.slice(0,300),meta:m,sel:String(window.getSelection()).slice(0,2000)};" +
-  "var w=window.open('http://localhost:8585/clip#'+encodeURIComponent(JSON.stringify(d)),'citrello','width=560,height=660');" +
+  "var w=window.open('" + CLIP_URL + "#'+encodeURIComponent(JSON.stringify(d)),'citrello','width=560,height=660');" +
   "if(!w){alert('Citrello: please allow pop-ups for this site, then click again.');}})();";
 const BOOKMARKLET = "javascript:" + encodeURIComponent(BOOKMARKLET_CODE);
 $("bookmarklet").href = BOOKMARKLET;
@@ -1108,14 +1116,24 @@ async function accountImport(path) {
 }
 $("impMendeley").onclick = () => accountImport("/api/library/import-mendeley");
 $("impZotero").onclick = () => accountImport("/api/library/import-zotero");
+const zoteroDone = (r) => {
+  notice("importMsg", "ok", `${r.added} added, ${r.skipped} already in your library` +
+    (r.collections ? `. Your ${r.collections} Zotero collection${r.collections > 1 ? "s are" : " is"} now in Projects.` : ".") +
+    (r.from_backup ? " (Read from Zotero's latest automatic backup: close Zotero and import again to include today's changes.)" : ""));
+  loadLibrary();
+};
 $("impZoteroLocal").onclick = async () => {
   notice("importMsg", "warn", "Reading your Zotero library…");
+  try { zoteroDone(await post("/api/library/import-zotero-local", {project: $("importProject").value})); }
+  catch (e) { notice("importMsg", "err", esc(e.message)); }
+};
+$("impZoteroFile").onchange = async () => {  // the web app: Zotero's own file, picked by the person
+  const f = $("impZoteroFile").files[0]; $("impZoteroFile").value = "";
+  if (!f) return;
+  notice("importMsg", "warn", "Reading your Zotero library…");
   try {
-    const r = await post("/api/library/import-zotero-local", {project: $("importProject").value});
-    notice("importMsg", "ok", `${r.added} added, ${r.skipped} already in your library` +
-      (r.collections ? `. Your ${r.collections} Zotero collection${r.collections > 1 ? "s are" : " is"} now in Projects.` : ".") +
-      (r.from_backup ? " (Read from Zotero's latest automatic backup: close Zotero and import again to include today's changes.)" : ""));
-    loadLibrary();
+    zoteroDone(await api("/api/web/import-zotero-file", {method: "POST", body: await f.arrayBuffer(),
+      headers: {"X-Project": encodeURIComponent($("importProject").value)}}));
   } catch (e) { notice("importMsg", "err", esc(e.message)); }
 };
 function setExportLinks() {

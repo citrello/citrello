@@ -217,3 +217,20 @@ def test_the_tab_answers_the_connector_like_the_desktop(web, web_conn):
     assert st == 200 and data[:2] == b"PK" and "Draft.docx" in hdrs["Content-Disposition"]
     assert call(web, "GET", "/api/web/documents/..%2Flibrary.json")[0] == 404
     assert web.answer_rpc("not json") == ""
+
+
+def test_import_zotero_file_in_the_browser(web, tmp_path):
+    """"From Zotero on this computer" in the web app: the person picks zotero.sqlite."""
+    import sys
+    sys.path.insert(0, os.path.dirname(__file__))
+    import test_zotero_local as Z
+    with library.editing() as data:
+        data.update(items=[], projects=[])
+    db = tmp_path / "zotero.sqlite"
+    Z.make_db(str(db))
+    st, out, _ = call(web, "POST", "/api/web/import-zotero-file", db.read_bytes(), {"X-Project": "Old%20Zotero"})
+    assert st == 200 and out["added"] >= 1 and out["collections"] >= 1 and "database" not in out
+    data = library.load()
+    assert all("Old Zotero" in it["projects"] for it in data["items"])
+    st, out, _ = call(web, "POST", "/api/web/import-zotero-file", b"PK\x03\x04 not sqlite", {})
+    assert st == 400 and "zotero.sqlite" in out["error"]

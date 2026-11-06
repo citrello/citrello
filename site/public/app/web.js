@@ -34,7 +34,9 @@
     if (p) p.textContent = t;
     cover.classList.toggle("err", !!err);
   };
-  document.addEventListener("DOMContentLoaded", () => document.body.appendChild(cover));
+  let coverGone = false;
+  const hideCover = () => { coverGone = true; cover.remove(); };
+  document.addEventListener("DOMContentLoaded", () => { if (!coverGone) document.body.appendChild(cover); });
 
   // ---------- the worker ----------
   let worker = null, readyResolve, readyReject;
@@ -49,7 +51,7 @@
     worker.onmessage = (ev) => {
       const m = ev.data;
       if (m.type === "status") coverText(m.text);
-      else if (m.type === "ready") { cover.remove(); readyResolve(); }
+      else if (m.type === "ready") { hideCover(); readyResolve(); }
       else if (m.type === "error") { coverText(m.text + " Try reloading the page, or use another browser.", true); readyReject(new Error(m.text)); }
       else if (m.type === "progress") { if (m.body) progress.set(m.path, m.body); else progress.delete(m.path); }
       else if (m.type === "library-changed") {
@@ -66,10 +68,29 @@
   // Ask for the browser to keep this site's storage (fewer automatic clean-ups, e.g. Safari after 7 days)
   if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(() => {});
 
+  // The browser button's pop-up (clip.html) uses the open Citrello tab when there is one: it asks over a
+  // BroadcastChannel (same site only), and that tab answers its /api/clip/ requests. With no tab open, the pop-up
+  // opens Citrello itself.
+  const CLIP = !!window.CITRELLO_CLIP;
+  const channel = "BroadcastChannel" in window ? new BroadcastChannel("citrello-web-app") : null;
+  const me = Math.random().toString(36).slice(2);
+  let relay = false; // this pop-up's requests go to the open Citrello tab
+
+  function askOpenTab() {
+    if (channel && !worker && !relay) channel.postMessage({ type: "ping", from: me });
+  }
+
   // One tab at a time: two tabs would each keep their own copy of the library and overwrite each other.
-  if (navigator.locks) {
+  function startHere() {
+    if (!navigator.locks) return startWorker();
     navigator.locks.request("citrello-web-app", { ifAvailable: true }, (lock) => {
+      if (relay) return null;
       if (!lock) {
+        if (CLIP) {  // the open tab is still starting: keep asking it
+          coverText("Waiting for your open Citrello tab…");
+          setTimeout(() => { askOpenTab(); if (!relay) setTimeout(startHere, 1000); }, 500);
+          return null;
+        }
         coverText("Citrello is already open in another tab or window. Use that one, or close it and reload this page.", true);
         readyReject(new Error("Citrello is open in another tab"));
         return null;
@@ -77,8 +98,39 @@
       startWorker();
       return new Promise(() => {}); // keep the lock while this tab is open
     });
+  }
+
+  if (channel) channel.addEventListener("message", async (ev) => {
+    const m = ev.data || {};
+    if (m.type === "pong" && m.to === me && CLIP && !worker && !relay) {
+      relay = true;
+      hideCover();
+      readyResolve();
+    } else if (m.type === "response" && m.to === me && pending.has(m.id)) {
+      pending.get(m.id)(m);
+      pending.delete(m.id);
+    } else if (m.type === "ping" && worker && !relay) {
+      try { await ready; } catch (e) { return; }
+      channel.postMessage({ type: "pong", to: m.from });
+    } else if (m.type === "request" && m.to === "open-tab" && worker && !relay) {
+      const url = new URL(m.path, location.origin);
+      let res;
+      if (!url.pathname.startsWith("/api/clip/")) {  // the pop-up only adds what it found
+        res = { status: 403, ctype: "application/json", body: new TextEncoder().encode('{"error":"not allowed"}') };
+      } else {
+        const r = await apiFetch(url, { method: m.method, headers: m.headers, body: m.body });
+        res = { status: r.status, ctype: r.headers.get("Content-Type"), body: new Uint8Array(await r.arrayBuffer()) };
+        if (url.pathname === "/api/clip/add" && r.ok && typeof loadLibrary === "function") loadLibrary();
+      }
+      channel.postMessage({ type: "response", to: m.from, id: m.id, headers: {}, ...res });
+    }
+  });
+
+  if (CLIP && channel) {
+    askOpenTab();
+    setTimeout(() => { if (!relay) startHere(); }, 600);
   } else {
-    startWorker();
+    startHere();
   }
 
   // ---------- fetch("/api/...") -> worker ----------
@@ -109,8 +161,10 @@
     const id = ++nextId;
     const m = await new Promise((resolve) => {
       pending.set(id, resolve);
-      worker.postMessage({ type: "request", id, method,
-                           path: url.pathname + url.search, headers, body }, body ? [body.buffer] : []);
+      if (relay) channel.postMessage({ type: "request", to: "open-tab", from: me, id, method,
+                                       path: url.pathname + url.search, headers, body });
+      else worker.postMessage({ type: "request", id, method,
+                                path: url.pathname + url.search, headers, body }, body ? [body.buffer] : []);
     });
     return new Response(m.body, { status: m.status, headers: { "Content-Type": m.ctype, ...m.headers } });
   }
@@ -201,6 +255,7 @@
   });
   window.addEventListener("citrello-downloaded", (e) => { if (e.detail === "/api/web/backup") backupState(); });
   document.addEventListener("DOMContentLoaded", () => {
+    if (CLIP) return;
     ready.then(backupState).catch(() => {});
     document.addEventListener("click", (e) => {
       if (e.target.closest && e.target.closest('.side button.navb')) setTimeout(() => {

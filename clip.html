@@ -96,7 +96,7 @@ function fail(msg) { show("loading", false); $("error").textContent = msg; show(
 async function start() {
   try { clip = JSON.parse(decodeURIComponent(location.hash.slice(1))); }
   catch (e) { return fail("Nothing to add. Use the “Add to Citrello” button on your bookmarks bar while viewing a paper."); }
-  history.replaceState(null, "", "/clip");  // keep the page data out of the address bar
+  history.replaceState(null, "", location.pathname);  // keep the page data out of the address bar
   $("source").textContent = clip.sel && clip.sel.length > 30 ? "From the text you selected on " + clip.url : "From " + clip.url;
   try {
     const r = await post("/api/clip/preview", clip);

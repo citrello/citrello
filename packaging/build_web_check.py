@@ -70,6 +70,13 @@ def build_app():
     page = page.replace("</head>", head + "</head>")
     with open(os.path.join(APP_OUT, "index.html"), "w", encoding="utf-8") as f:
         f.write(page)
+    # the browser button's pop-up: the desktop app's clip.html, answered by the open Citrello tab (or its own worker)
+    with open(os.path.join(ROOT, "clip.html"), encoding="utf-8") as f:
+        clip = f.read()
+    assert clip.count("</head>") == 1
+    clip = clip.replace("</head>", '<script>window.CITRELLO_CLIP = true;</script>\n<script src="web.js"></script>\n</head>')
+    with open(os.path.join(APP_OUT, "clip.html"), "w", encoding="utf-8") as f:
+        f.write(clip)
     print(f"Web app ready in {APP_OUT}: {len(APP_MODULES)} modules, {len(styles)} style files, {len(wheels)} wheels")
 
 

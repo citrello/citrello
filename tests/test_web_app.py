@@ -11,6 +11,7 @@ import json
 import os
 import re
 import sys
+import urllib.parse
 import zipfile
 
 import pytest
@@ -63,10 +64,11 @@ def test_web_app(browser_name, tmp_path):
         page.click("#wWebStart")
         expect(page.locator("#quit")).to_be_hidden()
         tab(page, "settings")
-        for h in ("Claude", "Codex", "Word", "Updates", "Mendeley", "Browser button"):
+        for h in ("Claude", "Codex", "Word", "Updates", "Mendeley"):
             expect(page.locator("#tab-settings h2", has_text=re.compile(f"^{h}$"))).to_be_hidden()
         expect(page.locator("#tab-settings h2", has_text="ChatGPT and Claude on the web")).to_be_visible()
         expect(page.locator("#tab-settings h2", has_text="Account")).to_be_visible()
+        expect(page.locator("#tab-settings h2", has_text="Browser button")).to_be_visible()
         expect(page.locator("#webBackup")).to_be_visible()
         expect(page.locator("#webBackupInfo")).to_contain_text("No backup yet")
         tab(page, "documents")
@@ -276,5 +278,84 @@ def test_web_app_documents_and_styles(browser_name, tmp_path):
         page.wait_for_selector("#webCover", state="detached", timeout=LOAD)
         tab(page, "settings")
         expect(page.locator("#defStyle")).to_have_value("nature", timeout=30000)
+        assert not errors, errors
+        b.close()
+
+
+PAPER_PAGE = """<html><head><title>{title}</title><meta name="citation_title" content="{title}">
+<meta name="citation_doi" content="{doi}"></head><body>A paper</body></html>"""
+
+
+@pytest.mark.parametrize("browser_name", BROWSERS)
+def test_web_app_browser_button_and_zotero(browser_name, tmp_path):
+    """Step 4: the "Add to Citrello" button, with a Citrello tab open (the pop-up uses it) and without one (the
+    pop-up opens Citrello itself); and importing Zotero's own library file."""
+    from playwright.sync_api import expect, sync_playwright
+    sys.path.insert(0, os.path.dirname(__file__))
+    import test_zotero_local as Z
+    shots = os.environ.get("CITRELLO_E2E_SHOTS") or str(tmp_path)
+
+    def click_button(ctx, code, title, doi):
+        """A paper's page, and the bookmarklet clicked on it -> the pop-up."""
+        paper = ctx.new_page()
+        paper.set_content(PAPER_PAGE.format(title=title, doi=doi))
+        with ctx.expect_page() as popup:
+            paper.evaluate(code)
+        pop = popup.value
+        pop.on("pageerror", lambda e: errors.append("pop-up: " + str(e)))
+        return paper, pop
+
+    with sync_playwright() as pw:
+        b = getattr(pw, browser_name).launch()
+        ctx = b.new_context(viewport={"width": 1280, "height": 860})
+        page = ctx.new_page()
+        errors = []
+        page.on("pageerror", lambda e: errors.append(str(e)))
+        open_app(page)
+        page.click("#wWebStart")
+        tab(page, "settings")
+        expect(page.locator("#bookmarklet")).to_be_visible()
+        href = page.get_attribute("#bookmarklet", "href")
+        code = urllib.parse.unquote(href[len("javascript:"):])
+        assert BASE.rstrip("/") + "/app/clip.html" in code
+
+        # with Citrello open: the pop-up asks the open tab, which adds it and shows it at once
+        paper, pop = click_button(ctx, code, "Sustainable decommissioning of an offshore wind farm",
+                                  "10.1016/j.renene.2016.10.066")
+        expect(pop.locator("#title")).to_contain_text("Sustainable decommissioning", timeout=90000)
+        pop.fill("#project", "Clipped")
+        pop.screenshot(path=os.path.join(shots, f"web-app-{browser_name}-clip.png"))
+        pop.click("#add")
+        expect(pop.locator("#doneMsg")).to_contain_text("Added", timeout=30000)
+        tab(page, "library")
+        expect(page.locator("#libRows")).to_contain_text("Sustainable decommissioning", timeout=30000)
+        expect(page.locator("#projNav")).to_contain_text("Clipped")
+        pop.close()
+        paper.close()
+
+        # with no Citrello tab open: the pop-up opens Citrello itself
+        page.close()
+        paper, pop = click_button(ctx, code, "Sailing through end-of-life challenges", "10.1016/j.rser.2024.114486")
+        expect(pop.locator("#title")).to_contain_text("Sailing through end-of-life", timeout=LOAD)
+        pop.click("#add")
+        expect(pop.locator("#doneMsg")).to_contain_text("Added", timeout=30000)
+        pop.close()
+        paper.close()
+
+        # both are in the library; then Zotero's own file, with its collections as projects
+        page = ctx.new_page()
+        page.on("pageerror", lambda e: errors.append(str(e)))
+        open_app(page)
+        expect(page.locator("#libRows .ref")).to_have_count(2, timeout=30000)
+        db = tmp_path / "zotero.sqlite"
+        Z.make_db(str(db))
+        page.click("#openImport")
+        expect(page.locator("#impZoteroLocal")).to_be_hidden()
+        expect(page.locator("#importPanel")).to_contain_text("Mendeley Reference Manager")
+        page.set_input_files("#impZoteroFile", str(db))
+        expect(page.locator("#importMsg")).to_contain_text("now in Projects", timeout=60000)
+        expect(page.locator("#projNav")).to_contain_text("Thesis")
+        expect(page.locator("#libRows")).to_contain_text("Wind Energy Handbook")
+        page.screenshot(path=os.path.join(shots, f"web-app-{browser_name}-zotero.png"))
         assert not errors, errors
         b.close()

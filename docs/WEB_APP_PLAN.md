@@ -157,7 +157,13 @@ jobs run after their request is answered (no threads in Pyodide; see step 2). On
    the connector makes are listed for download in Settings. Tools now carry MCP annotations (title, read-only,
    destructive, open world), which both directories require. Tested with a local bridge in Chromium and WebKit
    (`tests/test_web_bridge_e2e.py`, also run by bridge.yml before deploying).
-4. Clip button for the web app; Zotero (web API + sqlite file); Mendeley through the bridge.
+4. **Done (6 Nov 2026), except Mendeley's API:** the browser button opens `/app/clip.html` (built from
+   `clip.html`); it asks an open Citrello tab over a BroadcastChannel (only `/api/clip/` requests are answered),
+   or starts Citrello itself when no tab is open. Zotero: the online library works as is (api.zotero.org allows
+   browser requests); "Zotero on this computer" = the person picks `zotero.sqlite` (`/api/web/import-zotero-file`).
+   Mendeley: the web app explains File → Export in Mendeley Reference Manager and importing the file. A
+   one-click Mendeley import would need a Mendeley app registered with a citrello.app redirect and its secret in
+   the bridge (Armin's decision; low priority while export works).
 5. Claim check (section 4, step 1).
 6. Cloud copy (Phase B) → Overleaf live link → Word add-in (Office.js) on AppSource.
 7. Site: lead with "Open Citrello" (web), desktop as a secondary download; "What AI can't do" section/demo.

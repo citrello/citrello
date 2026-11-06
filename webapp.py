@@ -66,6 +66,29 @@ def _save_web_state(**values):
         json.dump(st, f)
 
 
+def import_zotero_file(raw, project=""):
+    """"From Zotero on this computer" in the browser: the person picks Zotero's own zotero.sqlite (a browser can't
+    look into the Zotero folder by itself). Read with the desktop app's zotero_local, collections -> projects."""
+    import tempfile
+    import zotero_local
+    if not raw.startswith(b"SQLite format 3\0"):
+        return 400, {"error": "That isn't Zotero's library file. Choose zotero.sqlite in your Zotero folder."}
+    folder = tempfile.mkdtemp(prefix="zotero_")
+    path = os.path.join(folder, "zotero.sqlite")
+    with open(path, "wb") as f:
+        f.write(raw)
+    try:
+        res = zotero_local.import_library(urllib.parse.unquote(project).strip() or None, path)
+    except zotero_local.ZoteroNotFound as e:
+        return 400, {"error": str(e)}
+    finally:
+        import shutil
+        shutil.rmtree(folder, ignore_errors=True)
+    res["from_backup"] = False
+    res.pop("database", None)
+    return 200, res
+
+
 def restore(raw):
     """Replace the library with a backup (a library.json saved by "Back up the library", or by the desktop app).
     Returns how many references it holds. Refuses anything that isn't a Citrello library."""
@@ -152,6 +175,8 @@ class WebHandler(app.Handler):
 
     def do_POST(self):
         path = urllib.parse.urlparse(self.path).path
+        if path == "/api/web/import-zotero-file":
+            return self.send(*import_zotero_file(self._body, self.headers.get("X-Project", "")))
         if path == "/api/web/restore":
             try:
                 return self.send(200, {"items": restore(self._body)})
