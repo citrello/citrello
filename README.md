@@ -164,6 +164,8 @@ pytest
 Issues and pull requests are welcome: see [CONTRIBUTING.md](CONTRIBUTING.md), which includes the
 contributor licence agreement.
 
-Copyright © 2026 Armin Hosseinghorbani. Citrello is licensed under the
+Copyright © 2026 Armin Hosseinghorbani. Citrello™ is a trademark of Armin Hosseinghorbani; the AGPL covers
+the code, not the name or logo (see [TRADEMARKS.md](TRADEMARKS.md): forks are welcome under their own name).
+Citrello is licensed under the
 [GNU Affero General Public License v3.0 or later](LICENSE). Citation styles are from the
 [CSL project](https://citationstyles.org/) (CC BY-SA 3.0).
