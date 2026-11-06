@@ -5,7 +5,8 @@ built for writing with AI. Owner and sole maintainer: **Armin Hosseinghorbani** 
 github.com/citrello). The library lives on the user's computer and is shared by the desktop app, Word, LaTeX, and
 AI assistants (Claude, ChatGPT, Codex) through an MCP connector.
 
-Read **docs/STATUS.md** for where things stand, decisions already made, and the to-do list.
+Read **docs/STATUS.md** for where things stand, decisions already made, and the to-do list. The current project is
+the web app: **docs/WEB_APP_PLAN.md**. **docs/VALUE_PROPOSITION.html** is the value-proposition report.
 
 ## Working with Armin
 - He is a researcher, not a developer. Explain in plain language, give exact click-by-click steps for anything he

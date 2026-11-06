@@ -40,10 +40,20 @@
   Developer Program, not done.
 
 ## Things Armin still needs to do (remind him)
+- **Edit docs/VALUE_PROPOSITION.html** (the value-proposition report, written 6 Nov 2026 before the web app plan).
+  Remind him at the start of the first session in the new account. Update it once the web app exists (no-install,
+  "what AI can't do without Citrello", claim checking).
 - Edit the 1.0.1 release notes on GitHub: put `[@Key]` in backticks (removes the stray contributor "key").
 - Send a real **Mendeley Cite** document to confirm that format works on real files (built from documentation,
   tested on generated files only).
 - Try citrello.app/check with a real paper.
+
+## Current focus: the web app
+**docs/WEB_APP_PLAN.md** is the plan: everything in the browser at citrello.app/app so nobody hits install
+warnings; the browser tab acts as the connector's device; optional cloud copy for an always-on connector, Word
+add-in (Office.js, also Mac/web) and Overleaf live link; claim checking ("does the cited paper support this
+sentence?") with the person's own AI, Consensus recommended alongside; "what AI can't do without Citrello".
+Decisions for Armin are in its section 3.
 
 ## Ideas and next steps (not started unless noted)
 1. **Launch**: quiet test with 5–10 real users and their own papers (Zotero, Mendeley Cite, EndNote, typed); fix

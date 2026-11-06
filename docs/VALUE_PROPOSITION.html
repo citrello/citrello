@@ -1,0 +1,493 @@
+<title>Citrello Value Proposition</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Gloock&family=Figtree:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+/* Layout: one reading column with a sticky contents bar; problems map as a 2x2 grid; personas as stacked chapters. */
+:root {
+  --bg: #fbfcff; --surface: #ffffff; --sky: #eaf0fb; --ink: #14213d; --muted: #4a5774; --line: #d5def0;
+  --cobalt: #1d3f8f; --lemon: #f6d646; --lemon-soft: #fbeeb0; --leaf: #3e7b4f; --leaf-soft: #e1f0e5;
+  --bad: #b3261e; --bad-soft: #fde3e1; --warn: #8a5a00; --warn-soft: #fff1c7;
+  --display: Gloock, Georgia, "Times New Roman", serif;
+  --body: Figtree, system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #0f1730; --surface: #17213f; --sky: #1e2c52; --ink: #e8edf8; --muted: #a9b5d3; --line: #2b3a63;
+  --cobalt: #9db8ff; --lemon: #f2c94c; --lemon-soft: #3a3416; --leaf: #8fd19e; --leaf-soft: #173326;
+  --bad: #ff8a80; --bad-soft: #3d1c1a; --warn: #f0c45a; --warn-soft: #3a2e10; color-scheme: dark; } }
+:root[data-theme="dark"] {
+  --bg: #0f1730; --surface: #17213f; --sky: #1e2c52; --ink: #e8edf8; --muted: #a9b5d3; --line: #2b3a63;
+  --cobalt: #9db8ff; --lemon: #f2c94c; --lemon-soft: #3a3416; --leaf: #8fd19e; --leaf-soft: #173326;
+  --bad: #ff8a80; --bad-soft: #3d1c1a; --warn: #f0c45a; --warn-soft: #3a2e10; color-scheme: dark; }
+* { box-sizing: border-box; }
+body { background: var(--bg); color: var(--ink); font: 16.5px/1.65 var(--body); }
+.wrap { max-width: 1040px; margin: 0 auto; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+h1, h2, h3 { font-family: var(--display); font-weight: 400; color: var(--cobalt); text-wrap: balance; margin: 0; }
+h1 { font-size: clamp(38px, 6vw, 62px); line-height: 1.03; }
+h2 { font-size: clamp(28px, 3.6vw, 38px); line-height: 1.1; margin-bottom: 14px; }
+h3 { font-size: 23px; line-height: 1.2; margin: 26px 0 8px; }
+h4 { font: 700 15px var(--body); margin: 18px 0 6px; color: var(--ink); }
+p { margin: 0 0 12px; max-width: 72ch; }
+a { color: var(--cobalt); }
+.small { font-size: 14px; color: var(--muted); }
+.tiles { height: 30px; background: var(--cobalt) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='64' height='64' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' fill='%231d3f8f'/%3E%3Ccircle cx='32' cy='32' r='14' fill='%23f6d646'/%3E%3Cpath d='M32 6c6 8 6 14 0 18c-6-4-6-10 0-18zM32 58c6-8 6-14 0-18c-6 4-6 10 0 18zM6 32c8-6 14-6 18 0c-4 6-10 6-18 0zM58 32c-8-6-14-6-18 0c4 6 10 6 18 0z' fill='%23fff'/%3E%3Ccircle cx='32' cy='32' r='5' fill='%233e7b4f'/%3E%3C/svg%3E") repeat-x left center / 30px 30px; }
+
+header.hero { padding-block: 40px 28px; }
+.hero .kicker { color: var(--leaf); font-weight: 700; font-size: 15px; margin-bottom: 10px; }
+.hero .lead { font-size: 20px; margin-top: 16px; max-width: 60ch; }
+.meta { display: flex; flex-wrap: wrap; gap: 8px 18px; margin-top: 16px; font-size: 14px; color: var(--muted); }
+
+nav.toc { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 5; background: var(--bg); border-block: 1px solid var(--line); }
+body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-area-inset-top, 0px); z-index: 10; background: var(--bg); }
+nav.toc .wrap { display: flex; gap: 6px 18px; overflow-x: auto; padding-block: 10px; white-space: nowrap; font-size: 14px; font-weight: 600; }
+nav.toc a { color: var(--muted); text-decoration: none; }
+nav.toc a:hover, nav.toc a:focus-visible { color: var(--cobalt); text-decoration: underline; }
+
+section { padding-block: 44px 8px; scroll-margin-top: 54px; }
+.summary { background: var(--surface); border: 2px solid var(--cobalt); border-radius: 22px; box-shadow: 10px 10px 0 var(--lemon); padding: 26px 28px; }
+.summary p.pos { font-family: var(--display); font-size: clamp(22px, 2.6vw, 28px); line-height: 1.3; color: var(--ink); max-width: none; }
+.pillars { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 14px; margin-top: 18px; }
+.pillar { background: var(--sky); border-radius: 16px; padding: 16px 18px; min-width: 0; }
+.pillar b { display: block; color: var(--cobalt); font-size: 16px; margin-bottom: 4px; }
+.pillar span { font-size: 15px; }
+
+.table-wrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 14px; background: var(--surface); margin-block: 14px; }
+table { width: 100%; border-collapse: collapse; font-size: 14.5px; min-width: 680px; }
+th, td { text-align: left; vertical-align: top; padding: 10px 12px; border-bottom: 1px solid var(--line); }
+th { font-size: 13px; color: var(--muted); font-weight: 700; background: var(--sky); }
+tr:last-child td { border-bottom: 0; }
+td b { color: var(--ink); }
+.lvl { display: inline-block; font-size: 12.5px; font-weight: 700; padding: 1px 9px; border-radius: 99px; white-space: nowrap; }
+.hi { background: var(--bad-soft); color: var(--bad); } .md { background: var(--warn-soft); color: var(--warn); } .lo { background: var(--leaf-soft); color: var(--leaf); }
+.yes { color: var(--leaf); font-weight: 700; } .part { color: var(--warn); font-weight: 700; } .no { color: var(--muted); } .unk { color: var(--muted); font-style: italic; }
+td.c { text-align: center; white-space: nowrap; }
+
+.map { display: grid; grid-template-columns: 34px 1fr 1fr; grid-template-rows: auto auto 30px; gap: 10px; margin-top: 16px; }
+.map .yl { grid-row: 1 / 3; writing-mode: vertical-rl; transform: rotate(180deg); text-align: center; font-size: 13px; font-weight: 700; color: var(--muted); }
+.map .xl { grid-column: 2 / 4; text-align: center; font-size: 13px; font-weight: 700; color: var(--muted); align-self: center; }
+.q { border-radius: 16px; padding: 14px 16px; min-width: 0; border: 1px solid var(--line); background: var(--surface); }
+.q h5 { margin: 0 0 6px; font: 700 13px var(--body); color: var(--muted); }
+.q ul { margin: 0; padding-left: 18px; font-size: 14.5px; }
+.q.top { background: var(--bad-soft); border-color: transparent; } .q.top h5 { color: var(--bad); }
+.q.time { background: var(--warn-soft); border-color: transparent; } .q.time h5 { color: var(--warn); }
+.q.risk { background: var(--lemon-soft); border-color: transparent; } .q.risk h5 { color: var(--ink); }
+
+.diagram { background: var(--surface); border: 1px solid var(--line); border-radius: 16px; padding: 16px; overflow-x: auto; margin-block: 14px; }
+.diagram .cap { font-size: 13.5px; color: var(--muted); margin: 8px 0 0; }
+pre.mermaid { margin: 0; background: none; text-align: center; font-family: var(--body); }
+
+.persona { border-top: 3px solid var(--cobalt); padding-top: 18px; margin-top: 30px; }
+.persona .tag { display: inline-block; background: var(--lemon-soft); color: var(--ink); font-weight: 700; font-size: 13px; padding: 2px 10px; border-radius: 99px; margin-bottom: 8px; }
+.cols { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 18px; }
+.cols > div { min-width: 0; }
+ul.tight { margin: 0; padding-left: 20px; } ul.tight li { margin: 4px 0; }
+.box { border-radius: 14px; padding: 14px 16px; margin-top: 12px; }
+.box.pain { background: var(--bad-soft); } .box.gain { background: var(--leaf-soft); } .box.gap { background: var(--sky); } .box.aha { background: var(--lemon-soft); }
+.box h4 { margin-top: 0; }
+.quote { font-family: var(--display); font-size: 21px; color: var(--cobalt); margin: 10px 0; max-width: 60ch; }
+
+.aud { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 18px; }
+.aud > div { background: var(--surface); border: 1px solid var(--line); border-radius: 18px; padding: 20px 22px; min-width: 0; }
+.aud h3 { margin-top: 0; }
+ol.steps { padding-left: 22px; margin: 6px 0 0; } ol.steps li { margin: 6px 0; }
+footer { padding-block: 40px 60px; color: var(--muted); font-size: 14px; }
+:focus-visible { outline: 3px solid var(--leaf); outline-offset: 2px; }
+@media (max-width: 640px) {
+  .map { grid-template-columns: 1fr; grid-template-rows: none; } .map .yl, .map .xl { display: none; }
+  .summary { padding: 20px; box-shadow: 6px 6px 0 var(--lemon); }
+}
+@media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
+html { scroll-behavior: smooth; }
+</style>
+
+<div class="tiles" aria-hidden="true"></div>
+<header class="hero wrap">
+  <div class="kicker">Citrello · product report</div>
+  <h1>References used to be the bitter end. Here's why they don't have to be.</h1>
+  <p class="lead">What Citrello does for each kind of researcher, the problems it removes, where it beats the tools people use today, and what a product manager, a CEO, an investor and a new user each need to know.</p>
+  <div class="meta"><span>November 2026</span><span>Product stage: version 1.0.1, before public launch</span><span>citrello.app</span></div>
+</header>
+
+<nav class="toc" aria-label="Contents"><div class="wrap">
+  <a href="#summary">Summary</a><a href="#problems">Problems</a><a href="#ai">AI</a><a href="#users">Users</a>
+  <a href="#compare">Comparison</a><a href="#strengths">Strengths and gaps</a><a href="#audiences">For each audience</a><a href="#validate">To validate</a>
+</div></nav>
+
+<main class="wrap">
+
+<section id="summary">
+  <div class="summary">
+    <p class="pos">Citrello is the free, open-source reference manager for the AI era. It lets Claude and ChatGPT cite only real, checked papers, checks and fixes the references in any paper, and works alongside Word, LaTeX, Zotero, Mendeley and EndNote instead of replacing them.</p>
+    <div class="pillars">
+      <div class="pillar"><b>AI that can't invent references</b><span>Claude, ChatGPT and Codex search your own library and add new papers only after a Crossref check.</span></div>
+      <div class="pillar"><b>Check and fix any paper</b><span>Word or PDF, from any reference manager or typed by hand: retracted papers, wrong DOIs, duplicates, citation mistakes, fixed in one click.</span></div>
+      <div class="pillar"><b>Works with what people already use</b><span>Word, LaTeX and Overleaf, and one-click import from Zotero, Mendeley and EndNote. No lock-in.</span></div>
+      <div class="pillar"><b>Free, open and private</b><span>The library stays on the user's computer. The web checker runs inside the browser. Open source (AGPL).</span></div>
+    </div>
+  </div>
+</section>
+
+<section id="problems">
+  <h2>Where researchers lose time and take risks</h2>
+  <p>Reference work is spread across the whole life of a paper, not only the last day. The problems below come from building and testing Citrello with real papers. Their size is our estimate, to be confirmed with the first users (see <a href="#validate">What to validate</a>).</p>
+
+  <div class="map" role="img" aria-label="Problems placed by time cost and by risk">
+    <div class="yl">Risk if it goes wrong →</div>
+    <div class="q risk"><h5>Rare, but damaging</h5><ul>
+      <li>Citing a retracted paper</li><li>A wrong DOI that points to another paper</li><li>Being locked in when a tool closes or changes</li></ul></div>
+    <div class="q top"><h5>Highest priority: costly and risky</h5><ul>
+      <li><b>AI-invented or wrong references</b></li><li><b>Citations that don't match the reference list</b> (missing, never cited, stale list)</li>
+      <li>Merging a paper written by co-authors with different tools</li></ul></div>
+    <div class="q"><h5>Small annoyances</h5><ul>
+      <li>Messy .bib entries and lowercased acronyms</li><li>Duplicates in the library</li></ul></div>
+    <div class="q time"><h5>Big time sinks</h5><ul>
+      <li><b>Reformatting every reference for a new journal</b></li><li>Collecting and typing in references</li>
+      <li>Getting AI-written text into Word with real citations</li></ul></div>
+    <div></div><div class="xl">Time it costs →</div>
+  </div>
+
+  <div class="table-wrap"><table>
+    <thead><tr><th>Problem</th><th>When it happens</th><th>Time</th><th>Risk</th><th>How Citrello removes it</th></tr></thead>
+    <tbody>
+      <tr><td><b>AI invents a reference, or gets its details wrong</b></td><td>Every time someone writes with ChatGPT or Claude, and growing fast</td><td><span class="lvl md">Medium</span></td><td><span class="lvl hi">Very high</span></td><td>The AI cites only papers in your library through the connector; new ones are checked on Crossref first. The paper checker catches invented references in any document.</td></tr>
+      <tr><td><b>Reformatting for another journal</b></td><td>Every submission and resubmission</td><td><span class="lvl hi">High</span></td><td><span class="lvl md">Medium</span></td><td>Live citations in Word and about 10,000 styles: change the style and click Update. Fix and format converts a paper made with any tool.</td></tr>
+      <tr><td><b>Citations and list don't match</b></td><td>Before every submission, after every big edit</td><td><span class="lvl md">Medium</span></td><td><span class="lvl hi">High</span></td><td>The checker finds citations to missing references, references never cited, gaps in numbering and lists that weren't refreshed.</td></tr>
+      <tr><td><b>Collecting references</b></td><td>Daily during reading</td><td><span class="lvl md">Medium</span></td><td><span class="lvl lo">Low</span></td><td>Paste a DOI or link in the search box, the browser button on any journal site, imports from every tool, or ask the AI to add it.</td></tr>
+      <tr><td><b>Wrong DOIs, metadata errors, duplicates</b></td><td>Constant, mostly unnoticed</td><td><span class="lvl md">Medium</span></td><td><span class="lvl md">Medium</span></td><td>Every reference is rated verified, check or problem; details are corrected from the publisher's record; duplicates are caught, while Part 1 and Part 2 are kept apart.</td></tr>
+      <tr><td><b>Citing a retracted paper</b></td><td>Rare</td><td><span class="lvl lo">Low</span></td><td><span class="lvl hi">Very high</span></td><td>Retractions are flagged in the library, in checks and in the AI's results.</td></tr>
+      <tr><td><b>Co-authors on different tools</b></td><td>Every multi-author paper</td><td><span class="lvl hi">High</span></td><td><span class="lvl md">Medium</span></td><td>The checker reads Zotero, Mendeley, EndNote, Word and typed citations in one document, and Fix turns them all into one consistent set.</td></tr>
+      <tr><td><b>LaTeX .bib hygiene</b></td><td>Every LaTeX paper</td><td><span class="lvl md">Medium</span></td><td><span class="lvl md">Medium</span></td><td>Clean BibTeX with stable keys, project checks, conversion of hand-typed bibliographies, a .bib that updates itself.</td></tr>
+      <tr><td><b>Lock-in and tool changes</b></td><td>When a tool closes, changes or starts charging</td><td><span class="lvl md">Medium</span></td><td><span class="lvl hi">High</span></td><td>Open source, the library is a file on your computer, one-click import and export in every format.</td></tr>
+    </tbody>
+  </table></div>
+  <p class="small">How to read this: "time" is how much of a researcher's hours it eats over a paper; "risk" is how much damage a mistake does (rejection, embarrassment, retraction, misconduct questions).</p>
+</section>
+
+<section id="ai">
+  <h2>The AI problem, and why it's Citrello's moment</h2>
+  <p>Researchers and students now draft, summarise and edit with ChatGPT and Claude. References are where this breaks most visibly: an invented citation looks real until someone checks it. Universities are writing AI policies, journals are retracting papers with fabricated references, and supervisors are checking theses by hand.</p>
+
+  <div class="table-wrap"><table>
+    <thead><tr><th>What goes wrong with AI today</th><th>What Citrello does about it</th></tr></thead>
+    <tbody>
+      <tr><td><b>Invented references</b>: plausible titles, authors and DOIs that don't exist</td><td>The AI searches your real library through the connector and cites with keys like <code>[@Topham2017]</code>. It can't cite what isn't there.</td></tr>
+      <tr><td><b>Real paper, wrong details</b>: wrong year, journal, pages or DOI</td><td>Details come from your library, which is checked against Crossref. New papers are looked up before they're added.</td></tr>
+      <tr><td><b>The AI can't see your library</b>, so you paste references back and forth</td><td>Claude Desktop, Claude Code, Codex, ChatGPT and claude.ai (web and phone) all reach the same library.</td></tr>
+      <tr><td><b>AI text has no live citations</b>, so you retype them in Word</td><td>The AI writes a Word file with live citations and a bibliography in any style. Markers in edited text become live with one click.</td></tr>
+      <tr><td><b>Editing with AI breaks citations</b></td><td>Markers are plain text the AI keeps while editing; the checker finds any it dropped or invented.</td></tr>
+      <tr><td><b>Nobody can easily check an AI-assisted paper</b></td><td>The paper checker, free in the browser, flags references that don't exist, wrong DOIs and retracted papers in any document.</td></tr>
+      <tr><td><b>The AI cites a real paper that doesn't support the claim</b></td><td>Not solved yet. Citrello proves a reference exists and is correct, not that it says what the sentence claims. This is a candidate future feature.</td></tr>
+    </tbody>
+  </table></div>
+
+  <div class="diagram">
+<pre class="mermaid">
+flowchart LR
+  A["You ask Claude or ChatGPT to write a section"] --> B{"Is the paper in your Citrello library?"}
+  B -- "Yes" --> C["Cite it with its key, e.g. [@Topham2017]"]
+  B -- "No" --> D["Add it by DOI or link"]
+  D --> E["Checked on Crossref: verified, check or problem"]
+  E -- "Retracted or wrong DOI" --> F["You are told; it isn't cited blindly"]
+  E -- "OK" --> C
+  C --> G["Word file with live citations and a bibliography in your journal's style"]
+  G --> H["Keep editing in Word or with AI; Update keeps everything right"]
+</pre>
+    <p class="cap">Writing with AI through Citrello: every citation comes from a real, checked library.</p>
+  </div>
+</section>
+
+<section id="users">
+  <h2>What Citrello means for each kind of user</h2>
+  <p>Most people already have a reference manager or a habit. Citrello's first job is to fit next to it, then to become the place they keep their references.</p>
+
+  <div class="diagram">
+<pre class="mermaid">
+flowchart TD
+  S["Where are you today?"] --> M["I use Mendeley"]
+  S --> Z["I use Zotero"]
+  S --> L["I write in LaTeX or Overleaf"]
+  S --> A["I write with ChatGPT or Claude"]
+  S --> N["I have no reference manager"]
+  S --> P["I have a paper to check"]
+  M --> M1["Import in one click, or check your Mendeley Cite paper"]
+  Z --> Z1["Import from Zotero on this computer: collections become projects"]
+  L --> L1["Clean .bib, project check, a .bib that updates itself"]
+  A --> A1["Connect Claude, ChatGPT or Codex"]
+  N --> N1["Paste a DOI or link; use the browser button"]
+  P --> P1["citrello.app/check: no install"]
+  M1 --> W["Same library, used by Word, LaTeX and your AI"]
+  Z1 --> W
+  L1 --> W
+  A1 --> W
+  N1 --> W
+  P1 --> W
+</pre>
+    <p class="cap">Every starting point leads to one library shared by Word, LaTeX and AI assistants.</p>
+  </div>
+
+  <div class="persona" id="mendeley">
+    <span class="tag">Mendeley users</span>
+    <h3>Researchers who rely on Mendeley, often because their institution or supervisor does</h3>
+    <div class="cols">
+      <div class="box pain"><h4>What they struggle with</h4><ul class="tight">
+        <li>Mendeley retired its classic Desktop app in 2022; many people found the replacement (Reference Manager and the Mendeley Cite add-in) slower or missing features they relied on.</li>
+        <li>An online account is required, and some researchers are uneasy about a publisher (Elsevier) holding their library.</li>
+        <li>Duplicates and wrong metadata accumulate over years.</li>
+        <li>Papers mix old Mendeley Desktop citations, new Mendeley Cite citations and typed ones.</li>
+        <li>No built-in way for ChatGPT or Claude to use the library.</li></ul></div>
+      <div class="box gain"><h4>How Citrello helps</h4><ul class="tight">
+        <li>Imports a Mendeley library (account or exported file), skipping duplicates and checking every reference.</li>
+        <li>Reads papers made with Mendeley Desktop and with Mendeley Cite, finds the problems, and fixes them into live citations.</li>
+        <li>Its Word citations use Mendeley's own format, so co-authors on Mendeley can keep working on the same file.</li>
+        <li>Library on your computer, free, open; AI assistants connected.</li></ul></div>
+    </div>
+    <div class="cols">
+      <div class="box aha"><h4>First "aha" moment</h4><p>Dropping a Mendeley Cite thesis into the checker and seeing a duplicate and two wrong DOIs nobody had noticed.</p></div>
+      <div class="box gap"><h4>Not yet as good as Mendeley at</h4><p>Reading and annotating PDFs, shared group libraries, the Word tab on Mac. Mendeley Cite support is built from its documented format and needs testing on more real files.</p></div>
+    </div>
+  </div>
+
+  <div class="persona" id="zotero">
+    <span class="tag">Zotero users</span>
+    <h3>Researchers who chose the free, open-source standard</h3>
+    <p>Zotero is excellent and trusted, and these users are the hardest to win as a replacement. Citrello should present itself as the AI and checking layer next to Zotero.</p>
+    <div class="cols">
+      <div class="box pain"><h4>What they struggle with</h4><ul class="tight">
+        <li>Their AI assistants can't use their Zotero library without third-party plugins or servers.</li>
+        <li>Good BibTeX needs an extra plugin (Better BibTeX), and LaTeX keys can change.</li>
+        <li>Free online storage is small; syncing large libraries costs money.</li>
+        <li>They can't easily check a co-author's paper made with Mendeley, EndNote or typed by hand.</li></ul></div>
+      <div class="box gain"><h4>How Citrello helps</h4><ul class="tight">
+        <li>One-click import of the Zotero library on the same computer, no account or API key; collections become projects.</li>
+        <li>Claude, ChatGPT and Codex use that library through the connector.</li>
+        <li>Checks and fixes any paper, whatever made it.</li>
+        <li>Checks every reference against the publisher's record, including DOIs that exist but point to a different paper.</li></ul></div>
+    </div>
+    <div class="cols">
+      <div class="box aha"><h4>First "aha" moment</h4><p>Asking Claude "write my related-work paragraph from my Zotero collection, as a Word file in Nature style" and getting it, with live citations.</p></div>
+      <div class="box gap"><h4>Zotero is stronger at</h4><p>PDF reading and notes, group libraries, saving from thousands of websites, a mature plugin ecosystem, retraction alerts (Zotero has these too). Citrello should not compete on those.</p></div>
+    </div>
+  </div>
+
+  <div class="persona" id="latex">
+    <span class="tag">LaTeX and Overleaf users</span>
+    <h3>Mathematicians, physicists, engineers, computer scientists and many PhD students</h3>
+    <div class="cols">
+      <div class="box pain"><h4>What they struggle with</h4><ul class="tight">
+        <li>BibTeX copied from search engines: missing DOIs, acronyms lowercased by the style ("Lidar" for LiDAR).</li>
+        <li>The same paper under two keys; a key cited but missing from the .bib; entries never cited.</li>
+        <li>Old papers with hand-typed <code>thebibliography</code> lists that are painful to convert.</li>
+        <li>Linking Overleaf to Mendeley or Zotero needs a paid Overleaf plan (as of our last check).</li></ul></div>
+      <div class="box gain"><h4>How Citrello helps</h4><ul class="tight">
+        <li>Clean BibTeX and biblatex with stable keys, protected acronyms and escaped special characters.</li>
+        <li>Checks a .tex file or Overleaf project zip for missing, unused and duplicate entries and unreliable references.</li>
+        <li>Converts hand-typed bibliographies into a .bib and matching <code>\cite</code> keys.</li>
+        <li>Keeps a .bib file up to date automatically; AI assistants write <code>\cite{Key}</code>.</li>
+        <li>Planned: a private .bib link Overleaf refreshes, on Overleaf's free plan.</li></ul></div>
+    </div>
+  </div>
+
+  <div class="persona" id="aiusers">
+    <span class="tag">AI-first writers</span>
+    <h3>Researchers and students who draft, edit and summarise with Claude, ChatGPT or Codex</h3>
+    <p class="quote">"I don't trust any reference my AI gives me, so I check every one by hand."</p>
+    <div class="cols">
+      <div class="box pain"><h4>What they struggle with</h4><ul class="tight">
+        <li>Invented or wrong references, and the time it takes to check each one.</li>
+        <li>Copying references between the chat and Word, then formatting them.</li>
+        <li>University AI policies and fear of misconduct questions.</li></ul></div>
+      <div class="box gain"><h4>How Citrello helps</h4><ul class="tight">
+        <li>16 tools for the AI: search, add with checks, format, write Word documents with live citations, verify, import, BibTeX, LaTeX checks.</li>
+        <li>Works in Claude Desktop (one-click extension), Claude Code, Codex, ChatGPT (paid plans with Developer mode) and claude.ai on the web and phone.</li>
+        <li>The same library in every chat, so the AI remembers your references.</li></ul></div>
+    </div>
+    <div class="cols">
+      <div class="box aha"><h4>First "aha" moment</h4><p>The AI says "this DOI doesn't exist; I won't cite it" instead of making one up.</p></div>
+      <div class="box gap"><h4>Limits</h4><p>Web connectors (ChatGPT, claude.ai) need Citrello running on a computer. Citrello checks that a reference is real and correct, not that it supports the sentence.</p></div>
+    </div>
+  </div>
+
+  <div class="persona" id="beginners">
+    <span class="tag">Beginners</span>
+    <h3>Undergraduates, master's students and first-year PhD students with no reference manager</h3>
+    <div class="cols">
+      <div class="box pain"><h4>What they struggle with</h4><ul class="tight">
+        <li>Typing references by hand and learning a style's rules.</li>
+        <li>A last-minute rush to build the bibliography before a deadline.</li>
+        <li>Renumbering everything after moving a paragraph.</li>
+        <li>Reference managers look complicated, and they don't know where to start.</li></ul></div>
+      <div class="box gain"><h4>How Citrello helps</h4><ul class="tight">
+        <li>One search box: paste a DOI, a link or a typed reference and press Enter.</li>
+        <li>Already typed it by hand? Fix and format turns the document into live citations in any style.</li>
+        <li>The free web checker needs no install: a first taste with zero commitment.</li>
+        <li>A clear rating for every reference teaches what a good reference looks like.</li></ul></div>
+    </div>
+  </div>
+
+  <div class="persona" id="checkers">
+    <span class="tag">Supervisors, editors and universities</span>
+    <h3>The people who check other people's references, and the institutions that buy tools</h3>
+    <div class="cols">
+      <div class="box pain"><h4>What they struggle with</h4><ul class="tight">
+        <li>Checking a thesis or manuscript's references by hand.</li>
+        <li>Detecting AI-invented references and enforcing AI policies.</li>
+        <li>IT approval and data-protection rules for any tool they recommend.</li></ul></div>
+      <div class="box gain"><h4>How Citrello helps</h4><ul class="tight">
+        <li>The checker gives a reference report for any thesis in a minute, as a spreadsheet.</li>
+        <li>Open source and local storage make IT approval easier.</li>
+        <li>Later, a university licence: single sign-on, managed installs, team libraries, support.</li></ul></div>
+    </div>
+  </div>
+</section>
+
+<section id="compare">
+  <h2>How Citrello compares</h2>
+  <p>Based on public information as of late 2026. Competitor features change; confirm before using this table outside the team.</p>
+  <div class="table-wrap"><table>
+    <thead><tr><th>Capability</th><th class="c">Citrello</th><th class="c">Zotero</th><th class="c">Mendeley</th><th class="c">EndNote</th></tr></thead>
+    <tbody>
+      <tr><td>Free</td><td class="c yes">Yes</td><td class="c yes">Yes (storage extra)</td><td class="c yes">Yes (storage extra)</td><td class="c no">Paid</td></tr>
+      <tr><td>Open source</td><td class="c yes">Yes</td><td class="c yes">Yes</td><td class="c no">No</td><td class="c no">No</td></tr>
+      <tr><td>Library kept on your computer, no account needed</td><td class="c yes">Yes</td><td class="c yes">Yes</td><td class="c no">No</td><td class="c yes">Yes</td></tr>
+      <tr><td>Claude, ChatGPT and Codex connected, built in</td><td class="c yes">Yes</td><td class="c part">Third-party add-ons</td><td class="c no">No</td><td class="c unk">Not that we know</td></tr>
+      <tr><td>Check any paper, whichever tool made it (Word and PDF)</td><td class="c yes">Yes</td><td class="c no">No</td><td class="c no">No</td><td class="c no">No</td></tr>
+      <tr><td>Fix any paper into live citations in a new style</td><td class="c yes">Yes</td><td class="c no">Own citations only</td><td class="c no">Own citations only</td><td class="c no">Own citations only</td></tr>
+      <tr><td>Wrong or nonexistent DOI detection</td><td class="c yes">Yes</td><td class="c no">No</td><td class="c no">No</td><td class="c no">No</td></tr>
+      <tr><td>Retraction alerts</td><td class="c yes">Yes</td><td class="c yes">Yes</td><td class="c unk">Unclear</td><td class="c unk">Unclear</td></tr>
+      <tr><td>Live citations in Word</td><td class="c part">Windows; Mac planned</td><td class="c yes">Yes</td><td class="c yes">Yes</td><td class="c yes">Yes</td></tr>
+      <tr><td>LaTeX: clean BibTeX, project checks, auto-updating .bib</td><td class="c yes">Yes</td><td class="c part">With a plugin</td><td class="c part">Basic</td><td class="c part">Basic</td></tr>
+      <tr><td>Import from the others in one click</td><td class="c yes">Yes</td><td class="c part">Via files</td><td class="c part">Via files</td><td class="c part">Via files</td></tr>
+      <tr><td>PDF reading and annotation</td><td class="c no">No</td><td class="c yes">Yes</td><td class="c yes">Yes</td><td class="c yes">Yes</td></tr>
+      <tr><td>Shared group libraries</td><td class="c no">Not yet</td><td class="c yes">Yes</td><td class="c yes">Yes</td><td class="c yes">Yes</td></tr>
+      <tr><td>Use without installing anything</td><td class="c part">Paper checker</td><td class="c part">Web library</td><td class="c part">Web library</td><td class="c part">EndNote Web</td></tr>
+    </tbody>
+  </table></div>
+</section>
+
+<section id="strengths">
+  <h2>Strengths and gaps</h2>
+  <div class="cols">
+    <div class="box gain"><h4>Where Citrello is strongest</h4><ul class="tight">
+      <li><b>Timing:</b> AI-invented references are a current, visible problem, and nobody owns the answer yet.</li>
+      <li><b>Neutral ground:</b> works with every tool and every document, so nobody has to switch to try it.</li>
+      <li><b>A free hook with no install:</b> the browser checker gives value in one minute.</li>
+      <li><b>Trust:</b> open source, local library, private checking, opt-in emails only.</li>
+      <li><b>Breadth from day one:</b> Word, LaTeX, five AI clients, Windows and Mac, imports from all major tools.</li>
+      <li><b>Built-in update channel and usage numbers:</b> one-click updates and anonymous counts from launch.</li>
+      <li><b>Brand:</b> a memorable name with a UK trademark application filed (6 November 2026).</li></ul></div>
+    <div class="box pain"><h4>Gaps and risks</h4><ul class="tight">
+      <li><b>Install warnings</b> on Windows and Mac until code signing; they cost downloads.</li>
+      <li><b>Untested on many real files:</b> Mendeley Cite and EndNote formats need real-world testing.</li>
+      <li><b>No PDF reader or group libraries</b>, which long-time Zotero and Mendeley users expect.</li>
+      <li><b>Word tab is Windows-only</b> for now.</li>
+      <li><b>One maintainer:</b> support load and continuity.</li>
+      <li><b>Copying:</b> the big AI companies or the existing reference managers could add similar features; speed and community are the defence.</li>
+      <li><b>ChatGPT connector</b> needs a paid ChatGPT plan with Developer mode.</li></ul></div>
+  </div>
+</section>
+
+<section id="audiences">
+  <h2>What each audience needs to know</h2>
+  <div class="aud">
+    <div>
+      <h3>For a new user</h3>
+      <p>Citrello keeps your references in one place on your computer and makes them work in Word, LaTeX and your AI assistant. It's free.</p>
+      <h4>Start in five minutes</h4>
+      <ol class="steps">
+        <li>Not ready to install? Check a paper at citrello.app/check.</li>
+        <li>Download Citrello and import your Zotero or Mendeley library, or paste a DOI in the search box.</li>
+        <li>Connect Claude, ChatGPT or Codex in Settings.</li>
+        <li>On Windows, add the Word tab, insert citations, and change the style any time.</li>
+      </ol>
+      <p class="small">Your library never leaves your computer. An account is optional.</p>
+    </div>
+    <div>
+      <h3>For a product manager</h3>
+      <h4>What matters most</h4>
+      <ul class="tight">
+        <li><b>Activation:</b> a first reference added, or a first paper checked.</li>
+        <li><b>Aha:</b> a check that finds a real problem, or an AI-written Word file with live citations.</li>
+        <li><b>Retention:</b> weekly active installs, connector use, repeat checks.</li>
+      </ul>
+      <h4>Available signals</h4>
+      <p>Anonymous daily installs by version and system, sign-ups, feature-email opt-ins, active connector users (in the admin stats).</p>
+      <h4>Priorities, in order</h4>
+      <ol class="steps">
+        <li>Test with 5–10 real users and their own papers; fix what breaks.</li>
+        <li>Launch around the free checker.</li>
+        <li>Code signing (SignPath approved → signed Windows builds).</li>
+        <li>Overleaf live .bib link.</li>
+        <li>Word tab for Mac (Office add-in).</li>
+        <li>Group libraries and sync (the paid tier).</li>
+      </ol>
+    </div>
+    <div>
+      <h3>For the CEO</h3>
+      <h4>Positioning</h4>
+      <p>"The reference manager for the AI era": the layer that makes AI-assisted research trustworthy, free and open, next to the tools people already use.</p>
+      <h4>Strategy</h4>
+      <ul class="tight">
+        <li><b>Wedge:</b> the free paper checker, shareable and installable by nobody.</li>
+        <li><b>Platform:</b> the library shared by Word, LaTeX and every AI assistant.</li>
+        <li><b>Revenue later:</b> sync and team libraries ("Citrello Plus"), university licences, research job ads. Never selling user data.</li>
+        <li><b>Synergy:</b> Citrello reaches researchers and the professors who act as referees, the people Refmee needs, as a separate, endorsed brand with separate consent for marketing.</li>
+      </ul>
+      <h4>Protect</h4>
+      <p>Trademark (filed in the UK; US/EU decision by 6 May 2027), AGPL licence with contributor terms that allow relicensing, a published trademark policy.</p>
+    </div>
+    <div>
+      <h3>For an investor</h3>
+      <h4>Problem and timing</h4>
+      <p>Millions of researchers (UNESCO counts roughly 9 million full-time researchers, plus far more students) now write with AI, and references are where AI fails most visibly. Universities and journals are reacting now.</p>
+      <h4>Product</h4>
+      <p>Built and tested on Windows and Mac (version 1.0.1), with automated end-to-end tests, a live web checker, live AI connectors for five clients, accounts, usage counting and in-app updates.</p>
+      <h4>Traction</h4>
+      <p>Before public launch: no user numbers yet. Usage counting and accounts are in place to measure from launch day.</p>
+      <h4>Business model</h4>
+      <p>Free core to win adoption; paid sync and team features; university licences (single sign-on, managed installs, data agreements, support); job ads; synergy with Refmee.</p>
+      <h4>Main risks</h4>
+      <p>Adoption against entrenched free tools, larger players copying the idea, and a single maintainer.</p>
+    </div>
+  </div>
+</section>
+
+<section id="funnel">
+  <h2>How a visitor becomes a user, and a customer</h2>
+  <div class="diagram">
+<pre class="mermaid">
+flowchart LR
+  A["Shared link or launch post"] --> B["citrello.app/check: free, no install"]
+  B --> C["Report finds real problems"]
+  C --> D["Fix and download"]
+  C --> E["Download the app to keep the library"]
+  D --> E
+  E --> F["Import Zotero or Mendeley; connect AI"]
+  F --> G["Free account for ChatGPT and web Claude"]
+  G --> H["Citrello Plus: sync and team libraries"]
+  F --> I["University licence"]
+  F --> J["Professors and job seekers meet Refmee"]
+</pre>
+    <p class="cap">The free checker is the front door; the app is the home; accounts, Plus, universities and Refmee come after value is proven.</p>
+  </div>
+</section>
+
+<section id="validate">
+  <h2>What to validate with the first users</h2>
+  <div class="table-wrap"><table>
+    <thead><tr><th>Assumption</th><th>How to test it</th><th>What would change our plan</th></tr></thead>
+    <tbody>
+      <tr><td>The checker finds real problems in real papers</td><td>Run 20+ real theses and papers (Zotero, Mendeley Cite, EndNote, typed, PDF); count problems found and false alarms</td><td>Many false alarms → tune the rules before launch</td></tr>
+      <tr><td>AI-invented references worry users enough to change tools</td><td>Ask test users how they check AI references today; watch connector use</td><td>Low concern → lead with reformatting and checking instead of AI</td></tr>
+      <tr><td>Reformatting for a new journal is the biggest time cost</td><td>Ask users to estimate hours on their last resubmission; track Fix and Update use</td><td>Smaller than assumed → move LaTeX or collecting higher</td></tr>
+      <tr><td>Zotero users keep Zotero and add Citrello</td><td>Track Zotero imports and whether they come back weekly</td><td>One-off imports only → build two-way sync with Zotero</td></tr>
+      <tr><td>Install warnings stop many downloads</td><td>Compare download clicks with first app launches (anonymous counts)</td><td>Big drop → prioritise signing and the Microsoft Store</td></tr>
+      <tr><td>Universities would pay</td><td>Talk to two or three university libraries once usage exists</td><td>No interest → focus revenue on individual Plus and job ads</td></tr>
+    </tbody>
+  </table></div>
+</section>
+
+</main>
+<footer class="wrap">
+  <p>Citrello™ is a trademark of Armin Hosseinghorbani (UK application filed 6 November 2026). Competitor information is from public sources as of late 2026 and should be checked before external use; problem sizes are estimates to be confirmed with users.</p>
+</footer>
