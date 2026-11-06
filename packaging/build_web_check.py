@@ -35,10 +35,10 @@ def main():
     subprocess.run([sys.executable, "-m", "pip", "download", "-q", "--no-deps", "--only-binary=:all:",
                     "--dest", wheel_dir] + WHEELS, check=True)
     wheels = sorted(os.path.basename(p) for p in glob.glob(os.path.join(wheel_dir, "*.whl")))
-    sys.path.insert(0, ROOT)
-    import citrello_core
+    import re
+    version = re.search(r'^VERSION = "([^"]+)"', open(os.path.join(ROOT, "citrello_core.py"), encoding="utf-8").read(), re.M).group(1)
     with open(os.path.join(OUT, "manifest.json"), "w") as f:
-        json.dump({"version": citrello_core.VERSION, "modules": MODULES, "styles": styles, "wheels": wheels}, f, indent=1)
+        json.dump({"version": version, "modules": MODULES, "styles": styles, "wheels": wheels}, f, indent=1)
     print(f"Web checker ready in {OUT}: {len(MODULES)} modules, {len(styles)} styles, {len(wheels)} wheels")
 
 
