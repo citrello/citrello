@@ -662,6 +662,7 @@ class Handler(BaseHTTPRequestHandler):
             self.send_header(k, v)
         self.end_headers()
         self.wfile.write(body)
+        return True  # library_post() tells "answered" from "not mine" (None) by this
 
     def redirect(self, url):
         self.send(302, b"", "text/plain", {"Location": url})

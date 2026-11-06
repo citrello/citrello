@@ -6,7 +6,10 @@ on:
     paths: ["site/public/**", "site/wrangler.toml", ".github/workflows/site.yml",
             # the in-browser checker (citrello.app/check) is built from the app's own code
             "doccheck.py", "citeformat.py", "citrello_core.py", "library.py", "latex.py", "styles/**",
-            "packaging/build_web_check.py", "tests/test_web_check.py"]
+            "packaging/build_web_check.py", "tests/test_web_check.py",
+            # the web app (citrello.app/app) is the desktop interface and app code, run in the browser
+            "ui.html", "app.py", "webapp.py", "arxiv.py", "zotero_local.py", "mcp_server.py", "bridge_client.py",
+            "usage.py", "updater.py", "word_addin.py", "codex_config.py", "tests/test_web_app.py"]
   workflow_dispatch:
 
 concurrency: site-deploy
@@ -20,10 +23,10 @@ jobs:
         with:
           python-version: "3.12"
       - run: pip install python-docx citeproc-py pypdf pybtex pytest playwright
-      - run: python -m playwright install --with-deps chromium
+      - run: python -m playwright install --with-deps chromium webkit
       - name: Build the in-browser checker
         run: python packaging/build_web_check.py
-      - name: Test it in a real browser (check, fix, PDF)
+      - name: Test the checker and the web app in real browsers (Chromium and WebKit)
         env:
           CITRELLO_WEB_CHECK: http://localhost:8099
           CITRELLO_E2E_SHOTS: web-shots
@@ -31,11 +34,11 @@ jobs:
           mkdir -p web-shots
           (cd site/public && python -m http.server 8099 > /dev/null 2>&1 &)
           sleep 2
-          python -m pytest -v tests/test_web_check.py
+          python -m pytest -v tests/test_web_check.py tests/test_web_app.py
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: web-check-screenshots
+          name: web-screenshots
           path: web-shots
 
   deploy:

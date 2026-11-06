@@ -35,6 +35,7 @@ Python 3.12, standard library plus python-docx, citeproc-py, pypdf, pybtex (and 
 | `zotero_local.py` | One-click import from Zotero's own `zotero.sqlite` (copy; falls back to `.bak`); collections → projects. |
 | `mcp_server.py` | The MCP connector (stdio JSON-RPC, hand-written): 17 tools (search/add/format references, find styles, Word documents, verify, import, BibTeX, LaTeX check, arXiv zip, Zotero import...). `remote_call()` limits file access for requests that come from web connectors. |
 | `app.py` | The desktop app: local server on 127.0.0.1:8585 serving `ui.html` + JSON API; Claude Desktop / Codex connection, Word tab install, document checks, LaTeX, accounts, updates. Windows: claims the port exclusively so a new copy takes over. |
+| `webapp.py` | The web app's runtime (citrello.app/app): answers `ui.html`'s `/api/...` requests with `app.py`'s own handler inside Pyodide; desktop-only endpoints answer "needs Citrello for desktop"; adds backup/restore. Page side: `site/public/app/web.js` (fetch → worker, downloads) and `worker.js` (Pyodide, IDBFS storage). |
 | `ui.html` | The app's interface (one file): Studio layout (sidebar with projects, reference list, detail panel), search box that also adds (DOI/link/reference), multi-select + reliability filters, Documents (one "Check and fix" card + "Keep a .bib up to date"), Settings, welcome screen, update banner. Brand: cobalt `#1d3f8f`, lemon `#f6d646`, leaf `#3e7b4f`, fonts Gloock + Figtree. |
 | `clip.html` | Pop-up of the browser bookmarklet ("Add to Citrello"). |
 | `word_addin.py` | Windows Word tab (VBA template `Citrello.dotm`, ribbon, dialogs built through PowerShell). `_check_vba` guards VBA syntax. |
@@ -45,7 +46,7 @@ Python 3.12, standard library plus python-docx, citeproc-py, pypdf, pybtex (and 
 | `make_mcpb.py` | Builds the Claude Desktop extension (.mcpb). Not shipped: the app builds it from the connector into `~/Citrello` when needed. |
 | `brand_icon.py` | Draws the lemon-slice icon (needs Pillow). |
 | `bridge/` | Cloudflare Worker at **mcp.citrello.app**: accounts (email codes via Resend), OAuth 2.1 + remote MCP endpoint relaying to the user's app (Durable Object per account), `/api/ping` usage count, `/api/latest`, `/admin/stats` and `/admin/broadcast` (Bearer ADMIN_TOKEN). D1 migrations in `bridge/migrations`. See `bridge/README.md`. |
-| `site/` | citrello.app (static, Cloudflare Workers assets): home, `/download`, `/check` (the paper checker running Citrello's Python in the browser via Pyodide; built by `packaging/build_web_check.py` at deploy), `/privacy`. |
+| `site/` | citrello.app (static, Cloudflare Workers assets): home, `/download`, `/check` (the paper checker running Citrello's Python in the browser via Pyodide), `/app` (the web app), `/privacy`. `/check-py`, `/app/index.html` and `/app/py` are built by `packaging/build_web_check.py` at deploy. In `ui.html`, `class="desktop-only"` / `"web-only"` hides parts in one or the other. |
 | `packaging/` | `build_mac.sh` (Citrello.app + zip), `make_msix.py` (Microsoft Store package, ready but not submitted), `store-listing.md`, `build_web_check.py`. |
 | `tests/` | pytest unit tests; `tests/e2e/` drives the real app in a browser (Playwright) with screenshots; `test_bridge_e2e.py` (needs local `wrangler dev`), `test_web_check.py` (needs the site served + internet), `update_smoke.py` (real update on Windows/Mac in CI). |
 
@@ -55,7 +56,8 @@ pip install python-docx citeproc-py pypdf pybtex pytest playwright
 pytest -q                                   # unit tests (e2e skips without Playwright browsers)
 python app.py                               # run the app from source (opens the browser at localhost:8585)
 CITRELLO_E2E_SHOTS=/tmp/shots pytest tests/e2e      # browser tests against `python app.py` (CITRELLO_E2E_CHROMIUM=path for a non-Playwright Chromium)
-python packaging/build_web_check.py         # build site/public/check-py for the web checker
+python packaging/build_web_check.py         # build the web checker (site/public/check-py) and the web app (site/public/app)
+(cd site/public && python -m http.server 8099) &   # then: CITRELLO_WEB_CHECK=http://localhost:8099 pytest tests/test_web_app.py tests/test_web_check.py
 cd bridge && npm install && npx wrangler d1 migrations apply citrello --local && npm run dev   # local bridge
 ```
 Useful environment variables for tests and local runs: `CITRELLO_HOME`, `CITRELLO_APP_CONFIG`,

@@ -121,6 +121,8 @@
   .toast { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); background: var(--ink); color: var(--bg); padding: 9px 16px; border-radius: 10px; font-size: 14px; opacity: 0; transition: opacity .2s; pointer-events: none; z-index: 5; }
   .toast.show { opacity: 1; }
   .hidden { display: none !important; }
+  /* the same page runs as the desktop app and as the web app (citrello.app/app adds class="web") */
+  html.web .desktop-only, html:not(.web) .web-only { display: none !important; }
 
   /* library */
   .lib { display: grid; grid-template-columns: minmax(0, 1fr) 360px; gap: 24px; align-items: start; }
@@ -208,8 +210,8 @@
   <h4>Projects</h4>
   <div id="projNav"></div>
   <div class="side-foot">
-    <div class="conn"><i id="connDot"></i><span id="connText">Web connectors: not signed in</span></div>
-    <div>Citrello™ <span id="ver"></span> · <button class="link" id="quit">Quit</button></div>
+    <div class="conn desktop-only"><i id="connDot"></i><span id="connText">Web connectors: not signed in</span></div>
+    <div>Citrello™ <span id="ver"></span><span class="desktop-only"> · <button class="link" id="quit">Quit</button></span></div>
   </div>
 </aside>
 <main class="main">
@@ -229,9 +231,12 @@
       </div>
       <div class="qadd hidden" id="qAdd"><span id="qAddText"></span><button class="primary" id="qAddBtn">Add to library</button></div>
       <div id="qAddResult"></div>
+      <div class="notice warn web-only hidden" id="webBackupNag" role="status" style="display:flex;align-items:center;gap:12px;justify-content:space-between"><span id="webBackupNagText"></span>
+        <a class="btn" href="/api/web/backup">Back up now</a></div>
       <select id="projectFilter" class="hidden" aria-hidden="true"><option value="*">All projects</option></select>
       <div class="page-head lib-head"><div><h1 id="libTitle">Library</h1>
-        <p>Shared with Claude and ChatGPT in every chat, and live in your Word documents.</p></div>
+        <p class="desktop-only">Shared with Claude and ChatGPT in every chat, and live in your Word documents.</p>
+        <p class="web-only">Kept in this browser. Cite with <code class="key">[@Key]</code> or <code class="key">\cite{Key}</code>, and check papers under Documents.</p></div>
         <div class="actions"><button class="primary" id="openAdd">Add several</button><button id="openImport">Import</button>
           <button id="openExport">Export</button><button id="verifyBtn" title="Check the references shown against Crossref">Verify online</button></div></div>
 
@@ -263,11 +268,13 @@
             <div class="row"><input type="file" id="importFile" accept=".ris,.bib,.json,.txt"></div>
           </div>
           <div>
+            <div class="desktop-only">
             <h3>From Zotero on this computer</h3>
             <div class="row"><button class="primary" id="impZoteroLocal">Import my Zotero library</button></div>
             <p class="muted small" style="margin:6px 0 0">No account or key needed, and Zotero can stay open. Your collections become projects.</p>
+            </div>
             <h3>From an account</h3>
-            <div class="row"><button id="impMendeley">Import my Mendeley library</button>
+            <div class="row"><button id="impMendeley" class="desktop-only">Import my Mendeley library</button>
               <button id="impZotero">Zotero online library</button></div>
             <p class="muted small" style="margin:6px 0 0">Connect the accounts under Settings first.</p>
           </div>
@@ -283,7 +290,7 @@
           <a class="btn" id="expBib">BibTeX (LaTeX, Zotero)</a>
           <a class="btn" id="expBiblatex">biblatex</a>
           <a class="btn" id="expJson">CSL-JSON (Zotero, pandoc)</a>
-          <button id="expMendeley">Send to my Mendeley account</button>
+          <button id="expMendeley" class="desktop-only">Send to my Mendeley account</button>
         </div>
         <div id="exportMsg"></div>
       </div>
@@ -321,7 +328,7 @@
       <div id="texResult"></div>
     </div>
 
-    <div class="card" id="latexCard">
+    <div class="card desktop-only" id="latexCard">
       <h2>Keep a .bib file up to date</h2>
       <p class="muted small" style="margin:0">Citrello rewrites the file whenever the project's references change, with the same keys as always. For LaTeX on your computer (VS Code, TeXstudio…) or a folder synced with Overleaf through Dropbox or Git.</p>
       <div id="bxList"></div>
@@ -337,7 +344,7 @@
 
   <!-- ================= SETTINGS ================= -->
   <section id="tab-settings" class="hidden">
-    <div class="card">
+    <div class="card desktop-only">
       <h2>Account</h2>
       <div id="acctOut">
         <p class="muted">Sign in to use your library from <strong>ChatGPT</strong> and <strong>Claude on the web and phone</strong>, and to use the same account on all your computers. Citrello works without an account; your library always stays on your computer.</p>
@@ -364,10 +371,10 @@
         </div>
       </div>
       <div id="acctMsg"></div>
-      <label class="small" style="display:block;margin-top:14px"><input type="checkbox" id="usageStats"> Send an anonymous daily count (app version and system only) so we know how many people use Citrello</label>
+      <label class="small desktop-only" style="display:block;margin-top:14px"><input type="checkbox" id="usageStats"> Send an anonymous daily count (app version and system only) so we know how many people use Citrello</label>
     </div>
 
-    <div class="card">
+    <div class="card desktop-only">
       <h2>ChatGPT and Claude on the web</h2>
       <p class="muted">Use your library from ChatGPT, or from Claude in the browser and on your phone. Requests go through Citrello's secure bridge to the Citrello app on this computer, so Citrello needs to be running. Sign in above first.</p>
       <p class="small">Connector address: <code id="connUrl">https://mcp.citrello.app/mcp</code> <button class="link" id="connCopy">Copy</button></p>
@@ -388,13 +395,13 @@
       </details>
       <p class="small muted">Requests from the web can save Word files only in Citrello's Documents folder.</p>
     </div>
-    <div class="card">
+    <div class="card desktop-only">
       <h2>Updates</h2>
       <p class="muted" style="margin:0">You have Citrello <b id="updCurrent"></b>. Citrello checks for new versions when it starts and offers to update itself.</p>
       <div class="row"><button id="updCheck">Check for updates</button><span class="small muted" id="updCheckMsg"></span></div>
     </div>
 
-    <div class="card">
+    <div class="card desktop-only">
       <h2>Claude</h2>
       <p class="muted">Connect Citrello to the Claude desktop app. Claude can then search and add to your library in every chat, cite with <code class="key">[@Key]</code> markers, and write Word documents with live citations.</p>
       <div id="claudeStatus"></div>
@@ -428,7 +435,7 @@
       </details>
     </div>
 
-    <div class="card">
+    <div class="card desktop-only">
       <h2>Codex</h2>
       <p class="muted small" style="margin:0">For the Codex app, CLI and IDE extension. Gives Codex the same tools as Claude: search, add and verify references, format them, and write Word documents with live citations.</p>
       <div id="codexStatus"></div>
@@ -439,7 +446,7 @@
       </details>
     </div>
 
-    <div class="card">
+    <div class="card desktop-only">
       <h2>Browser button</h2>
       <p class="muted">Add the paper you're looking at, from any website, with one click. It reads the page in your own browser, so sites that block robots (ScienceDirect, IEEE…) and your university login work too.</p>
       <ol class="small">
@@ -451,7 +458,7 @@
       <p class="muted small">Citrello must be running. Can't drag it? <button class="link" id="bmCopy">Copy the button's code</button>, create a new bookmark, and paste it as the address.</p>
     </div>
 
-    <div class="card">
+    <div class="card desktop-only">
       <h2>Word</h2>
       <p class="muted">Adds a <strong>Citrello</strong> tab to Word:</p>
       <ul class="small">
@@ -486,16 +493,27 @@
       </div>
       <div>
         <h2>Library</h2>
+        <div class="desktop-only">
         <p class="small muted" style="margin:0">Stored on this computer in</p>
         <p class="small"><code id="libPath"></code></p>
         <p class="small muted">To use it on several computers, keep this folder in OneDrive or Dropbox. Back it up with Library → Export → CSL-JSON.</p>
+        </div>
+        <div class="web-only">
+        <p class="small muted" style="margin:0">Stored in this browser only: nothing is sent to Citrello. Clearing this site's data in your browser deletes it, so keep a backup file.</p>
+        <p class="small" id="webBackupInfo"></p>
+        <div class="row"><a class="btn primary" href="/api/web/backup" id="webBackup">Back up the library</a>
+          <label class="btn" for="webRestoreFile">Restore from a backup…</label>
+          <input type="file" id="webRestoreFile" accept=".json" hidden></div>
+        <p class="small muted">A backup is one file with every reference, project and key. It also opens in Citrello for desktop (put it in the Citrello folder as library.json).</p>
+        <div id="webRestoreMsg"></div>
+        </div>
         <label class="field">Your email (optional, sent to Crossref for faster lookups)<input type="email" id="email"></label>
         <div class="row"><button id="saveEmail">Save</button></div>
       </div>
     </div>
 
     <div class="card grid2">
-      <div>
+      <div class="desktop-only">
         <h2>Mendeley</h2>
         <div id="mSetup" class="hidden">
           <p class="small muted">Enter your Mendeley app ID and secret (register a free app at <a href="https://dev.mendeley.com/myapps.html" target="_blank" rel="noopener">dev.mendeley.com</a> with the redirect URL <code>http://localhost:8585/callback</code>).</p>
@@ -525,6 +543,16 @@
   <div class="welcome"><div class="wtiles" aria-hidden="true"></div><div class="wbody">
     <div id="wStart">
       <h1 id="wTitle">Welcome to Citrello</h1>
+      <div class="web-only">
+        <p class="muted" style="margin:0">Your library stays in this browser: nothing to install, and nothing is sent to Citrello.</p>
+        <ul class="perks">
+          <li><b>Paste a DOI, a link or a reference</b> in the search box to add it.</li>
+          <li><b>Check and fix a paper</b> (Word, PDF or LaTeX) under Documents.</li>
+          <li><b>Keep a backup file</b> (Settings → Library), because clearing the browser's data deletes the library.</li>
+        </ul>
+        <div class="wrow"><button class="primary" id="wWebStart">Start using Citrello</button></div>
+      </div>
+      <div class="desktop-only">
       <p class="muted" style="margin:0">Your library stays on this computer. A free account adds:</p>
       <ul class="perks">
         <li><b>ChatGPT and Claude on the web and phone</b> can use your library.</li>
@@ -534,6 +562,7 @@
       <div class="wrow"><input type="email" id="wEmail" placeholder="Your email" autocomplete="email" aria-label="Your email">
         <button class="primary" id="wSend">Email me a code</button></div>
       <label class="small" style="display:block;margin-top:10px"><input type="checkbox" id="wNews"> Email me about new features (a few times a year)</label>
+      </div>
     </div>
     <div id="wCode" class="hidden">
       <h1>Check your email</h1>
@@ -548,8 +577,8 @@
       <div class="wrow"><button class="primary" id="wFinish">Start using Citrello</button></div>
     </div>
     <div id="wMsg"></div>
-    <button class="link skip" id="wSkip">Skip for now</button>
-    <p class="fine">Citrello sends an anonymous daily count (app version and system, no email or library) so we know how many people use it. You can turn it off in Settings. <a href="https://citrello.app/privacy" target="_blank" rel="noopener">Privacy policy</a></p>
+    <button class="link skip desktop-only" id="wSkip">Skip for now</button>
+    <p class="fine desktop-only">Citrello sends an anonymous daily count (app version and system, no email or library) so we know how many people use it. You can turn it off in Settings. <a href="https://citrello.app/privacy" target="_blank" rel="noopener">Privacy policy</a></p>
   </div></div>
 </div>
 <div class="toast" id="toast"></div>
@@ -577,7 +606,7 @@ document.querySelectorAll(".side button.navb").forEach((b) => b.onclick = () => 
   ["library", "documents", "settings"].forEach((t) => show("tab-" + t, t === b.dataset.tab));
   if (b.dataset.tab === "library") loadLibrary();
   if (b.dataset.tab === "documents") loadBibExports();
-  if (b.dataset.tab === "settings") { loadAccount(); loadClaude(); loadCodex(); loadWord(); }
+  if (b.dataset.tab === "settings" && !status.web) { loadAccount(); loadClaude(); loadCodex(); loadWord(); }
 });
 
 const relTag = (r) => ({verified: '<span class="tag ok" title="Found by DOI; matches the publisher record">✓ Verified</span>',
@@ -1368,7 +1397,7 @@ $("updCheck").onclick = async () => {
 function closeWelcome() { show("welcome", false); post("/api/config", {welcome_done: "1"}).catch(() => {}); $("q").focus(); }
 function maybeWelcome() {
   if (status.welcome_done || status.signed_in) return;
-  show("welcome"); setTimeout(() => $("wEmail").focus(), 50);
+  show("welcome"); setTimeout(() => $(status.web ? "wWebStart" : "wEmail").focus(), 50);
 }
 $("wSend").onclick = async () => {
   const email = $("wEmail").value.trim(); if (!email) return $("wEmail").focus();
@@ -1393,6 +1422,7 @@ $("wEmail").onkeydown = (e) => { if (e.key === "Enter") $("wSend").click(); };
 $("wCodeIn").onkeydown = (e) => { if (e.key === "Enter") $("wVerify").click(); };
 $("wBack").onclick = () => { show("wCode", false); show("wStart"); $("wMsg").innerHTML = ""; };
 $("wSkip").onclick = closeWelcome;
+$("wWebStart").onclick = closeWelcome;
 $("wFinish").onclick = closeWelcome;
 document.addEventListener("keydown", (e) => { if (e.key === "Escape" && !$("welcome").classList.contains("hidden")) closeWelcome(); });
 
@@ -1405,10 +1435,10 @@ $("usageStats").onchange = async () => {
 const params = new URLSearchParams(location.search);
 if (params.get("login_error")) { $("loginErr").textContent = "Mendeley login failed: " + params.get("login_error"); show("loginErr"); }
 if (params.get("connected") || params.get("login_error")) document.querySelector('.side button.navb[data-tab="settings"]').click();
-if (params.toString()) history.replaceState(null, "", "/");
+if (params.toString()) history.replaceState(null, "", location.pathname);
 loadStatus().then(maybeWelcome); loadStyles(); loadLibrary();
 api("/api/account").then(renderSideConn).catch(() => {});
-setTimeout(() => checkUpdate(false), 3000);
+setTimeout(() => status.web || checkUpdate(false), 3000);
 </script>
 </body>
 </html>

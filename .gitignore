@@ -13,3 +13,5 @@ site/shots/
 citrello.ico
 tests/e2e/screenshots/
 site/public/check-py/
+site/public/app/py/
+site/public/app/index.html

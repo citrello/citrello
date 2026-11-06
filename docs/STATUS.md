@@ -49,6 +49,10 @@
 - Try citrello.app/check with a real paper.
 
 ## Current focus: the web app
+**Progress:** step 1 is built and tested (citrello.app/app: library in the browser, import/export, backup/restore,
+check and fix Word documents), Chromium and WebKit. Armin's section 3 decisions are recorded in the plan: free
+cloud copy with a limit, EU storage; Word add-in later; desktop app kept, web app leads.
+
 **docs/WEB_APP_PLAN.md** is the plan: everything in the browser at citrello.app/app so nobody hits install
 warnings; the browser tab acts as the connector's device; optional cloud copy for an always-on connector, Word
 add-in (Office.js, also Mac/web) and Overleaf live link; claim checking ("does the cited paper support this
