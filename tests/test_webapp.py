@@ -114,3 +114,36 @@ def test_built_page_is_the_desktop_page_plus_web_js(tmp_path):
     assert "html.web .desktop-only" in ui
     web_js = open(os.path.join(root, "site", "public", "app", "web.js"), encoding="utf-8").read()
     assert 'classList.add("web")' in web_js
+
+
+def test_jobs_report_progress_while_they_run(web, monkeypatch, tmp_path):
+    """In the browser a job runs after its request has been answered; meanwhile its progress goes to the page,
+    which answers its own progress polls with it, until the job says it's finished ("")."""
+    import sys
+    import threading
+    import doccheck
+    sys.path.insert(0, os.path.dirname(__file__))
+    import test_doccheck as T
+    import docx
+    monkeypatch.setattr(threading, "Thread", web._LaterThread)
+    monkeypatch.setattr(doccheck, "check", web._with_progress(doccheck.check))
+    sent = []
+    monkeypatch.setattr(web, "PUBLISH", lambda path, body: sent.append((path, json.loads(body) if body else None)))
+    monkeypatch.setattr(web, "_last_publish", 0.0)
+    monkeypatch.setattr(web, "PROGRESS_EVERY", 0)
+    d = docx.Document()
+    T.add_field(d.add_paragraph("Costly "), T.csl_field([T.TOPHAM, T.VETTERS], zotero=True))
+    path = tmp_path / "paper.docx"
+    d.save(path)
+    st, out, _ = call(web, "POST", "/api/doccheck", path.read_bytes(), {"X-Filename": "paper.docx"})
+    assert st == 200 and web.has_pending()
+    poll = "/api/doccheck/" + out["id"]
+    assert sent and sent[0][0] == poll  # the first progress went out with the answer
+    assert call(web, "GET", poll)[1]["state"] == "checking"  # not run yet: the answer went back first
+    web.run_pending()
+    assert not web.has_pending()
+    steps = [body for p, body in sent if p == poll]
+    assert steps[0]["state"] == "checking" and len(steps) >= 3  # the start, and steps while it ran
+    assert steps[-1] is None  # finished: the page asks Python again
+    final = call(web, "GET", poll)[1]
+    assert final["state"] == "done" and final["report"]["references"] == 2

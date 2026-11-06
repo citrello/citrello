@@ -1284,7 +1284,7 @@ function renderTex() {
   if (r.unused.length) h += `<details><summary>${r.unused.length} .bib entr${r.unused.length > 1 ? "ies" : "y"} never cited</summary><p class="small">${r.unused.map((k) => `<code>${esc(k)}</code>`).join(" ")}</p></details>`;
   if (r.ok && !r.typed_bibliography.length && !r.issues.length) h += `<div class="notice ok">All citations are in the .bib, with no duplicates or problems.</div>`;
   if (r.bib_entries) h += `<div class="row" style="margin-top:12px"><input type="text" id="texImpProject" list="projectList" value="${esc(name)}" placeholder="Project">
-    <button id="texImport">Import the .bib into Citrello</button><span class="muted small">Then Citrello keeps it clean and can keep a .bib file up to date (below).</span></div>`;
+    <button id="texImport">Import the .bib into Citrello</button><span class="muted small">Then Citrello keeps it clean<span class="desktop-only"> and can keep a .bib file up to date (below)</span><span class="web-only">, and Library → Export gives you a fresh .bib any time</span>.</span></div>`;
   if (/\.(zip|tex|ltx)$/i.test(texJob.name)) h += `<div class="panel" style="margin-top:18px"><strong>Submitting to arXiv?</strong>
     <p class="small muted" style="margin:4px 0 0">arXiv doesn't run BibTeX, so an upload without a <code>.bbl</code> file shows [?] for every citation. Citrello makes the <code>.bbl</code> in your journal's style, removes comments (anyone can download your source files on arXiv) and build files, and checks for what makes arXiv fail.</p>
     <div class="row"><button class="primary" id="axGo">Make an arXiv-ready .zip</button>

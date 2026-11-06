@@ -6,7 +6,7 @@ const PYODIDE = "https://cdn.jsdelivr.net/pyodide/v0.27.7/full/";
 importScripts(PYODIDE + "pyodide.js");
 
 const DATA = "/home/web";
-let py = null, handle = null;
+let py = null, handle = null, hasPending = null, runPending = null;
 const post = (m, transfer) => self.postMessage(m, transfer || []);
 
 const sync = (populate) => new Promise((resolve, reject) =>
@@ -49,7 +49,12 @@ pyodide_http.patch_all()          # urllib -> the browser's own requests
 import webapp
 webapp.start()
 `);
-  handle = py.globals.get("webapp").handle;
+  const webapp = py.globals.get("webapp");
+  handle = webapp.handle;
+  hasPending = webapp.has_pending;
+  runPending = webapp.run_pending;
+  // a running job sends its progress to the page, which answers its own progress polls with it
+  webapp.PUBLISH = (path, body) => post({ type: "progress", path, body });
   await sync(false);
   post({ type: "ready", version: man.version });
 }
@@ -92,4 +97,13 @@ async function answer(m) {
     post({ type: "storage-error", text: String(e && e.message || e) });
   }
   post({ type: "response", id: m.id, ...res }, [res.body.buffer]);
+  // a job the request started (checking a document, verifying references…) runs now that the page has its id
+  if (hasPending && hasPending()) {
+    try {
+      runPending();
+    } catch (e) {
+      console.error(e);
+    }
+    try { await sync(false); } catch (e) { post({ type: "storage-error", text: String(e && e.message || e) }); }
+  }
 }

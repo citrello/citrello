@@ -49,8 +49,9 @@
 - Try citrello.app/check with a real paper.
 
 ## Current focus: the web app
-**Progress:** step 1 is built and tested (citrello.app/app: library in the browser, import/export, backup/restore,
-check and fix Word documents), Chromium and WebKit. Armin's section 3 decisions are recorded in the plan: free
+**Progress:** steps 1 and 2 are live at citrello.app/app and tested in Chromium and WebKit: library in the browser,
+import/export, backup/restore, check and fix Word/PDF/LaTeX, arXiv .zip, style search, progress bars. Next: step 3
+(sign-in and the ChatGPT/Claude connector with the browser tab as the device). Armin's section 3 decisions are recorded in the plan: free
 cloud copy with a limit, EU storage; Word add-in later; desktop app kept, web app leads.
 
 **docs/WEB_APP_PLAN.md** is the plan: everything in the browser at citrello.app/app so nobody hits install

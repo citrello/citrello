@@ -19,11 +19,28 @@ import urllib.parse
 
 
 class _InlineThread(threading.Thread):
-    """The browser's Python can't start threads. Run background jobs straight away instead: the request that
-    starts a job returns once the job is finished, and the page's next poll sees it done."""
+    """The browser's Python can't start threads. Run a background job straight away instead: the request that
+    starts it returns once the job is finished (used by the tests; the browser uses _LaterThread)."""
 
     def start(self):
         self.run()
+
+
+class _LaterThread(threading.Thread):
+    """In the browser: a job app.py starts runs right after the request that started it has been answered
+    (run_pending), so the page gets the job's id at once and can show its progress."""
+
+    def start(self):
+        PENDING.append(self)
+
+
+PENDING = []
+# Set by the worker: PUBLISH(path, json_text) gives the page the answer to a progress poll (GET path) while a job
+# keeps Python busy; json_text "" means the job has finished and the page should ask Python again.
+PUBLISH = None
+_LIVE = set()
+_last_publish = 0.0
+PROGRESS_EVERY = 0.25  # seconds between progress updates
 
 
 import app  # noqa: E402
@@ -140,6 +157,65 @@ class WebHandler(app.Handler):
         return super().do_POST()
 
 
+def _running():
+    """Progress polls the page makes for jobs that are still running -> their answers (as app.py gives them)."""
+    out = {}
+    for vid, st in list(app.VERIFY.items()):
+        if not st.get("done"):
+            out["/api/verify/" + vid] = st
+    for cid, st in list(app.CHECKS.items()):
+        if st.get("state") == "checking":
+            out["/api/doccheck/" + cid] = app.check_public(cid)
+    for lid, lj in list(app.LATEX.items()):
+        if lj.get("convert") and not lj["convert"].get("done"):
+            out["/api/latex/" + lid] = app.latex_public(lid)
+    return out
+
+
+def publish_progress(force=False):
+    global _last_publish
+    if PUBLISH is None or (not force and time.time() - _last_publish < PROGRESS_EVERY):
+        return
+    _last_publish = time.time()
+    running = _running()
+    for path in _LIVE - set(running):
+        PUBLISH(path, "")
+    for path, body in running.items():
+        PUBLISH(path, json.dumps(body))
+    _LIVE.clear()
+    _LIVE.update(running)
+
+
+def _with_progress(fn):
+    """Wrap a long-running function of library/doccheck/latex so each progress step also updates the page."""
+    def wrapper(*args, **kwargs):
+        def wrap(cb):
+            def progress(*a, **k):
+                cb(*a, **k)
+                publish_progress()
+            return progress
+        if callable(kwargs.get("progress")):
+            kwargs["progress"] = wrap(kwargs["progress"])
+        else:
+            args = [wrap(a) if callable(a) and getattr(a, "__name__", "") == "progress" else a for a in args]
+        return fn(*args, **kwargs)
+    wrapper.__wrapped__ = fn
+    return wrapper
+
+
+def has_pending():
+    return bool(PENDING)
+
+
+def run_pending():
+    """Run the jobs the last request started (called by the worker after it has sent the answer)."""
+    while PENDING:
+        job = PENDING.pop(0)
+        publish_progress(force=True)
+        job.run()
+    publish_progress(force=True)
+
+
 def handle(method, path, headers, body):
     """One API request from the page -> (status, content type, headers, body bytes)."""
     if body is not None and not isinstance(body, bytes):
@@ -153,11 +229,18 @@ def handle(method, path, headers, body):
         h.send(500, {"error": str(e) or e.__class__.__name__})
     if h.response is None:
         h.send(500, {"error": "No answer"})
+    if PENDING:  # a job starts after this answer: give the page its first progress before the page asks
+        publish_progress(force=True)
     return h.response
 
 
 def start():
     """Called once when the worker has loaded the code (not by the desktop app or the tests)."""
-    threading.Thread = _InlineThread  # app.py looks it up each time it starts a job
+    threading.Thread = _LaterThread  # app.py looks it up each time it starts a job
+    import doccheck
+    import latex
+    for mod, name in ((library, "verify"), (doccheck, "check"), (latex, "convert_thebibliography")):
+        if not hasattr(getattr(mod, name), "__wrapped__"):
+            setattr(mod, name, _with_progress(getattr(mod, name)))
     library.migrate_legacy_data()
     os.makedirs(library.HOME, exist_ok=True)

@@ -142,12 +142,15 @@ How the web app works (built in step 1): `packaging/build_web_check.py` turns `u
 `web.js` sends every `fetch("/api/...")` of the page to `worker.js`, which runs **`webapp.py` → `app.py`'s own
 handler** in Pyodide. The library is `$HOME/Citrello/library.json` in an IDBFS folder (IndexedDB), saved after every
 request. Desktop-only parts of `ui.html` carry `class="desktop-only"`, web-only parts `class="web-only"`. Background
-jobs run to the end inside the request (no threads in Pyodide). One tab at a time (Web Locks).
+jobs run after their request is answered (no threads in Pyodide; see step 2). One tab at a time (Web Locks).
 
 1. **Done (6 Nov 2026):** `/app` shell: library in IndexedDB, add/search/edit/projects, import/export, backup and
-   restore with a reminder, one tab at a time. Reuses `ui.html` and `app.py` unchanged. Check and fix of Word
-   documents already works too (tested); PDF/LaTeX/arXiv/style search are step 2.
-2. Documents in the web app: check + fix + add to library; LaTeX check; arXiv zip; style search.
+   restore with a reminder, one tab at a time. Reuses `ui.html` and `app.py` unchanged.
+2. **Done (6 Nov 2026):** documents in the web app: Word/PDF check + fix + add to library; LaTeX check; arXiv
+   zip (bundled .bst files); style search and downloaded styles (kept in the browser); progress bars. Jobs run
+   right after their request is answered (`webapp.run_pending`), and while one runs the page answers its own
+   progress polls from what the job posts (`webapp.PUBLISH`), because Python is busy. Other requests wait for the
+   job to finish.
 3. Connector Phase A (tab as device) + sign-in in the web app; directory applications (Claude, ChatGPT).
 4. Clip button for the web app; Zotero (web API + sqlite file); Mendeley through the bridge.
 5. Claim check (section 4, step 1).

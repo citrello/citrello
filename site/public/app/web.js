@@ -38,6 +38,7 @@
   const ready = new Promise((res, rej) => { readyResolve = res; readyReject = rej; });
   ready.catch(() => {});
   const pending = new Map();
+  const progress = new Map(); // path of a progress poll -> latest answer, while a job keeps Python busy
   let nextId = 0;
 
   function startWorker() {
@@ -47,6 +48,7 @@
       if (m.type === "status") coverText(m.text);
       else if (m.type === "ready") { cover.remove(); readyResolve(); }
       else if (m.type === "error") { coverText(m.text + " Try reloading the page, or use another browser.", true); readyReject(new Error(m.text)); }
+      else if (m.type === "progress") { if (m.body) progress.set(m.path, m.body); else progress.delete(m.path); }
       else if (m.type === "storage-error") console.warn("Citrello: couldn't save to the browser's storage:", m.text);
       else if (m.type === "response" && pending.has(m.id)) { pending.get(m.id)(m); pending.delete(m.id); }
     };
@@ -86,6 +88,9 @@
   }
 
   async function apiFetch(url, opts) {
+    const method = (opts.method || "GET").toUpperCase();
+    const live = method === "GET" && progress.get(url.pathname + url.search);
+    if (live) return new Response(live, { status: 200, headers: { "Content-Type": "application/json" } });
     await ready;
     const headers = {};
     new Headers(opts.headers || {}).forEach((v, k) => {
@@ -96,7 +101,7 @@
     const id = ++nextId;
     const m = await new Promise((resolve) => {
       pending.set(id, resolve);
-      worker.postMessage({ type: "request", id, method: (opts.method || "GET").toUpperCase(),
+      worker.postMessage({ type: "request", id, method,
                            path: url.pathname + url.search, headers, body }, body ? [body.buffer] : []);
     });
     return new Response(m.body, { status: m.status, headers: { "Content-Type": m.ctype, ...m.headers } });
