@@ -302,3 +302,20 @@ def test_markers_from_claude(tmp_path, monkeypatch):
     assert any("[@Nobody1999]" in i["text"] for i in rep["citation_issues"])
     res = doccheck.fix(path, rep, out, "apa")
     assert res["entries"] == 1 and "ADDIN CSL_CITATION" in docx.Document(out).element.xml
+
+
+def test_failed_lookups_dont_stop_the_check(tmp_path, monkeypatch):
+    calls = []
+
+    def boom(*a, **k):
+        calls.append(1)
+        raise RuntimeError("NetworkError: Failed to execute 'send' on 'XMLHttpRequest'")
+    monkeypatch.setattr(doccheck.core, "crossref_lookup", boom)
+    path = str(tmp_path / "paper.pdf")
+    make_pdf(path, [["Costs are underestimated [1] and planning matters [4]."],
+                    ["References", "[1] Topham, E. and McMillan, D. (2017). Sustainable decommissioning of an",
+                     "offshore wind farm. Renewable Energy, 102, pp.470-480.",
+                     "[2] Burton, T. and Jenkins, N. (2011). Wind Energy Handbook. Wiley, Chichester."]])
+    rep = doccheck.check(path, offline=False)
+    assert len(calls) == 2 and rep["references"] == 2
+    assert any("[4]" in i["text"] for i in rep["citation_issues"])

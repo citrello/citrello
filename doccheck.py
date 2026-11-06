@@ -467,6 +467,7 @@ def check(path, offline=False, email=None, progress=None):
                          "us (github.com/citrello/citrello/issues) so we can support its format.")
 
     # online check, one reference at a time
+    failures = 0
     for i, r in enumerate(refs, 1):
         say(i, len(refs), "Checking references online" if not offline else "Checking references")
         if offline:
@@ -474,8 +475,15 @@ def check(path, offline=False, email=None, progress=None):
         typed = core.parse_reference(r["raw"]) if r.get("typed_text") else r["typed"]
         try:
             csl, src, meta = core.crossref_lookup(r["raw"], typed, email)
+            failures = 0
         except ConnectionError:
             offline = True
+            continue
+        except Exception as e:  # one failed lookup (refused, timed out...) never stops the check
+            failures += 1
+            r.setdefault("lookup_error", str(e)[:200])
+            if failures >= 3:  # several in a row: treat as offline, keep the rest of the report
+                offline = True
             continue
         if csl:
             r.update(csl=csl, meta=meta, typed=typed, lookup=src)
