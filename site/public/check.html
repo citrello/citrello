@@ -1,0 +1,181 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Check the references in your paper · Citrello</title>
+<meta name="description" content="Free reference checker: find retracted papers, wrong DOIs, duplicates and citation mistakes in your Word document or PDF. Runs in your browser; your paper never leaves your computer.">
+<meta property="og:title" content="Check the references in your paper, free">
+<meta property="og:description" content="Retracted papers, wrong DOIs, duplicates and citation mistakes, found in a minute. Your paper never leaves your computer.">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Gloock&family=Figtree:wght@400;500;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/site.css">
+<style>
+.ck-hero{padding:36px 0 8px}
+.ck-hero h1{font-size:clamp(38px,5vw,60px);margin-bottom:12px}
+.ck-hero p{font-size:19px;max-width:38em;margin:0}
+.private{display:inline-flex;gap:8px;align-items:center;background:var(--ok-soft);color:var(--leaf);font-weight:700;font-size:14px;border-radius:999px;padding:6px 14px;margin-top:18px}
+.tool{background:#fff;border:2px solid var(--cobalt);border-radius:24px;box-shadow:10px 10px 0 var(--lemon);padding:28px;margin:28px 0 40px}
+.drop{display:block;border:2px dashed var(--line);border-radius:18px;padding:34px 16px;text-align:center;cursor:pointer;background:var(--sky)}
+.drop:hover,.drop.over{border-color:var(--cobalt)}
+.drop strong{color:var(--cobalt);font-size:18px}
+.drop .hint{color:var(--muted);font-size:14px;margin-top:6px}
+.status{margin-top:16px;color:var(--muted);font-size:15px}
+.bar{height:8px;background:var(--line);border-radius:99px;overflow:hidden;margin-top:8px}
+.bar>div{height:100%;width:0;background:var(--leaf);transition:width .3s}
+.chips{display:flex;flex-wrap:wrap;gap:8px;margin:18px 0 6px}
+.chip{font-size:13px;font-weight:700;padding:3px 12px;border-radius:999px;background:var(--sky);color:var(--cobalt)}
+.chip.ok{background:var(--ok-soft);color:var(--leaf)}.chip.warn{background:var(--warn-soft);color:var(--warn)}.chip.bad{background:var(--bad-soft);color:var(--bad)}
+.tool h3{font:700 17px Figtree,sans-serif;color:var(--ink);margin:20px 0 6px}
+ul.iss{margin:0;padding-left:20px;font-size:15px}ul.iss li{margin:4px 0}
+ul.iss li.problem{color:var(--bad)}ul.iss li.check{color:var(--warn)}ul.iss li.ok{color:var(--leaf)}ul.iss li.info{color:var(--muted)}
+.notice{padding:12px 16px;border-radius:12px;margin-top:14px;font-size:15px}
+.notice.ok{background:var(--ok-soft);color:var(--leaf)}.notice.err{background:var(--bad-soft);color:var(--bad)}.notice.warn{background:var(--warn-soft);color:var(--warn)}
+.fix{border-top:1px solid var(--line);margin-top:22px;padding-top:18px}
+.fix h2{font-size:28px;margin-bottom:6px}
+.row{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-top:12px}
+select{font:inherit;padding:10px 12px;border:2px solid var(--line);border-radius:12px;background:#fff;max-width:100%}
+button.btn,a.btn{border:0;cursor:pointer;font:700 16px Figtree,sans-serif}
+.btn.ghost{background:#fff;color:var(--cobalt);border:2px solid var(--cobalt)}
+details summary{cursor:pointer;color:var(--cobalt);font-weight:700;margin-top:16px}
+table{width:100%;border-collapse:collapse;font-size:14px;margin-top:8px}
+td,th{padding:8px;border-bottom:1px solid var(--line);text-align:left;vertical-align:top}
+.cta{background:var(--sky);border-radius:22px;padding:26px 28px;margin:0 0 72px;display:flex;gap:20px;align-items:center;flex-wrap:wrap}
+.cta h2{font-size:28px;margin:0 0 4px}.cta p{margin:0}
+.cta .grow{flex:1;min-width:260px}
+</style>
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+<div class="tiles" aria-hidden="true"></div>
+<header class="wrap nav">
+  <a class="logo" href="/" aria-label="Citrello home">citr<span>ello</span></a>
+  <nav aria-label="Main"><a href="/">What it does</a><a href="https://github.com/citrello/citrello">GitHub</a><a class="nav-cta" href="/download">Download</a></nav>
+</header>
+
+<main id="main" class="wrap">
+  <section class="ck-hero">
+    <h1>Check the references in your paper</h1>
+    <p>Retracted papers, DOIs that are wrong or don't exist, the same paper listed twice, citations pointing to a missing reference. Free, for any Word document or PDF, whichever reference manager made it.</p>
+    <span class="private">Your paper never leaves your computer: the check runs in this browser.</span>
+  </section>
+
+  <section class="tool" aria-label="Reference checker">
+    <label class="drop" id="drop"><input type="file" id="file" accept=".docx,.pdf" hidden>
+      <strong id="dropText">Choose your paper or drag it here</strong>
+      <div class="hint">Word (.docx) or PDF · Zotero, Mendeley, EndNote, Word's own citations or typed by hand</div></label>
+    <div class="status" id="status" role="status" aria-live="polite"></div>
+    <div id="result"></div>
+  </section>
+
+  <section class="cta">
+    <div class="grow"><h2>Want this inside Word and your AI?</h2>
+      <p>The free Citrello app keeps your library, inserts live citations in Word, and lets Claude and ChatGPT cite only real, checked papers.</p></div>
+    <a class="btn" href="/download">Download Citrello</a>
+  </section>
+</main>
+
+<footer>
+  <div class="tiles" aria-hidden="true"></div>
+  <div class="wrap foot">
+    <a class="logo" href="/">citr<span>ello</span></a>
+    <p>References, the sweet part.</p>
+    <nav aria-label="Footer"><a href="https://github.com/citrello/citrello">GitHub</a><a href="/privacy">Privacy</a><a href="https://github.com/citrello/citrello/blob/main/LICENSE">Licence (AGPL)</a></nav>
+    <p class="small">© 2026 Armin Hosseinghorbani</p>
+  </div>
+</footer>
+
+<script>
+(function () {
+  const $ = (id) => document.getElementById(id);
+  const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({"&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"}[c]));
+  const worker = new Worker("/check-worker.js");
+  let ready = false, styles = [], fileName = "", busy = false;
+
+  function status(text, i, n) {
+    $("status").innerHTML = text ? `${esc(text)}${n ? `: ${i} of ${n}` : ""}${n ? `<div class="bar"><div style="width:${Math.round(100 * i / n)}%"></div></div>` : ""}` : "";
+  }
+  function download(bytes, name, type) {
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(new Blob([bytes], {type}));
+    a.download = name;
+    document.body.appendChild(a); a.click(); a.remove();
+  }
+
+  worker.onmessage = (ev) => {
+    const m = ev.data;
+    if (m.type === "status") status(m.text);
+    if (m.type === "ready") { ready = true; styles = m.styles; status(busy ? "Reading your paper…" : ""); }
+    if (m.type === "progress") status(m.step, m.i, m.n);
+    if (m.type === "error") { busy = false; status(""); $("result").innerHTML = `<div class="notice err">${esc(m.text)}</div>`; }
+    if (m.type === "report") { busy = false; status(""); render(m.report); }
+    if (m.type === "fixed") { renderFix(m.result); download(m.bytes, fileName.replace(/\.docx$/i, "") + "_fixed.docx",
+                               "application/vnd.openxmlformats-officedocument.wordprocessingml.document"); }
+    if (m.type === "csv") download(m.bytes, fileName.replace(/\.(docx|pdf)$/i, "") + "_reference_check.csv", "text/csv");
+  };
+
+  async function choose(file) {
+    if (!/\.(docx|pdf)$/i.test(file.name)) { $("result").innerHTML = `<div class="notice err">Please choose a Word document (.docx) or a PDF.</div>`; return; }
+    fileName = file.name; busy = true;
+    $("dropText").textContent = `${file.name} · choose another paper to check it`;
+    $("result").innerHTML = "";
+    status(ready ? "Reading your paper…" : "Loading the checker into your browser… (the first time takes 10–30 seconds)");
+    worker.postMessage({type: "check", name: file.name, data: await file.arrayBuffer()});
+  }
+  const drop = $("drop");
+  ["dragenter", "dragover"].forEach((e) => drop.addEventListener(e, (ev) => { ev.preventDefault(); drop.classList.add("over"); }));
+  ["dragleave", "drop"].forEach((e) => drop.addEventListener(e, (ev) => { ev.preventDefault(); drop.classList.remove("over"); }));
+  drop.addEventListener("drop", (ev) => ev.dataTransfer.files[0] && choose(ev.dataTransfer.files[0]));
+  $("file").onchange = (ev) => { ev.target.files[0] && choose(ev.target.files[0]); ev.target.value = ""; };
+
+  const REL = {verified: ["ok", "Verified"], check: ["warn", "Check"], problem: ["bad", "Problem"], complete: ["", "Complete"]};
+  function render(r) {
+    let h = `<div class="chips"><span class="chip">${r.references} references · ${esc(r.manager)}</span>
+      ${r.counts.verified ? `<span class="chip ok">${r.counts.verified} verified</span>` : ""}
+      ${r.counts.check ? `<span class="chip warn">${r.counts.check} to check</span>` : ""}
+      ${r.counts.problem ? `<span class="chip bad">${r.counts.problem} with problems</span>` : ""}
+      ${r.duplicates ? `<span class="chip bad">${r.duplicates} duplicate${r.duplicates > 1 ? "s" : ""}</span>` : ""}</div>`;
+    if (!r.online) h += `<div class="notice warn">The references couldn't be looked up online just now, so they weren't checked against the publishers' records. The other checks below still apply.</div>`;
+    h += r.citation_issues.length ? `<h3>Citations and the reference list</h3><ul class="iss">${r.citation_issues.map((x) => `<li class="${x.level}">${esc(x.text)}</li>`).join("")}</ul>`
+      : `<div class="notice ok">Every citation matches the reference list, and there are no duplicates.</div>`;
+    const flagged = r.refs.filter((x) => ["problem", "check"].includes(x.reliability) && x.checks.length)
+      .sort((a, b) => (a.reliability === "problem" ? 0 : 1) - (b.reliability === "problem" ? 0 : 1));
+    if (flagged.length) h += `<h3>References to look at</h3><ul class="iss">${flagged.map((x) =>
+      `<li class="${x.reliability}"><b>[${x.number}]</b> ${esc(x.authors)} (${esc(x.year || "n.d.")}) ${esc(x.title)}: ${x.checks.map((k) => esc(k.text)).join("; ")}</li>`).join("")}</ul>`;
+    h += `<details><summary>All ${r.references} references</summary><table><thead><tr><th>#</th><th>Reference</th><th>Reliability</th></tr></thead><tbody>
+      ${r.refs.map((x) => `<tr><td>${x.number}</td><td><b>${esc(x.title)}</b><br><span style="color:var(--muted)">${[x.authors, x.year, x.container, x.doi].filter(Boolean).map(esc).join(" · ")}</span></td>
+        <td><span class="chip ${(REL[x.reliability] || ["", ""])[0]}">${(REL[x.reliability] || ["", "-"])[1]}</span></td></tr>`).join("")}</tbody></table></details>`;
+    h += `<div class="row"><button class="btn ghost" id="csv">Download the report (.csv)</button></div>`;
+    if (r.source !== "pdf") {
+      h += `<div class="fix"><h2>Fix and format</h2>
+        <p style="margin:0">Get a corrected copy of your Word file: every citation becomes a live citation, details are corrected from the publisher's record, duplicates are merged, and the reference list is rebuilt in the style you choose. Your original file isn't changed.</p>
+        <div class="row"><select id="style" aria-label="Citation style">${styles.map((s) => `<option value="${esc(s.id)}" ${s.id === "apa" ? "selected" : ""}>${esc(s.title)}</option>`).join("")}</select>
+        <button class="btn" id="fix">Fix and download</button></div><div id="fixResult"></div></div>`;
+    } else {
+      h += `<p style="color:var(--muted);font-size:14px">A PDF can't be changed. To get a fixed copy, check the Word version of your paper.</p>`;
+    }
+    $("result").innerHTML = h;
+    $("csv").onclick = () => worker.postMessage({type: "csv"});
+    if ($("fix")) $("fix").onclick = () => {
+      $("fix").disabled = true; $("fix").textContent = "Fixing…";
+      worker.postMessage({type: "fix", style: $("style").value});
+    };
+  }
+  function renderFix(f) {
+    const li = (arr) => `<ul class="iss">${arr.join("")}</ul>`;
+    let h = `<div class="notice ok">Done: ${f.citations} citations and ${f.entries} references in ${esc(f.style)}. Your fixed document is downloading.</div>`;
+    if (f.corrected.length) h += `<h3>Corrected from the publisher's record</h3>` + li(f.corrected.map((x) => `<li class="ok">[${x.number}] ${esc(x.title)}: ${x.changes.map(esc).join(", ")}</li>`));
+    if (f.merged.length) h += `<h3>Duplicates merged</h3>` + li(f.merged.map((x) => `<li class="ok">${esc(x)}</li>`));
+    if (f.dropped_uncited.length) h += `<h3>Removed from the list (never cited)</h3>` + li([`<li class="check">${f.dropped_uncited.map((n) => `[${n}]`).join(", ")}</li>`]);
+    if (f.still_problems.length || f.unfixable.length) h += `<h3>Still needs you</h3>` + li([
+      ...f.still_problems.map((x) => `<li class="problem">${esc(x.title)}: ${esc(x.text)}</li>`),
+      ...f.unfixable.map((t) => `<li class="problem">${esc(t)}</li>`)]);
+    $("fixResult").innerHTML = h;
+    const b = $("fix"); b.disabled = false; b.textContent = "Fix and download again";
+  }
+})();
+</script>
+</body>
+</html>

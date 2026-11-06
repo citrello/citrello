@@ -12,3 +12,4 @@ app_config.json
 site/shots/
 citrello.ico
 tests/e2e/screenshots/
+site/public/check-py/

@@ -3,13 +3,43 @@ name: Deploy website (citrello.app)
 on:
   push:
     branches: [main]
-    paths: ["site/public/**", "site/wrangler.toml", ".github/workflows/site.yml"]
+    paths: ["site/public/**", "site/wrangler.toml", ".github/workflows/site.yml",
+            # the in-browser checker (citrello.app/check) is built from the app's own code
+            "doccheck.py", "citeformat.py", "citrello_core.py", "library.py", "latex.py", "styles/**",
+            "packaging/build_web_check.py", "tests/test_web_check.py"]
   workflow_dispatch:
 
 concurrency: site-deploy
 
 jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install python-docx citeproc-py pypdf pytest playwright
+      - run: python -m playwright install --with-deps chromium
+      - name: Build the in-browser checker
+        run: python packaging/build_web_check.py
+      - name: Test it in a real browser (check, fix, PDF)
+        env:
+          CITRELLO_WEB_CHECK: http://localhost:8099
+          CITRELLO_E2E_SHOTS: web-shots
+        run: |
+          mkdir -p web-shots
+          (cd site/public && python -m http.server 8099 > /dev/null 2>&1 &)
+          sleep 2
+          python -m pytest -v tests/test_web_check.py
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: web-check-screenshots
+          path: web-shots
+
   deploy:
+    needs: test
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -22,5 +52,11 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Build the in-browser checker
+        run: python packaging/build_web_check.py
+        working-directory: .
       - name: Deploy
         run: npx --yes wrangler@4.42.0 deploy

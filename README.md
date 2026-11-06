@@ -70,6 +70,11 @@ your computer and is shared by the Citrello app, Claude and Word:
 - **Import / export:** RIS, BibTeX, biblatex and CSL-JSON (Mendeley, Zotero, EndNote and others), plus a
   Mendeley account (import and export) and a Zotero account (import).
 
+## Check a paper without installing anything
+[citrello.app/check](https://citrello.app/check) runs the paper checker in your browser: drop in a Word file or PDF,
+get the report and a fixed copy. Citrello's own code runs inside the browser (Pyodide), so the paper never leaves
+your computer; only the reference lookups go to Crossref.
+
 ## Install (Windows)
 1. **Download** `Citrello-windows.zip` from the
    [latest release](https://github.com/citrello/citrello/releases/latest). Right-click it → **Extract All** into
