@@ -15,6 +15,8 @@ import urllib.parse
 
 import pytest
 
+import mcp_server
+
 pytestmark = pytest.mark.skipif(os.environ.get("CITRELLO_BRIDGE_E2E") != "1", reason="needs a running bridge")
 
 import bridge_client as bc  # noqa: E402
@@ -106,7 +108,7 @@ def test_end_to_end():
     assert st == 200 and json.loads(raw)["result"]["serverInfo"]["name"] == "citrello"
     assert rpc(access, "notifications/initialized", id=None)[0] == 202
     tools = json.loads(rpc(access, "tools/list")[2])["result"]["tools"]
-    assert len(tools) == 16
+    assert len(tools) == len(mcp_server.TOOLS) and "prepare_arxiv" in {t["name"] for t in tools}
     res = json.loads(rpc(access, "tools/call", {"name": "search_references", "arguments": {"query": "offshore"}})[2])["result"]
     assert not res["isError"] and "Topham2017" in res["content"][0]["text"]
     res = json.loads(rpc(access, "tools/call", {"name": "create_word_document",
@@ -127,6 +129,6 @@ def test_end_to_end():
 
     bc.sign_out()
     time.sleep(1)
-    assert len(json.loads(rpc(access, "tools/list")[2])["result"]["tools"]) == 16  # remembered while offline
+    assert len(json.loads(rpc(access, "tools/list")[2])["result"]["tools"]) == len(mcp_server.TOOLS)  # remembered while offline
     res = json.loads(rpc(access, "tools/call", {"name": "search_references", "arguments": {}})[2])["result"]
     assert res["isError"] and "isn't running" in res["content"][0]["text"]
