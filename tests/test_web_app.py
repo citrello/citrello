@@ -77,10 +77,11 @@ def test_web_app(browser_name, tmp_path):
 
         # import a .bib file into a project
         page.click("#openImport")
-        expect(page.locator("#impZoteroLocal")).to_be_hidden()
         page.fill("#importProject", "Review")
+        page.click('[data-guide="imp-file"]')
         page.set_input_files("#importFile", str(bib))
-        expect(page.locator("#importMsg")).to_contain_text("1", timeout=60000)
+        expect(page.locator("#gResult")).to_contain_text("1 added", timeout=60000)
+        page.click("#gNext")
         expect(page.locator("#libRows")).to_contain_text("Sailing through end-of-life")
 
         # add by DOI: looked up on Crossref from the browser
@@ -261,8 +262,10 @@ def test_web_app_documents_and_styles(browser_name, tmp_path):
         bib.write_text(LATEX_BIB.replace("@article{dupe", "@article{other").replace(
             "title={Sustainable decommissioning of an offshore wind farm}, year={2017},\n  doi={10.1016/j.renene.2016.10.066}",
             "title={Wind Energy Handbook}, year={2011}, publisher={Wiley}"), encoding="utf-8")
+        page.click('[data-guide="imp-file"]')
         page.set_input_files("#importFile", str(bib))
         expect(page.locator("#libRows .ref")).to_have_count(3, timeout=60000)
+        page.click("#gNext")
         page.evaluate("""() => { window.seen = []; new MutationObserver(() => seen.push(verifyMsg.textContent))
                                      .observe(verifyMsg, {childList: true, characterData: true, subtree: true}); }""")
         page.click("#verifyBtn")
@@ -350,10 +353,16 @@ def test_web_app_browser_button_and_zotero(browser_name, tmp_path):
         db = tmp_path / "zotero.sqlite"
         Z.make_db(str(db))
         page.click("#openImport")
-        expect(page.locator("#impZoteroLocal")).to_be_hidden()
-        expect(page.locator("#importPanel")).to_contain_text("Mendeley Reference Manager")
+        page.click('[data-guide="imp-mendeley"]')  # without Citrello's Mendeley app: only the export way
+        expect(page.locator("#guide")).to_contain_text("Mendeley Reference Manager")
+        expect(page.locator("#impMendeleyWeb")).to_be_hidden()
+        page.click("#gNext")
+        page.click('[data-guide="imp-zotero"]')
+        expect(page.locator("#impZoteroLocal")).to_have_count(0)  # the desktop's one-click import isn't in the web app
         page.set_input_files("#impZoteroFile", str(db))
-        expect(page.locator("#importMsg")).to_contain_text("now in Projects", timeout=60000)
+        expect(page.locator("#gResult")).to_contain_text("now in Projects", timeout=60000)
+        expect(page.locator("#importMsg")).to_contain_text("now in Projects")
+        page.click("#gNext")
         expect(page.locator("#projNav")).to_contain_text("Thesis")
         expect(page.locator("#libRows")).to_contain_text("Wind Energy Handbook")
         page.screenshot(path=os.path.join(shots, f"web-app-{browser_name}-zotero.png"))
@@ -394,6 +403,7 @@ def test_web_app_mendeley_import(browser_name, tmp_path):
             page.click("#wWebStart")
             page.click("#openImport")
             page.fill("#importProject", "From Mendeley")
+            page.click('[data-guide="imp-mendeley"]')
             with ctx.expect_page() as popup:
                 page.click("#impMendeleyWeb")
             expect(page.locator("#importMsg")).to_contain_text("2 added from Mendeley", timeout=60000)
@@ -444,5 +454,33 @@ def test_web_app_connection_guides(browser_name, tmp_path):
         expect(page.locator("#gCount")).to_have_text("Step 2 of 5")
         page.keyboard.press("Escape")
         expect(page.locator("#guide")).to_be_hidden()
+        assert not errors, errors
+        b.close()
+
+
+@pytest.mark.parametrize("browser_name", BROWSERS)
+def test_web_app_import_endnote_xml(browser_name, tmp_path):
+    """Import → EndNote: an EndNote XML export, dropped into the window."""
+    from playwright.sync_api import expect, sync_playwright
+    sys.path.insert(0, os.path.dirname(__file__))
+    from test_citrello import ENDNOTE_XML
+    xml = tmp_path / "My EndNote Library.xml"
+    xml.write_text(ENDNOTE_XML, encoding="utf-8")
+    with sync_playwright() as pw:
+        b = getattr(pw, browser_name).launch()
+        page = b.new_context(viewport={"width": 1280, "height": 860}).new_page()
+        errors = []
+        page.on("pageerror", lambda e: errors.append(str(e)))
+        open_app(page)
+        page.click("#wWebStart")
+        page.click("#openImport")
+        page.click('[data-guide="imp-endnote"]')
+        expect(page.locator("#guide")).to_contain_text("Save as type")
+        page.set_input_files("#importFile", str(xml))
+        expect(page.locator("#gResult")).to_contain_text("2 added", timeout=60000)
+        page.keyboard.press("Escape")
+        expect(page.locator("#libRows")).to_contain_text("Wind Energy Handbook")
+        tab(page, "settings")
+        expect(page.locator("#tab-settings h2", has_text=re.compile("^Zotero$"))).to_have_count(0)  # no Zotero card now
         assert not errors, errors
         b.close()

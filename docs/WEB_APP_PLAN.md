@@ -168,6 +168,9 @@ jobs run after their request is answered (no threads in Pyodide; see step 2). On
    Mendeley: if Mendeley refuses the implicit grant or hides the `Link` header (libraries over 500), move the
    sign-in and paging to the bridge. Settings (7 Nov): connector help is three tiles (Claude, ChatGPT, Claude
    Code) that open a step-by-step window with simplified SVG pictures; the browser button has one too.
+   Import (7 Nov): four tiles (file, Zotero, Mendeley, EndNote), each a window with pictures and its action;
+   the Zotero user ID/key moved there (Settings' Zotero card removed). EndNote XML exports are read
+   (`library.parse_endnote_xml`), in the desktop app too.
 5. Claim check (section 4, step 1).
 6. Cloud copy (Phase B) → Overleaf live link → Word add-in (Office.js) on AppSource.
 7. Site: lead with "Open Citrello" (web), desktop as a secondary download; "What AI can't do" section/demo.

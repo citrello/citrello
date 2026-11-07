@@ -160,8 +160,11 @@ def test_01_starts_with_an_empty_library(page):
 def test_02_import_bibtex_keeps_keys(page, env):
     page.click("#openImport")
     page.fill("#importProject", "Thesis")
+    page.click('[data-guide="imp-file"]')  # the Import tiles open a window
     page.set_input_files("#importFile", write(env, "refs.bib", BIB))
-    expect(page.locator("#importMsg")).to_contain_text("3 added", timeout=20000)
+    expect(page.locator("#gResult")).to_contain_text("3 added", timeout=20000)
+    expect(page.locator("#importMsg")).to_contain_text("3 added")
+    page.click("#gNext")  # Close
     expect(page.locator("#libRows .ref")).to_have_count(3)
     for key in ("topham2017", "vetters2024", "burton2011"):
         expect(page.locator(f'#libRows .ref[data-sel="{key}"]')).to_be_visible()
@@ -434,8 +437,11 @@ def test_11b_import_zotero_on_this_computer(page, env):
     zfix.make_db(os.path.join(env["CITRELLO_ZOTERO_DIR"], "zotero.sqlite"))
     tab(page, "library")
     page.click("#openImport")
+    page.click('[data-guide="imp-zotero"]')
     page.click("#impZoteroLocal")
     expect(page.locator("#importMsg")).to_contain_text("2 Zotero collections are now in Projects", timeout=20000)
+    shot(page, "zotero-window")
+    page.click("#gNext")
     expect(page.locator('#projNav [data-proj-nav="Thesis / Chapter 2"]')).to_be_visible()
     expect(page.locator('#libRows .ref[data-sel="Orsted"]').or_(page.locator("#libRows .ref", has_text="Our offshore wind farms"))).to_be_visible()
     shot(page, "zotero-imported")

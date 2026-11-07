@@ -132,6 +132,15 @@
   .g-dots i { width: 8px; height: 8px; border-radius: 50%; background: var(--line); }
   .g-dots i.on { background: var(--accent); }
   .g-note { margin: 10px 0 0; font-size: 12px; }
+  dialog.guide.sheet { width: min(720px, calc(100vw - 32px)); }
+  dialog.guide.sheet .g-art, dialog.guide.sheet .g-count, dialog.guide.sheet #gStep,
+  dialog.guide.sheet .g-dots, dialog.guide.sheet #gBack { display: none; }
+  .g-sec { display: grid; grid-template-columns: 220px 1fr; gap: 16px; align-items: start; padding: 14px 0; border-top: 1px solid var(--line); }
+  .g-sec:first-child { border-top: 0; }
+  .g-sec-art { border-radius: 10px; background: var(--bg); border: 1px solid var(--line); overflow: hidden; }
+  .g-sec-art svg { display: block; width: 100%; height: auto; }
+  .g-sec h3 { margin: 0 0 4px; } .g-sec p { margin: 0 0 10px; } .g-sec .drop { margin-top: 4px; padding: 16px; }
+  @media (max-width: 600px) { .g-sec { grid-template-columns: 1fr; } }
   .g-copy { display: flex; gap: 8px; align-items: center; margin: 6px 0; }
   .g-copy code { flex: 1; padding: 6px 10px; border-radius: 8px; background: var(--sky); color: var(--cobalt); font-size: 13px; overflow-wrap: anywhere; }
   .g-copy button { padding: 5px 12px; }
@@ -294,31 +303,16 @@
       </div>
 
       <div class="panel hidden" id="importPanel">
-        <strong>Import</strong>
-        <div class="grid2">
-          <div>
-            <h3>From a file</h3>
-            <p class="muted small" style="margin:0">RIS, BibTeX or CSL-JSON, exported from Mendeley (File → Export), Zotero (right-click a collection → Export), EndNote or another tool.</p>
-            <div class="row"><input type="file" id="importFile" accept=".ris,.bib,.json,.txt"></div>
-          </div>
-          <div>
-            <div class="desktop-only">
-            <h3>From Zotero on this computer</h3>
-            <div class="row"><button class="primary" id="impZoteroLocal">Import my Zotero library</button></div>
-            <p class="muted small" style="margin:6px 0 0">No account or key needed, and Zotero can stay open. Your collections become projects.</p>
-            </div>
-            <div class="web-only">
-            <h3>From Zotero on this computer</h3>
-            <div class="row"><label class="btn primary" for="impZoteroFile">Choose zotero.sqlite…</label>
-              <input type="file" id="impZoteroFile" accept=".sqlite,.bak" hidden></div>
-            <p class="muted small" style="margin:6px 0 0">Zotero's library file is in your Zotero folder: on Windows <code>C:\Users\<i>you</i>\Zotero</code>, on a Mac your home folder → Zotero (in Zotero: Settings → Advanced → Files and Folders → Show Data Directory). It's read in this browser, not uploaded. Your collections become projects.</p>
-            </div>
-            <h3>From an account</h3>
-            <div class="row"><button id="impMendeley" class="desktop-only">Import my Mendeley library</button>
-              <button id="impMendeleyWeb" class="web-only mendeley-web hidden">Import my Mendeley library</button>
-              <button id="impZotero">Zotero online library</button></div>
-            <p class="muted small" style="margin:6px 0 0"><span class="desktop-only">Connect the accounts under Settings first.</span><span class="web-only">For Zotero online, add your user ID and key under Settings first. <span class="mendeley-web hidden">Mendeley asks you to sign in, then your library comes straight into this browser. </span>Or from <b>Mendeley</b>: in Mendeley Reference Manager select all references, then File → Export (BibTeX or RIS), and choose that file under “From a file”.</span></p>
-          </div>
+        <strong>Import</strong> <span class="muted small">Duplicates are skipped, so importing twice is safe.</span>
+        <div class="guide-tiles" role="list">
+          <button class="guide-tile" data-guide="imp-file" role="listitem"><span class="gt-icon gt-3" aria-hidden="true">⇪</span>
+            <span><b>From a file</b><span class="small muted">RIS, BibTeX, CSL-JSON or EndNote XML</span></span></button>
+          <button class="guide-tile" data-guide="imp-zotero" role="listitem"><span class="gt-icon" aria-hidden="true">Z</span>
+            <span><b>Zotero</b><span class="small muted">Collections become projects</span></span></button>
+          <button class="guide-tile" data-guide="imp-mendeley" role="listitem"><span class="gt-icon gt-2" aria-hidden="true">M</span>
+            <span><b>Mendeley</b><span class="small muted">Sign in, or use an exported file</span></span></button>
+          <button class="guide-tile" data-guide="imp-endnote" role="listitem"><span class="gt-icon gt-3" aria-hidden="true">E</span>
+            <span><b>EndNote</b><span class="small muted">From an exported file</span></span></button>
         </div>
         <div class="row"><input type="text" id="importProject" list="projectList" placeholder="Put into project (optional)"></div>
         <div id="importMsg"></div>
@@ -545,8 +539,8 @@
       </div>
     </div>
 
-    <div class="card grid2">
-      <div class="desktop-only">
+    <div class="card desktop-only">
+      <div>
         <h2>Mendeley</h2>
         <div id="mSetup" class="hidden">
           <p class="small muted">Enter your Mendeley app ID and secret (register a free app at <a href="https://dev.mendeley.com/myapps.html" target="_blank" rel="noopener">dev.mendeley.com</a> with the redirect URL <code>http://localhost:8585/callback</code>).</p>
@@ -558,13 +552,6 @@
           <a class="btn" href="/login">Connect to Mendeley</a></div>
         <div id="mIn" class="hidden"><p>Connected as <strong id="who"></strong>. <button class="link" id="logout">Disconnect</button></p></div>
         <div id="loginErr" class="notice err hidden"></div>
-      </div>
-      <div>
-        <h2>Zotero</h2>
-        <p class="small muted">To import your Zotero library: your user ID and a read-only API key from <a href="https://www.zotero.org/settings/keys" target="_blank" rel="noopener">zotero.org/settings/keys</a>.</p>
-        <label class="field">User ID<input type="text" id="zUser"></label>
-        <label class="field">API key<input type="password" id="zKey" placeholder=""></label>
-        <div class="row"><button id="zSave">Save</button><span class="small muted" id="zMsg"></span></div>
       </div>
     </div>
   </section>
@@ -667,8 +654,6 @@ async function loadStatus() {
   show("mSetup", !status.configured); show("mOut", status.configured && !status.connected); show("mIn", status.connected);
   $("who").textContent = status.name || "";
   $("email").value = status.email || "";
-  $("zUser").value = status.zotero_user || "";
-  $("zKey").placeholder = status.has_zotero_key ? "saved" : "";
   $("usageStats").checked = status.usage_stats;
 }
 async function loadStyles() {
@@ -706,7 +691,6 @@ stylePicker($("styleFind"), $("styleFindList"), $("styleMsg"), async (id) => {
 $("saveEmail").onclick = async () => { await post("/api/config", {email: $("email").value}); toast("Saved"); };
 $("saveCfg").onclick = async () => { await post("/api/config", {client_id: $("cid").value, client_secret: $("csec").value}); loadStatus(); };
 $("logout").onclick = async () => { await post("/api/logout"); loadStatus(); };
-$("zSave").onclick = async () => { await post("/api/config", {zotero_user: $("zUser").value, zotero_key: $("zKey").value}); $("zKey").value = ""; loadStatus(); $("zMsg").textContent = "Saved."; };
 $("quit").onclick = async () => {
   await post("/api/quit").catch(() => {});
   document.body.innerHTML = '<main class="main" style="max-width:640px;margin:15vh auto;text-align:center"><h1>Citrello has closed.</h1><p class="muted">You can close this tab. Claude Desktop and Codex keep working; ChatGPT and Claude on the web need Citrello running.</p></main>';
@@ -870,8 +854,100 @@ const GUIDES = {
      html: `<p>On any paper's page, click <b>Add to Citrello</b>; a small window shows what it found. To add a paper the page only mentions, select its reference first.</p>`},
   ]}),
 };
+// more pictures, for the import windows
+Object.assign(A, {
+  // a folder with one file highlighted
+  folder(app, files, hi) {
+    const rows = files.map((f, i) => {
+      const y = 70 + i * 28, on = f === hi;
+      return (on ? `<rect class="a-hi" x="44" y="${y - 18}" width="220" height="26" rx="7"/>` : "") +
+        `<rect class="${f.includes(".") ? "a-box" : "a-btn"}" x="56" y="${y - 12}" width="12" height="15" rx="2"/>
+         <text class="${on ? "a-txt" : "a-mut"}" x="78" y="${y}">${esc(f)}</text>`;
+    }).join("");
+    const i = files.indexOf(hi);
+    return A.svg(`The ${app} folder with ${hi} highlighted`, A.win(app, rows + (i >= 0 ? A.cursor(240, 60 + i * 28) : "")));
+  },
+  // a menu bar with File open and one item highlighted
+  fileMenu(app, items, hi) {
+    const rows = items.map((t, i) => {
+      const y = 92 + i * 26, on = t === hi;
+      return (on ? `<rect class="a-hi" x="44" y="${y - 17}" width="150" height="24" rx="6"/>` : "") +
+        `<text class="${on ? "a-txt" : "a-mut"}" x="56" y="${y}">${esc(t)}</text>`;
+    }).join("");
+    const i = items.indexOf(hi);
+    return A.svg(`${app}: File menu, ${hi} highlighted`, A.win(app, `
+      <text class="a-txt" x="48" y="62">File</text><text class="a-mut" x="92" y="62">Edit</text><text class="a-mut" x="136" y="62">View</text>
+      <rect class="a-win" x="38" y="70" width="166" height="${items.length * 26 + 12}" rx="8"/>${rows}` +
+      (i >= 0 ? A.cursor(176, 80 + i * 26) : ""), 440, 180));
+  },
+  // the four kinds of file Citrello reads
+  files() {
+    const kinds = [["RIS", ".ris"], ["BibTeX", ".bib"], ["CSL-JSON", ".json"], ["EndNote", ".xml"]];
+    return A.svg("File types: RIS, BibTeX, CSL-JSON and EndNote XML", kinds.map(([name, ext], i) => {
+      const x = 40 + i * 104;
+      return `<path class="a-win" d="M${x} 40h56l20 20v96a8 8 0 0 1-8 8h-68a8 8 0 0 1-8-8v-108a8 8 0 0 1 8-8z"/>
+        <path class="a-top" d="M${x + 56} 40v20h20z"/><text class="a-txt" x="${x + 38}" y="112" text-anchor="middle">${ext}</text>
+        <text class="a-mut" x="${x + 38}" y="190" text-anchor="middle">${name}</text>`;
+    }).join(""));
+  },
+  // zotero.org's key page: the user ID and the new key button
+  zoteroKeys() {
+    return A.svg("zotero.org settings: your user ID and the button for a new key", A.win("zotero.org · Settings · Security",
+      `<text class="a-txt" x="50" y="68">Applications</text>
+       <rect class="a-hi" x="44" y="80" width="330" height="28" rx="7"/><text class="a-txt" x="56" y="99">Your user ID for API calls is 1234567</text>
+       <rect class="a-btn" x="50" y="124" width="170" height="30" rx="8"/><text class="a-btnt" x="135" y="144" text-anchor="middle">Create new private key</text>
+       ${A.cursor(200, 138)}`));
+  },
+});
+const fileDrop = (what) => `<label class="drop" for="importFile"><input type="file" id="importFile" accept=".ris,.bib,.json,.txt,.xml" hidden>
+  <strong>Choose ${esc(what)}</strong> or drag it here</label>`;
+Object.assign(GUIDES, {
+  "imp-file": () => ({title: "Import from a file", sections: [
+    {art: A.files(), title: "RIS, BibTeX, CSL-JSON or EndNote XML", html: `<p>Exported from any reference manager: Zotero (right-click a collection → Export), Mendeley, EndNote, Papers, JabRef… Your keys and duplicates are handled for you.</p>${fileDrop("a file")}`},
+  ]}),
+  "imp-zotero": () => ({title: "Import from Zotero", sections: [
+    IS_WEB
+      ? {art: A.folder("Zotero", ["storage", "styles", "zotero.sqlite", "zotero.sqlite.bak"], "zotero.sqlite"), title: "Zotero on this computer",
+         html: `<p>Choose <b>zotero.sqlite</b> in your Zotero folder: on Windows <code>C:\\Users\\<i>you</i>\\Zotero</code>, on a Mac your home folder → Zotero. In Zotero: <b>Settings → Advanced → Files and Folders → Show Data Directory</b>. It's read in this browser, not uploaded.</p>
+           <label class="btn primary" for="impZoteroFile">Choose zotero.sqlite…</label><input type="file" id="impZoteroFile" accept=".sqlite,.bak" hidden>`}
+      : {art: A.folder("Zotero", ["storage", "styles", "zotero.sqlite"], "zotero.sqlite"), title: "Zotero on this computer",
+         html: `<p>One click: Citrello reads Zotero's own library. No account or key, and Zotero can stay open.</p><button class="primary" id="impZoteroLocal">Import my Zotero library</button>`},
+    {art: A.zoteroKeys(), title: "Or your Zotero online library",
+     html: `<p>On <a href="https://www.zotero.org/settings/keys" target="_blank" rel="noopener">zotero.org/settings/keys</a>, copy your <b>user ID</b> and create a <b>read-only key</b>.</p>
+       <div class="row"><input type="text" id="zUser" placeholder="User ID" value="${esc(status.zotero_user || "")}" style="max-width:140px">
+       <input type="password" id="zKey" placeholder="${status.has_zotero_key ? "Key (saved)" : "Key"}" style="max-width:200px">
+       <button id="impZotero">Import</button></div>`},
+  ]}),
+  "imp-mendeley": () => ({title: "Import from Mendeley", sections: [
+    IS_WEB
+      ? {art: A.form("mendeley.com", "Sign in to Mendeley", [["Email", "you@university.edu"], ["Password", "••••••••"]], "Sign in"), title: "Sign in to Mendeley", cls: "mendeley-web hidden",
+         html: `<p>Your library comes straight from Mendeley into this browser. Nothing goes through Citrello's servers.</p><button class="primary" id="impMendeleyWeb">Import my Mendeley library</button>`}
+      : {art: A.form("mendeley.com", "Sign in to Mendeley", [["Email", "you@university.edu"], ["Password", "••••••••"]], "Sign in"), title: "From your Mendeley account",
+         html: status.connected ? `<p>Connected as <b>${esc(status.name || "")}</b>.</p><button class="primary" id="impMendeley">Import my Mendeley library</button>`
+                                : `<p>Connect your Mendeley account first: <b>Settings → Mendeley</b>.</p>`},
+    {art: A.fileMenu("Mendeley Reference Manager", ["New library", "Import", "Export…", "Sync"], "Export…"), title: "Or export a file",
+     html: `<p>In Mendeley Reference Manager, select all references (<b>Ctrl+A</b>, Mac <b>Cmd+A</b>), then <b>File → Export…</b> and choose <b>BibTeX</b> or <b>RIS</b>.</p>${fileDrop("the exported file")}`},
+  ]}),
+  "imp-endnote": () => ({title: "Import from EndNote", sections: [
+    {art: A.form("EndNote · Export", "Export library", [["File name", "My library"], ["Save as type", "XML (*.xml)"]], "Save"), title: "Export from EndNote",
+     html: `<p>In EndNote, select all references (<b>Ctrl+A</b>, Mac <b>Cmd+A</b>), then <b>File → Export…</b>. Set <b>Save as type</b> to <b>XML</b> and save. (A RIS export works too.)</p>${fileDrop("the EndNote file")}`},
+  ]}),
+});
+
 let guide = null, guideStep = 0;
 function renderGuide() {
+  const sheet = !!guide.sections;  // options side by side, with their buttons, instead of steps
+  $("guide").classList.toggle("sheet", sheet);
+  $("gTitle").textContent = guide.title;
+  if (sheet) {
+    $("gArt").innerHTML = ""; $("gCount").textContent = ""; $("gStep").textContent = "";
+    $("gText").innerHTML = guide.sections.map((x) => `<div class="g-sec ${x.cls || ""}"><div class="g-sec-art">${x.art}</div>
+      <div><h3>${esc(x.title)}</h3>${x.html}</div></div>`).join("") + `<div id="gResult"></div>`;
+    $("gNext").textContent = "Close";
+    if (window.citrelloWeb) window.citrelloWeb.config().then((c) => document.querySelectorAll("#guide .mendeley-web")
+      .forEach((el) => el.classList.toggle("hidden", !c.mendeley_client_id)));
+    return;
+  }
   const st = guide.steps[guideStep], n = guide.steps.length;
   $("gTitle").textContent = guide.title;
   $("gArt").innerHTML = st.art;
@@ -884,12 +960,13 @@ function renderGuide() {
 }
 function openGuide(name) {
   guide = GUIDES[name](); guideStep = 0; renderGuide();
-  $("guide").showModal(); $("gNext").focus();
+  $("guide").showModal();
+  (guide.sections ? $("guide").querySelector("#gText button, #gText label.btn, #gText .drop") || $("gNext") : $("gNext")).focus();
 }
 document.addEventListener("click", (e) => {
   const t = e.target.closest("[data-guide]"); if (t) openGuide(t.dataset.guide);
 });
-$("gNext").onclick = () => { if (guideStep < guide.steps.length - 1) { guideStep++; renderGuide(); } else $("guide").close(); };
+$("gNext").onclick = () => { if (guide.steps && guideStep < guide.steps.length - 1) { guideStep++; renderGuide(); } else $("guide").close(); };
 $("gBack").onclick = () => { if (guideStep > 0) { guideStep--; renderGuide(); } };
 $("gClose").onclick = () => $("guide").close();
 $("guide").addEventListener("click", async (e) => {
@@ -899,6 +976,7 @@ $("guide").addEventListener("click", async (e) => {
   if (e.target.closest("[data-copy-bookmarklet]")) { await navigator.clipboard.writeText(BOOKMARKLET).catch(() => {}); toast("Copied: paste it as a bookmark's address"); }
 });
 $("guide").addEventListener("keydown", (e) => {
+  if (!guide.steps || e.target.closest("input")) return;
   if (e.key === "ArrowRight" && guideStep < guide.steps.length - 1) { guideStep++; renderGuide(); }
   if (e.key === "ArrowLeft" && guideStep > 0) { guideStep--; renderGuide(); }
 });
@@ -1309,53 +1387,74 @@ $("addGo").onclick = async () => {
   } catch (e) { $("addResults").innerHTML = `<div class="notice err">${esc(e.message)}</div>`; }
   $("addGo").disabled = false; $("addMsg").textContent = "";
 };
-$("importFile").onchange = async (ev) => {
-  const f = ev.target.files[0]; if (!f) return;
-  notice("importMsg", "warn", "Importing…");
+// ---------- import (the windows behind the Import tiles) ----------
+function impNote(kind, html) {  // the result, in the window and under the tiles
+  notice("importMsg", kind, html);
+  if ($("gResult")) notice("gResult", kind, html);
+}
+const impProject = () => $("importProject").value;
+async function importFile(f) {
+  if (!f) return;
+  impNote("warn", "Importing…");
   try {
     const r = await api("/api/library/import", {method: "POST", body: await f.arrayBuffer(),
-      headers: {"X-Filename": encodeURIComponent(f.name), "X-Project": encodeURIComponent($("importProject").value)}});
-    notice("importMsg", "ok", `${r.added} added, ${r.skipped} skipped (already in the library or incomplete).`); loadLibrary();
-  } catch (e) { notice("importMsg", "err", esc(e.message)); }
-  ev.target.value = "";
-};
-async function accountImport(path) {
-  notice("importMsg", "warn", "Importing… (large libraries take a while)");
-  try { const r = await post(path, {project: $("importProject").value}); notice("importMsg", "ok", `${r.added} added, ${r.skipped} already in your library.`); loadLibrary(); }
-  catch (e) { notice("importMsg", "err", esc(e.message)); }
+      headers: {"X-Filename": encodeURIComponent(f.name), "X-Project": encodeURIComponent(impProject())}});
+    impNote("ok", `${r.added} added, ${r.skipped} skipped (already in the library or incomplete).`); loadLibrary();
+  } catch (e) { impNote("err", esc(e.message)); }
 }
-$("impMendeley").onclick = () => accountImport("/api/library/import-mendeley");
-$("impZotero").onclick = () => accountImport("/api/library/import-zotero");
 const zoteroDone = (r) => {
-  notice("importMsg", "ok", `${r.added} added, ${r.skipped} already in your library` +
+  impNote("ok", `${r.added} added, ${r.skipped} already in your library` +
     (r.collections ? `. Your ${r.collections} Zotero collection${r.collections > 1 ? "s are" : " is"} now in Projects.` : ".") +
     (r.from_backup ? " (Read from Zotero's latest automatic backup: close Zotero and import again to include today's changes.)" : ""));
   loadLibrary();
 };
-$("impZoteroLocal").onclick = async () => {
-  notice("importMsg", "warn", "Reading your Zotero library…");
-  try { zoteroDone(await post("/api/library/import-zotero-local", {project: $("importProject").value})); }
-  catch (e) { notice("importMsg", "err", esc(e.message)); }
+async function accountImport(path, body = {}) {
+  impNote("warn", "Importing… (large libraries take a while)");
+  try { const r = await post(path, {project: impProject(), ...body}); impNote("ok", `${r.added} added, ${r.skipped} already in your library.`); loadLibrary(); }
+  catch (e) { impNote("err", esc(e.message)); }
+}
+const IMPORT_ACTIONS = {
+  impZoteroLocal: async () => {
+    impNote("warn", "Reading your Zotero library…");
+    try { zoteroDone(await post("/api/library/import-zotero-local", {project: impProject()})); }
+    catch (e) { impNote("err", esc(e.message)); }
+  },
+  impZotero: () => accountImport("/api/library/import-zotero", {user: $("zUser").value.trim(), key: $("zKey").value.trim()}),
+  impMendeley: () => accountImport("/api/library/import-mendeley"),
+  impMendeleyWeb: async () => {  // the web app: sign in to Mendeley in a pop-up, then import
+    impNote("warn", "Sign in to Mendeley in the window that opened…");
+    try {
+      const token = await window.citrelloWeb.mendeleyToken();
+      impNote("warn", "Importing your Mendeley library…");
+      const r = await post("/api/web/import-mendeley", {token, project: impProject()});
+      impNote("ok", `${r.added} added from Mendeley, ${r.skipped} already in your library.`);
+      loadLibrary();
+    } catch (e) { impNote("err", esc(e.message)); }
+  },
 };
-$("impMendeleyWeb").onclick = async () => {  // the web app: sign in to Mendeley in a pop-up, then import
-  notice("importMsg", "warn", "Sign in to Mendeley in the window that opened…");
-  try {
-    const token = await window.citrelloWeb.mendeleyToken();
-    notice("importMsg", "warn", "Importing your Mendeley library…");
-    const r = await post("/api/web/import-mendeley", {token, project: $("importProject").value});
-    notice("importMsg", "ok", `${r.added} added from Mendeley, ${r.skipped} already in your library.`);
-    loadLibrary();
-  } catch (e) { notice("importMsg", "err", esc(e.message)); }
-};
-$("impZoteroFile").onchange = async () => {  // the web app: Zotero's own file, picked by the person
-  const f = $("impZoteroFile").files[0]; $("impZoteroFile").value = "";
-  if (!f) return;
-  notice("importMsg", "warn", "Reading your Zotero library…");
-  try {
-    zoteroDone(await api("/api/web/import-zotero-file", {method: "POST", body: await f.arrayBuffer(),
-      headers: {"X-Project": encodeURIComponent($("importProject").value)}}));
-  } catch (e) { notice("importMsg", "err", esc(e.message)); }
-};
+$("guide").addEventListener("click", (e) => {
+  const b = e.target.closest("button[id]");
+  if (b && IMPORT_ACTIONS[b.id]) IMPORT_ACTIONS[b.id]();
+});
+$("guide").addEventListener("change", async (e) => {
+  const f = e.target.files && e.target.files[0];
+  if (e.target.id === "importFile") importFile(f);
+  if (e.target.id === "impZoteroFile" && f) {  // the web app: Zotero's own file, picked by the person
+    impNote("warn", "Reading your Zotero library…");
+    try {
+      zoteroDone(await api("/api/web/import-zotero-file", {method: "POST", body: await f.arrayBuffer(),
+        headers: {"X-Project": encodeURIComponent(impProject())}}));
+    } catch (err) { impNote("err", esc(err.message)); }
+  }
+  if (e.target.type === "file") e.target.value = "";
+});
+$("guide").addEventListener("dragover", (e) => { if (e.target.closest(".drop")) e.preventDefault(); });
+$("guide").addEventListener("drop", (e) => {
+  if (!e.target.closest(".drop")) return;
+  e.preventDefault();
+  const input = e.target.closest(".drop").querySelector("input[type=file]");
+  if (input && input.id === "importFile") importFile(e.dataTransfer.files[0]);
+});
 function setExportLinks() {
   const q = encodeURIComponent($("q").value), p = encodeURIComponent($("projectFilter").value);
   ["ris", "bib", "biblatex", "json"].forEach((f) => $("exp" + f[0].toUpperCase() + f.slice(1)).href = `/api/library/export?fmt=${f}&q=${q}&project=${p}`);

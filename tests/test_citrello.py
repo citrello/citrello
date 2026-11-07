@@ -266,3 +266,35 @@ def test_change_projects_for_many(tmp_path, monkeypatch):
     by = {it["key"]: it["projects"] for it in library.load()["items"]}
     assert by[keys[0]] == ["New"] and by[keys[2]] == ["Moved"]
     assert {"New", "Moved"} <= set(library.load()["projects"])
+
+
+ENDNOTE_XML = """<?xml version="1.0" encoding="UTF-8" ?><xml><records>
+<record><database name="My EndNote Library.enl">My EndNote Library.enl</database><rec-number>1</rec-number>
+<ref-type name="Journal Article">17</ref-type>
+<contributors><authors><author><style face="normal" font="default" size="100%">Topham, Eva</style></author>
+<author><style face="normal" font="default" size="100%">McMillan, David</style></author></authors></contributors>
+<titles><title><style face="normal" font="default" size="100%">Sustainable decommissioning of an offshore wind farm</style></title>
+<secondary-title><style face="normal" font="default" size="100%">Renewable Energy</style></secondary-title></titles>
+<pages><style face="normal" font="default" size="100%">470-480</style></pages><volume><style>102</style></volume>
+<dates><year><style face="normal" font="default" size="100%">2017</style></year></dates>
+<electronic-resource-num><style face="normal" font="default" size="100%">https://doi.org/10.1016/j.renene.2016.10.066</style></electronic-resource-num>
+</record>
+<record><ref-type name="Book">6</ref-type><contributors><authors><author>Burton, Tony</author></authors>
+<secondary-authors><author>Jenkins, Nick</author></secondary-authors></contributors>
+<titles><title>Wind Energy Handbook</title></titles><publisher>Wiley</publisher><pub-location>Chichester</pub-location>
+<isbn>9780470699751</isbn><dates><year>2011</year></dates></record>
+<record><ref-type name="Journal Article">17</ref-type><titles><title></title></titles></record>
+</records></xml>"""
+
+
+def test_endnote_xml_import():
+    items = library.parse_any(ENDNOTE_XML, "My EndNote Library.xml")
+    assert len(items) == 2  # the record without a title is skipped
+    a, b = items
+    assert a["type"] == "article-journal" and a["DOI"] == "10.1016/j.renene.2016.10.066"
+    assert a["author"][0] == {"family": "Topham", "given": "Eva"} and a["container-title"] == "Renewable Energy"
+    assert a["issued"] == {"date-parts": [[2017]]} and a["page"] == "470-480" and a["volume"] == "102"
+    assert b["type"] == "book" and b["ISBN"] == "9780470699751" and b["editor"][0]["family"] == "Jenkins"
+    assert library.parse_any(ENDNOTE_XML.replace('<?xml version="1.0" encoding="UTF-8" ?>', ""), "export.txt")[0]["title"]
+    with pytest.raises(ValueError):
+        library.parse_any("<xml><records><record><titles>", "broken.xml")

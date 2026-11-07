@@ -64,8 +64,10 @@ def test_browser_tab_is_the_device(browser_name, tmp_path):
         page.click("#wWebStart")
         expect(page.locator("#connText")).to_have_text("Web connectors: not signed in")
         page.click("#openImport")
+        page.click('[data-guide="imp-file"]')
         page.set_input_files("#importFile", str(bib))
         expect(page.locator("#libRows .ref")).to_have_count(2, timeout=60000)  # the third entry is a duplicate
+        page.click("#gNext")
 
         # sign in with an emailed code (the local bridge hands the latest code to the test)
         page.click('.side button.navb[data-tab="settings"]')

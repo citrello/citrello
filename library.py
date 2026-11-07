@@ -594,9 +594,68 @@ def parse_bibtex(text):
     return items
 
 
+ENDNOTE_TYPES = {"journal article": "article-journal", "book": "book", "book section": "chapter",
+                 "edited book": "book", "conference proceedings": "paper-conference", "conference paper": "paper-conference",
+                 "thesis": "thesis", "report": "report", "government document": "report", "web page": "webpage",
+                 "electronic article": "article-journal", "magazine article": "article-magazine",
+                 "newspaper article": "article-newspaper", "patent": "patent", "dataset": "dataset"}
+
+
+def parse_endnote_xml(text):
+    """EndNote's own export (File → Export → XML): <xml><records><record>… -> CSL items."""
+    import xml.etree.ElementTree as ET
+    try:
+        root = ET.fromstring(text.lstrip("\ufeff \n\r\t"))
+    except ET.ParseError as e:
+        raise ValueError(f"This EndNote XML file couldn't be read ({e}).")
+
+    def txt(rec, path):
+        el = rec.find(path)
+        return re.sub(r"\s+", " ", "".join(el.itertext())).strip() if el is not None else ""
+
+    def names(rec, path):
+        out = []
+        for el in rec.findall(path):
+            n = re.sub(r"\s+", " ", "".join(el.itertext())).strip().rstrip(",")
+            if not n:
+                continue
+            fam, _, given = n.partition(",")
+            out.append({"family": fam.strip(), "given": given.strip()} if given.strip() else {"literal": fam.strip()})
+        return out
+
+    items = []
+    for rec in root.iter("record"):
+        rt = rec.find("ref-type")
+        kind = ENDNOTE_TYPES.get(((rt.get("name") if rt is not None else "") or "").strip().lower(), "article")
+        c = {"type": kind, "title": txt(rec, "titles/title"),
+             "container-title": txt(rec, "titles/secondary-title") or txt(rec, "periodical/full-title"),
+             "volume": txt(rec, "volume"), "issue": txt(rec, "number"), "page": txt(rec, "pages"),
+             "publisher": txt(rec, "publisher"), "publisher-place": txt(rec, "pub-location"),
+             "ISBN": txt(rec, "isbn") if kind in ("book", "chapter") else "",
+             "ISSN": txt(rec, "isbn") if kind not in ("book", "chapter") else "",
+             "URL": txt(rec, "urls/related-urls/url"), "abstract": txt(rec, "abstract")}
+        doi = core.clean_doi(txt(rec, "electronic-resource-num"))
+        if doi and doi.startswith("10."):
+            c["DOI"] = doi
+        authors, editors = names(rec, "contributors/authors/author"), names(rec, "contributors/secondary-authors/author")
+        if authors:
+            c["author"] = authors
+        if editors:
+            c["editor"] = editors
+        year = re.search(r"\d{4}", txt(rec, "dates/year"))
+        if year:
+            c["issued"] = {"date-parts": [[int(year.group())]]}
+        c = {k: v for k, v in c.items() if v}
+        if c.get("title"):
+            items.append(c)
+    return items
+
+
 def parse_any(text, filename=""):
     name = filename.lower()
     t = text.lstrip("\ufeff \n\r\t")
+    if name.endswith(".xml") or (t.startswith("<") and "<record" in t[:5000]):
+        return parse_endnote_xml(text)
     if name.endswith(".json") or t.startswith("[") or t.startswith("{"):
         data = json.loads(t)
         if isinstance(data, dict):
@@ -606,7 +665,7 @@ def parse_any(text, filename=""):
         return parse_bibtex(text)
     if re.search(r"^TY  -", t, re.M):
         return parse_ris(text)
-    raise ValueError("Unrecognised file. Use RIS (.ris), BibTeX (.bib) or CSL-JSON (.json).")
+    raise ValueError("Unrecognised file. Use RIS (.ris), BibTeX (.bib), CSL-JSON (.json) or EndNote XML (.xml).")
 
 
 def import_items(cslist, project=None, source="import", extra_key=None, keymap=None):
