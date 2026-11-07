@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Mendeley sign-in</title>
+<meta name="robots" content="noindex">
+<style>
+  :root { --bg: #f6f8fd; --ink: #14213d; --muted: #4a5774; }
+  @media (prefers-color-scheme: dark) { :root { --bg: #0f1730; --ink: #e8edf8; --muted: #a9b5d3; } }
+  body { margin: 0; min-height: 100vh; display: grid; place-items: center; padding: 16px; background: var(--bg);
+         color: var(--ink); font: 16px/1.5 Figtree, system-ui, sans-serif; text-align: center; }
+  p { max-width: 380px; }
+  .muted { color: var(--muted); font-size: 14px; }
+</style>
+</head>
+<body>
+<div><p id="msg">Signed in to Mendeley. Importing in your Citrello tab…</p>
+<p class="muted">You can close this window.</p></div>
+<script>
+// Mendeley sends the sign-in here (citrello.app/app/mendeley.html#access_token=…&state=…). Hand it to the Citrello
+// tab that asked (same site only) and close. The token stays in this browser; no Citrello server sees it.
+(function () {
+  const p = new URLSearchParams(location.hash.slice(1) || location.search.slice(1));
+  history.replaceState(null, "", location.pathname);  // keep the token out of the address bar and history
+  const msg = { state: p.get("state"), access_token: p.get("access_token"),
+                error: p.get("error_description") || p.get("error") };
+  if (!msg.access_token) document.getElementById("msg").textContent = "Mendeley didn't sign you in" +
+    (msg.error ? ": " + msg.error : ".") + " Close this window and try again.";
+  try { new BroadcastChannel("citrello-mendeley").postMessage(msg); } catch (e) {}
+  if (msg.access_token) setTimeout(() => window.close(), 600);
+})();
+</script>
+</body>
+</html>

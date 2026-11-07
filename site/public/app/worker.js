@@ -9,6 +9,7 @@ const DATA = "/home/web";
 // The bridge ChatGPT and Claude reach this tab through. A local test bridge only for a locally served copy.
 const LOCAL = ["localhost", "127.0.0.1"].includes(self.location.hostname);
 const BRIDGE = (LOCAL && new URLSearchParams(self.location.search).get("bridge")) || "https://mcp.citrello.app";
+const MENDELEY_API = (LOCAL && new URLSearchParams(self.location.search).get("mendeley_api")) || "";
 
 function browserName() {
   const ua = navigator.userAgent;
@@ -56,6 +57,8 @@ import os, sys
 os.environ["HOME"] = "${DATA}"
 os.environ["CITRELLO_NO_USAGE"] = "1"
 os.environ["CITRELLO_BRIDGE"] = ${JSON.stringify(BRIDGE)}
+if ${JSON.stringify(MENDELEY_API)}:
+    os.environ["CITRELLO_API"] = ${JSON.stringify(MENDELEY_API)}   # app.py points Mendeley calls there (tests)
 sys.path.insert(0, "/citrello")
 import pyodide_http
 pyodide_http.patch_all()          # urllib -> the browser's own requests

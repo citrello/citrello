@@ -40,6 +40,10 @@
   Developer Program, not done.
 
 ## Things Armin still needs to do (remind him)
+- **Register Citrello's Mendeley app** so "Import my Mendeley library" appears in the web app: dev.mendeley.com →
+  My Apps → Register a new app, redirect URL `https://citrello.app/app/mendeley.html`; then put its **ID** (not
+  the secret) in GitHub → Settings → Secrets and variables → Actions → **Variables** → `MENDELEY_CLIENT_ID`, and
+  re-run "Deploy website". Until then the button stays hidden and the export instructions show.
 - **Apply to the directories** (steps were given in the session of 6 Nov 2026): Claude at claude.ai/directory/manage
   (MCP connector, URL https://mcp.citrello.app/mcp); ChatGPT at platform.openai.com/apps-manage. Both want a privacy
   policy (citrello.app/privacy), a test account for reviewers and example prompts.

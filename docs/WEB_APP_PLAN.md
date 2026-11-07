@@ -161,9 +161,13 @@ jobs run after their request is answered (no threads in Pyodide; see step 2). On
    `clip.html`); it asks an open Citrello tab over a BroadcastChannel (only `/api/clip/` requests are answered),
    or starts Citrello itself when no tab is open. Zotero: the online library works as is (api.zotero.org allows
    browser requests); "Zotero on this computer" = the person picks `zotero.sqlite` (`/api/web/import-zotero-file`).
-   Mendeley: the web app explains File → Export in Mendeley Reference Manager and importing the file. A
-   one-click Mendeley import would need a Mendeley app registered with a citrello.app redirect and its secret in
-   the bridge (Armin's decision; low priority while export works).
+   Mendeley (7 Nov): "Import my Mendeley library" signs in to Mendeley in a pop-up (implicit grant, no secret,
+   no Citrello server) and `/app/mendeley.html` hands the token to the tab; the desktop app's own import then reads
+   api.mendeley.com from the browser (it allows browsers). Needs Citrello's Mendeley app ID in the GitHub variable
+   `MENDELEY_CLIENT_ID` (→ `app/config.json` at deploy); hidden until then. Not yet tried against the real
+   Mendeley: if Mendeley refuses the implicit grant or hides the `Link` header (libraries over 500), move the
+   sign-in and paging to the bridge. Settings (7 Nov): connector help is three tiles (Claude, ChatGPT, Claude
+   Code) that open a step-by-step window with simplified SVG pictures; the browser button has one too.
 5. Claim check (section 4, step 1).
 6. Cloud copy (Phase B) → Overleaf live link → Word add-in (Office.js) on AppSource.
 7. Site: lead with "Open Citrello" (web), desktop as a secondary download; "What AI can't do" section/demo.

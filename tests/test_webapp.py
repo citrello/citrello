@@ -234,3 +234,26 @@ def test_import_zotero_file_in_the_browser(web, tmp_path):
     assert all("Old Zotero" in it["projects"] for it in data["items"])
     st, out, _ = call(web, "POST", "/api/web/import-zotero-file", b"PK\x03\x04 not sqlite", {})
     assert st == 400 and "zotero.sqlite" in out["error"]
+
+
+def test_import_mendeley_with_a_token_from_the_browser(web, monkeypatch, tmp_path):
+    """"Import my Mendeley library" in the web app: the page passes Mendeley's sign-in token; nothing is kept."""
+    import sys
+    import citrello_core as core
+    sys.path.insert(0, os.path.dirname(__file__))
+    import mendeley_mock
+    base, srv = mendeley_mock.start()
+    monkeypatch.setattr(core, "API", base)
+    monkeypatch.setattr(core, "TOKEN_FILE", str(tmp_path / "mendeley.json"))  # never a real login file
+    try:
+        with library.editing() as data:
+            data.update(items=[], projects=[])
+        st, out, _ = call(web, "POST", "/api/web/import-mendeley", {"token": mendeley_mock.TOKEN, "project": "Mendeley"})
+        assert st == 200 and out == {"added": 2, "skipped": 0}  # both pages
+        assert all(it["projects"] == ["Mendeley"] for it in library.load()["items"])
+        assert not os.path.exists(core.TOKEN_FILE)  # the token isn't kept
+        st, out, _ = call(web, "POST", "/api/web/import-mendeley", {"token": "expired"})
+        assert st == 400 and "expired" in out["error"] and not os.path.exists(core.TOKEN_FILE)
+        assert call(web, "POST", "/api/web/import-mendeley", {})[0] == 400
+    finally:
+        srv.shutdown()

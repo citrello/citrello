@@ -70,6 +70,9 @@ def build_app():
     page = page.replace("</head>", head + "</head>")
     with open(os.path.join(APP_OUT, "index.html"), "w", encoding="utf-8") as f:
         f.write(page)
+    # settings made at deploy (GitHub repository variables): Citrello's Mendeley app (its ID is public by design)
+    with open(os.path.join(APP_OUT, "config.json"), "w") as f:
+        json.dump({"mendeley_client_id": os.environ.get("MENDELEY_CLIENT_ID", "").strip()}, f)
     # the browser button's pop-up: the desktop app's clip.html, answered by the open Citrello tab (or its own worker)
     with open(os.path.join(ROOT, "clip.html"), encoding="utf-8") as f:
         clip = f.read()

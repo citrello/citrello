@@ -66,7 +66,7 @@ def test_web_app(browser_name, tmp_path):
         tab(page, "settings")
         for h in ("Claude", "Codex", "Word", "Updates", "Mendeley"):
             expect(page.locator("#tab-settings h2", has_text=re.compile(f"^{h}$"))).to_be_hidden()
-        expect(page.locator("#tab-settings h2", has_text="ChatGPT and Claude on the web")).to_be_visible()
+        expect(page.locator("#tab-settings h2", has_text="Use Citrello in ChatGPT and Claude")).to_be_visible()
         expect(page.locator("#tab-settings h2", has_text="Account")).to_be_visible()
         expect(page.locator("#tab-settings h2", has_text="Browser button")).to_be_visible()
         expect(page.locator("#webBackup")).to_be_visible()
@@ -357,5 +357,92 @@ def test_web_app_browser_button_and_zotero(browser_name, tmp_path):
         expect(page.locator("#projNav")).to_contain_text("Thesis")
         expect(page.locator("#libRows")).to_contain_text("Wind Energy Handbook")
         page.screenshot(path=os.path.join(shots, f"web-app-{browser_name}-zotero.png"))
+        assert not errors, errors
+        b.close()
+
+
+@pytest.mark.parametrize("browser_name", BROWSERS)
+def test_web_app_mendeley_import(browser_name, tmp_path):
+    """"Import my Mendeley library": sign in to Mendeley in a pop-up (a stand-in here), then the library comes
+    straight from Mendeley's API into the browser (a stand-in server that, like Mendeley, allows browsers)."""
+    from playwright.sync_api import expect, sync_playwright
+    sys.path.insert(0, os.path.dirname(__file__))
+    import mendeley_mock
+    api, srv = mendeley_mock.start()
+    seen = {}
+    try:
+        with sync_playwright() as pw:
+            b = getattr(pw, browser_name).launch()
+            ctx = b.new_context(viewport={"width": 1280, "height": 860})
+            # Citrello's Mendeley app ID, set at deploy; and Mendeley's sign-in page, which sends the person back
+            ctx.route("**/app/config.json", lambda r: r.fulfill(json={"mendeley_client_id": "citrello-test"}))
+
+            def mendeley_sign_in(route):
+                q = dict(urllib.parse.parse_qsl(urllib.parse.urlsplit(route.request.url).query))
+                seen.update(q)
+                back = q["redirect_uri"] + "#" + urllib.parse.urlencode(
+                    {"access_token": mendeley_mock.TOKEN, "token_type": "bearer", "state": q["state"]})
+                # Mendeley redirects; Playwright can't fake a redirect in WebKit, so the page sends you back itself
+                route.fulfill(content_type="text/html", body=f"<script>location.replace({json.dumps(back)})</script>")
+            ctx.route("https://mendeley.test/**", mendeley_sign_in)
+            page = ctx.new_page()
+            errors = []
+            page.on("pageerror", lambda e: errors.append(str(e)))
+            page.goto(BASE.rstrip("/") + "/app/?" + urllib.parse.urlencode(
+                {"mendeley_auth": "https://mendeley.test/oauth/authorize", "mendeley_api": api}))
+            page.wait_for_selector("#webCover", state="detached", timeout=LOAD)
+            page.click("#wWebStart")
+            page.click("#openImport")
+            page.fill("#importProject", "From Mendeley")
+            with ctx.expect_page() as popup:
+                page.click("#impMendeleyWeb")
+            expect(page.locator("#importMsg")).to_contain_text("2 added from Mendeley", timeout=60000)
+            assert seen["client_id"] == "citrello-test" and seen["response_type"] == "token"
+            assert seen["redirect_uri"].endswith("/app/mendeley.html")
+            popup.value.wait_for_event("close", timeout=10000)  # the sign-in window closes itself
+            expect(page.locator("#libRows")).to_contain_text("Wind Energy Handbook")
+            expect(page.locator("#projNav")).to_contain_text("From Mendeley")
+            assert not errors, errors
+            b.close()
+    finally:
+        srv.shutdown()
+
+
+@pytest.mark.parametrize("browser_name", BROWSERS)
+def test_web_app_connection_guides(browser_name, tmp_path):
+    """Settings: the Claude, ChatGPT, Claude Code and browser-button guides open in a window, one picture per step."""
+    from playwright.sync_api import expect, sync_playwright
+    shots = os.environ.get("CITRELLO_E2E_SHOTS") or str(tmp_path)
+    with sync_playwright() as pw:
+        b = getattr(pw, browser_name).launch()
+        page = b.new_context(viewport={"width": 1280, "height": 860}).new_page()
+        errors = []
+        page.on("pageerror", lambda e: errors.append(str(e)))
+        open_app(page)
+        page.click("#wWebStart")
+        tab(page, "settings")
+        expect(page.locator("#webDocsBox")).to_be_hidden()  # nothing to download yet: not shown
+        for name, title, steps in (("claude", "Connect Claude", 5), ("chatgpt", "Connect ChatGPT", 5),
+                                   ("code", "Connect Claude Code", 2), ("button", "The browser button", 3)):
+            page.click(f'[data-guide="{name}"]')
+            dialog = page.locator("#guide")
+            expect(dialog).to_be_visible()
+            expect(page.locator("#gTitle")).to_have_text(title)
+            for i in range(steps):
+                expect(page.locator("#gCount")).to_have_text(f"Step {i + 1} of {steps}")
+                expect(page.locator("#gArt svg")).to_be_visible()
+                assert page.locator("#gArt svg").get_attribute("aria-label")  # the picture is described
+                if i == steps - 1:
+                    expect(page.locator("#gNext")).to_have_text("Done")
+                if name == "claude" and i == 2:
+                    expect(page.locator("#gText")).to_contain_text("https://mcp.citrello.app/mcp")
+                    page.screenshot(path=os.path.join(shots, f"web-app-{browser_name}-guide.png"))
+                page.click("#gNext")
+            expect(dialog).to_be_hidden()  # Done closes it
+        page.click('[data-guide="claude"]')
+        page.keyboard.press("ArrowRight")
+        expect(page.locator("#gCount")).to_have_text("Step 2 of 5")
+        page.keyboard.press("Escape")
+        expect(page.locator("#guide")).to_be_hidden()
         assert not errors, errors
         b.close()

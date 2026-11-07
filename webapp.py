@@ -66,6 +66,30 @@ def _save_web_state(**values):
         json.dump(st, f)
 
 
+def import_mendeley(token, project=""):
+    """"Import my Mendeley library" in the browser. The page signs in to Mendeley in a pop-up (no Citrello server
+    involved) and passes the short-lived token here; the desktop app's own import then reads the library
+    straight from Mendeley. The token isn't kept."""
+    import citrello_core as core
+    if not token:
+        return 400, {"error": "Sign in to Mendeley first."}
+    with open(core.TOKEN_FILE, "w") as f:
+        json.dump({"access_token": token}, f)
+    try:
+        added, skipped = library.import_from_mendeley(project.strip() or None)
+    except BaseException as e:  # core.mendeley_call stops with SystemExit and a message
+        msg = str(e) or e.__class__.__name__
+        if "401" in msg:
+            msg = "Mendeley's sign-in has expired. Click the button again."
+        return 400, {"error": msg}
+    finally:
+        try:
+            os.remove(core.TOKEN_FILE)
+        except OSError:
+            pass
+    return 200, {"added": added, "skipped": skipped}
+
+
 def import_zotero_file(raw, project=""):
     """"From Zotero on this computer" in the browser: the person picks Zotero's own zotero.sqlite (a browser can't
     look into the Zotero folder by itself). Read with the desktop app's zotero_local, collections -> projects."""
@@ -175,6 +199,9 @@ class WebHandler(app.Handler):
 
     def do_POST(self):
         path = urllib.parse.urlparse(self.path).path
+        if path == "/api/web/import-mendeley":
+            b = self.json_body()
+            return self.send(*import_mendeley(str(b.get("token", "")), str(b.get("project", ""))))
         if path == "/api/web/import-zotero-file":
             return self.send(*import_zotero_file(self._body, self.headers.get("X-Project", "")))
         if path == "/api/web/restore":

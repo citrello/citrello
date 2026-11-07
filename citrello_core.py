@@ -787,9 +787,9 @@ def mendeley_call(path, method="GET", body=None, media=None, retry=True):
         sys.exit("Not logged in. Run:  citrello.py auth --client-id ... --client-secret ...")
     tok = json.load(open(TOKEN_FILE))
     headers = {"Authorization": "Bearer " + tok["access_token"]}
-    if media:
-        headers.update({"Content-Type": media, "Accept": media})
     data = json.dumps(body).encode() if body is not None else None
+    if media:  # Content-Type only with a body: the web app's browser may only send what Mendeley allows
+        headers.update({"Accept": media, **({"Content-Type": media} if data is not None else {})})
     try:
         return http_json(path if path.startswith("http") else API + path, headers, data, method)
     except urllib.error.HTTPError as e:

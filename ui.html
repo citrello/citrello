@@ -109,6 +109,40 @@
   .spick-list li .t { min-width: 0; } .spick-list li .t b { font-weight: 600; }
   .spick-list li.off { color: var(--muted); }
   .spick-list li button { flex: none; padding: 4px 12px; }
+  /* Settings: guides that open in a window, one picture per step */
+  .guide-tiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 10px; margin-top: 14px; }
+  .guide-tile { display: flex; gap: 12px; align-items: center; text-align: left; padding: 14px; border-radius: 14px; font-weight: 400; }
+  .guide-tile b { display: block; font-size: 15.5px; }
+  .guide-tile .small { display: block; }
+  .guide-tile:hover { background: var(--sky); }
+  .gt-icon { flex: none; width: 38px; height: 38px; border-radius: 11px; display: grid; place-items: center; font: 700 16px Figtree, sans-serif;
+             background: var(--lemon); color: #14213d; }
+  .gt-icon.gt-2 { background: var(--ok-soft); color: var(--ok); } .gt-icon.gt-3 { background: var(--sky); color: var(--cobalt); font-size: 13px; }
+  dialog.guide { width: min(560px, calc(100vw - 32px)); max-height: calc(100vh - 32px); border: 1px solid var(--line); border-radius: 18px;
+                 padding: 20px 22px 14px; background: var(--card); color: var(--ink); box-shadow: 0 20px 60px rgba(10,20,50,.35); }
+  dialog.guide::backdrop { background: rgba(10, 20, 50, .45); }
+  .g-head { display: flex; justify-content: space-between; align-items: center; gap: 10px; }
+  .g-head h2 { margin: 0; }
+  .g-art { margin: 12px 0 6px; border-radius: 12px; background: var(--bg); border: 1px solid var(--line); overflow: hidden; }
+  .g-art svg { display: block; width: 100%; height: auto; }
+  .g-count { margin: 6px 0 0; } .g-text { min-height: 66px; } .g-text p { margin: 4px 0; }
+  .guide h3 { margin: 2px 0 4px; font-size: 17px; }
+  .g-foot { display: flex; gap: 8px; align-items: center; margin-top: 10px; }
+  .g-dots { flex: 1; display: flex; gap: 6px; }
+  .g-dots i { width: 8px; height: 8px; border-radius: 50%; background: var(--line); }
+  .g-dots i.on { background: var(--accent); }
+  .g-note { margin: 10px 0 0; font-size: 12px; }
+  .g-copy { display: flex; gap: 8px; align-items: center; margin: 6px 0; }
+  .g-copy code { flex: 1; padding: 6px 10px; border-radius: 8px; background: var(--sky); color: var(--cobalt); font-size: 13px; overflow-wrap: anywhere; }
+  .g-copy button { padding: 5px 12px; }
+  /* the pictures */
+  .a-win { fill: var(--card); stroke: var(--line); stroke-width: 1.5; } .a-top { fill: var(--sky); }
+  .a-txt { fill: var(--ink); font: 600 13px Figtree, system-ui, sans-serif; } .a-mut { fill: var(--muted); font: 500 12px Figtree, system-ui, sans-serif; }
+  .a-line { fill: var(--line); } .a-box { fill: var(--bg); stroke: var(--line); stroke-width: 1.5; }
+  .a-hi { fill: var(--lemon-soft); stroke: var(--lemon); stroke-width: 2.5; } .a-btn { fill: var(--accent); }
+  .a-btnt { fill: var(--accent-ink); font: 700 13px Figtree, system-ui, sans-serif; } .a-ok { fill: var(--ok); }
+  .a-dot { fill: var(--line); } .a-term { fill: #14213d; } .a-termt { fill: #e8edf8; font: 500 12.5px ui-monospace, Menlo, monospace; }
+  .a-cur { fill: #14213d; stroke: #fff; stroke-width: 1.5; } .a-arrow { stroke: var(--accent); stroke-width: 3; fill: none; stroke-dasharray: 6 5; }
   .notice { padding: 10px 14px; border-radius: 10px; margin-top: 12px; font-size: 14px; }
   .notice.err { background: var(--err-soft); color: var(--err); }
   .notice.warn { background: var(--warn-soft); color: var(--warn); }
@@ -281,8 +315,9 @@
             </div>
             <h3>From an account</h3>
             <div class="row"><button id="impMendeley" class="desktop-only">Import my Mendeley library</button>
+              <button id="impMendeleyWeb" class="web-only mendeley-web hidden">Import my Mendeley library</button>
               <button id="impZotero">Zotero online library</button></div>
-            <p class="muted small" style="margin:6px 0 0"><span class="desktop-only">Connect the accounts under Settings first.</span><span class="web-only">For Zotero online, add your user ID and key under Settings first. From <b>Mendeley</b>: in Mendeley Reference Manager select all references, then File → Export (BibTeX or RIS), and choose that file under “From a file”.</span></p>
+            <p class="muted small" style="margin:6px 0 0"><span class="desktop-only">Connect the accounts under Settings first.</span><span class="web-only">For Zotero online, add your user ID and key under Settings first. <span class="mendeley-web hidden">Mendeley asks you to sign in, then your library comes straight into this browser. </span>Or from <b>Mendeley</b>: in Mendeley Reference Manager select all references, then File → Export (BibTeX or RIS), and choose that file under “From a file”.</span></p>
           </div>
         </div>
         <div class="row"><input type="text" id="importProject" list="projectList" placeholder="Put into project (optional)"></div>
@@ -381,28 +416,19 @@
     </div>
 
     <div class="card" id="connCard">
-      <h2>ChatGPT and Claude on the web</h2>
-      <p class="muted desktop-only">Use your library from ChatGPT, or from Claude in the browser and on your phone. Requests go through Citrello's secure bridge to the Citrello app on this computer, so Citrello needs to be running. Sign in above first.</p>
-      <p class="muted web-only">Use your library from ChatGPT, or from Claude in the browser, the desktop app and on your phone. Requests go through Citrello's secure bridge to <strong>this browser tab</strong>, so keep a Citrello tab open while you use them (it can stay in the background). Sign in above first.</p>
-      <p class="small">Connector address: <code id="connUrl">https://mcp.citrello.app/mcp</code> <button class="link" id="connCopy">Copy</button></p>
-      <details><summary>Add it to ChatGPT</summary>
-        <ol class="small">
-          <li>In ChatGPT open <strong>Settings → Apps &amp; Connectors → Advanced settings</strong> and turn on <strong>Developer mode</strong> (paid plans).</li>
-          <li>Back in <strong>Apps &amp; Connectors</strong>, click <strong>Create</strong>. Name: <em>Citrello</em>. MCP server URL: the address above. Authentication: <strong>OAuth</strong>. Tick “I trust this application” and click <strong>Create</strong>.</li>
-          <li>Sign in with the same email as here, and enter the code from the email.</li>
-          <li>In a chat, click <strong>+ → More → Developer mode</strong> and turn on Citrello. Then ask: <em>“What's in my Citrello library?”</em></li>
-        </ol>
-      </details>
-      <details><summary>Add it to Claude on the web and phone</summary>
-        <ol class="small">
-          <li>On claude.ai open <strong>Settings → Connectors → Add custom connector</strong>.</li>
-          <li>Name: <em>Citrello</em>. URL: the address above. Click <strong>Add</strong>, then <strong>Connect</strong>, and sign in with the same email.</li>
-          <li>It then works on claude.ai, in the Claude phone apps, and in Claude Desktop too.</li>
-        </ol>
-      </details>
-      <p class="small muted desktop-only">Requests from the web can save Word files only in Citrello's Documents folder.</p>
-      <div class="web-only"><h3>Word files ChatGPT and Claude made</h3>
-        <p class="small muted" style="margin:0">They're saved in this browser. Download them here.</p>
+      <h2>Use Citrello in ChatGPT and Claude</h2>
+      <p class="muted" style="margin:0 0 4px">They can search your library, add papers and cite them, and write Word files with live citations. <span class="web-only">While this tab is open.</span><span class="desktop-only">While Citrello is running.</span></p>
+      <div class="guide-tiles" role="list">
+        <button class="guide-tile" data-guide="claude" role="listitem"><span class="gt-icon" aria-hidden="true">C</span>
+          <span><b>Claude</b><span class="small muted">On the web, the desktop app and phones · 5 steps</span></span></button>
+        <button class="guide-tile" data-guide="chatgpt" role="listitem"><span class="gt-icon gt-2" aria-hidden="true">G</span>
+          <span><b>ChatGPT</b><span class="small muted">Paid plans · 5 steps</span></span></button>
+        <button class="guide-tile" data-guide="code" role="listitem"><span class="gt-icon gt-3" aria-hidden="true">&gt;_</span>
+          <span><b>Claude Code</b><span class="small muted">For programmers · 2 steps</span></span></button>
+      </div>
+      <p class="small muted" style="margin:12px 0 0">Connector address: <code id="connUrl">https://mcp.citrello.app/mcp</code> <button class="link" id="connCopy">Copy</button></p>
+      <p class="small muted desktop-only" style="margin:4px 0 0">Requests from the web can save Word files only in Citrello's Documents folder.</p>
+      <div class="web-only hidden" id="webDocsBox"><h3 style="margin:16px 0 4px">Word files ChatGPT and Claude made</h3>
         <div id="webDocs" class="small"></div></div>
     </div>
     <div class="card desktop-only">
@@ -458,16 +484,13 @@
 
     <div class="card">
       <h2>Browser button</h2>
-      <p class="muted">Add the paper you're looking at, from any website, with one click. It reads the page in your own browser, so sites that block robots (ScienceDirect, IEEE…) and your university login work too.</p>
-      <ol class="small">
-        <li>Show your browser's bookmarks bar: <strong>Ctrl+Shift+B</strong> (Mac: Cmd+Shift+B).</li>
-        <li>Drag this button onto the bookmarks bar: <a class="btn primary" id="bookmarklet" href="#" title="Drag me to your bookmarks bar">＋ Add to Citrello</a></li>
-        <li>On a paper's page, click <strong>Add to Citrello</strong>. A small window shows what was found; click <strong>Add</strong>.</li>
-        <li>To add a paper the page <em>mentions</em> (e.g. one in its reference list): <strong>select that reference's title or whole entry</strong>, then click the button. Citrello adds the selected reference instead of the page's own paper.</li>
-      </ol>
-      <p class="muted small"><span class="desktop-only">Citrello must be running.</span><span class="web-only">It works whether or not a Citrello tab is open, in this browser.</span> Can't drag it? <button class="link" id="bmCopy">Copy the button's code</button>, create a new bookmark, and paste it as the address.</p>
+      <p class="muted" style="margin:0">Add the paper you're reading, from any website, with one click. <span class="desktop-only">Citrello must be running.</span></p>
+      <div class="row" style="align-items:center">
+        <a class="btn primary" id="bookmarklet" href="#" title="Drag me to your bookmarks bar">＋ Add to Citrello</a>
+        <span class="small muted">← drag this to your bookmarks bar</span>
+        <button class="link" data-guide="button">Show me how</button>
+      </div>
     </div>
-
     <div class="card desktop-only">
       <h2>Word</h2>
       <p class="muted">Adds a <strong>Citrello</strong> tab to Word:</p>
@@ -584,7 +607,7 @@
     </div>
     <div id="wDone" class="hidden">
       <h1>You're signed in</h1>
-      <p>Next: paste a DOI or a link into the search box to add your first reference, or import your Mendeley or Zotero library. To use ChatGPT, see <b>Settings → ChatGPT and Claude on the web</b>.</p>
+      <p>Next: paste a DOI or a link into the search box to add your first reference, or import your Mendeley or Zotero library. To use ChatGPT or Claude, see <b>Settings → Use Citrello in ChatGPT and Claude</b>.</p>
       <div class="wrow"><button class="primary" id="wFinish">Start using Citrello</button></div>
     </div>
     <div id="wMsg"></div>
@@ -592,6 +615,16 @@
     <p class="fine desktop-only">Citrello sends an anonymous daily count (app version and system, no email or library) so we know how many people use it. You can turn it off in Settings. <a href="https://citrello.app/privacy" target="_blank" rel="noopener">Privacy policy</a></p>
   </div></div>
 </div>
+<dialog class="guide" id="guide" aria-labelledby="gTitle">
+  <div class="g-head"><h2 id="gTitle"></h2><button class="icon g-x" id="gClose" aria-label="Close">✕</button></div>
+  <div class="g-art" id="gArt"></div>
+  <p class="small muted g-count" id="gCount"></p>
+  <h3 id="gStep"></h3>
+  <div id="gText" class="g-text"></div>
+  <div class="g-foot"><div class="g-dots" id="gDots" aria-hidden="true"></div>
+    <button id="gBack">Back</button><button class="primary" id="gNext">Next</button></div>
+  <p class="small muted g-note">Simplified pictures: the real screens may look a little different.</p>
+</dialog>
 <div class="toast" id="toast"></div>
 
 <script>
@@ -692,7 +725,183 @@ const BOOKMARKLET_CODE = "(function(){var m={},n=0;document.querySelectorAll('me
 const BOOKMARKLET = "javascript:" + encodeURIComponent(BOOKMARKLET_CODE);
 $("bookmarklet").href = BOOKMARKLET;
 $("bookmarklet").onclick = (e) => { e.preventDefault(); toast("Drag this button to your bookmarks bar"); };
-$("bmCopy").onclick = async () => { await navigator.clipboard.writeText(BOOKMARKLET).catch(() => {}); toast("Copied: paste it as a bookmark's address"); };
+
+// ---------- guides: a window with one simplified picture per step (Settings) ----------
+const IS_WEB = document.documentElement.classList.contains("web");
+let lastAccount = null;  // set by renderAccount: the first step of a connector guide says whether you're signed in
+const CONNECTOR = "https://mcp.citrello.app/mcp";
+const A = {  // the pictures: small SVG sketches in Citrello's colours, readable in light and dark mode
+  esc: (t) => esc(t),
+  svg: (label, body, h = 210) => `<svg viewBox="0 0 480 ${h}" role="img" aria-label="${esc(label)}">${body}</svg>`,
+  win(title, body, w = 440, h = 180, x = 20, y = 15) {
+    return `<rect class="a-win" x="${x}" y="${y}" width="${w}" height="${h}" rx="12"/>
+      <path class="a-top" d="M${x + 1} ${y + 28}V${y + 12}a11 11 0 0 1 11-11h${w - 24}a11 11 0 0 1 11 11v${16}z"/>
+      <circle class="a-dot" cx="${x + 16}" cy="${y + 15}" r="4"/><circle class="a-dot" cx="${x + 30}" cy="${y + 15}" r="4"/>
+      <circle class="a-dot" cx="${x + 44}" cy="${y + 15}" r="4"/>
+      <text class="a-mut" x="${x + w / 2}" y="${y + 19}" text-anchor="middle">${esc(title)}</text>${body}`;
+  },
+  cursor: (x, y) => `<path class="a-cur" d="M${x} ${y}l0 18l5-4l3.5 7l3-1.5l-3.5-7l6.5 0z"/>`,
+  // a settings window: a list on the left with one item highlighted
+  menu(app, items, hi, right = "") {
+    const rows = items.map((t, i) => {
+      const y = 62 + i * 27, on = t === hi;
+      return (on ? `<rect class="a-hi" x="32" y="${y - 17}" width="130" height="25" rx="7"/>` : "") +
+             `<text class="${on ? "a-txt" : "a-mut"}" x="44" y="${y}">${esc(t)}</text>`;
+    }).join("");
+    const i = items.indexOf(hi);
+    return A.svg(`${app} settings, ${hi} highlighted`, A.win(`${app} · Settings`,
+      `<rect class="a-line" x="172" y="44" width="1.5" height="140"/>${rows}${right}` + (i >= 0 ? A.cursor(140, 50 + i * 27) : "")));
+  },
+  // a form: labels and boxes, then a highlighted button
+  form(app, title, fields, button) {
+    const rows = fields.map(([label, value], i) => {
+      const y = 92 + i * 36;
+      return `<text class="a-mut" x="60" y="${y}">${esc(label)}</text>
+        <rect class="a-box" x="160" y="${y - 17}" width="250" height="26" rx="7"/>
+        <text class="a-txt" x="170" y="${y}">${esc(value)}</text>`;
+    }).join("");
+    const by = 92 + fields.length * 36 - 12;
+    return A.svg(`${app}: ${title}`, A.win(app, `<text class="a-txt" x="60" y="64">${esc(title)}</text>${rows}
+      <rect class="a-btn" x="330" y="${by}" width="80" height="28" rx="8"/><text class="a-btnt" x="370" y="${by + 19}" text-anchor="middle">${esc(button)}</text>
+      ${A.cursor(392, by + 14)}`, 440, Math.max(180, by + 44)), Math.max(210, by + 74));
+  },
+  // one big highlighted button in a window
+  button(app, text, label, sub = "") {
+    return A.svg(`${app}: ${label}`, A.win(app, `<text class="a-txt" x="60" y="70">${esc(text)}</text>
+      ${sub ? `<text class="a-mut" x="60" y="92">${esc(sub)}</text>` : ""}
+      <rect class="a-hi" x="58" y="112" width="${label.length * 8 + 40}" height="34" rx="9"/>
+      <text class="a-txt" x="${78}" y="134">${esc(label)}</text>${A.cursor(70 + label.length * 8, 128)}`));
+  },
+  // a switch turned on
+  toggle(app, path, label) {
+    return A.svg(`${app}: ${label} turned on`, A.win(`${app} · ${path}`, `<text class="a-txt" x="60" y="86">${esc(label)}</text>
+      <text class="a-mut" x="60" y="108">Lets you add your own connectors</text>
+      <rect class="a-hi" x="320" y="70" width="70" height="34" rx="17"/><circle class="a-btn" cx="370" cy="87" r="12"/>
+      ${A.cursor(372, 92)}`));
+  },
+  // Citrello's own sign-in page (the bridge), with the emailed code
+  signin() {
+    const boxes = [0, 1, 2, 3, 4, 5].map((i) => `<rect class="a-box" x="${150 + i * 32}" y="104" width="26" height="32" rx="6"/>
+      <text class="a-txt" x="${163 + i * 32}" y="125" text-anchor="middle">${"483 921"[i < 3 ? i : i + 1]}</text>`).join("");
+    return A.svg("Citrello's sign-in page asking for the code from your email", A.win("mcp.citrello.app",
+      `<text class="a-txt" x="240" y="66" text-anchor="middle" style="font-size:16px">Sign in to Citrello</text>
+       <text class="a-mut" x="240" y="88" text-anchor="middle">Enter the 6-digit code we emailed you</text>${boxes}
+       <rect class="a-btn" x="200" y="150" width="80" height="28" rx="8"/><text class="a-btnt" x="240" y="169" text-anchor="middle">Sign in</text>`));
+  },
+  // this page's Account card
+  account() {
+    const on = lastAccount && lastAccount.signed_in;
+    return A.svg(on ? "Citrello: you're signed in" : "Citrello: sign in with your email", A.win("Citrello · Settings",
+      `<text class="a-txt" x="60" y="66" style="font-size:15px">Account</text>` + (on
+        ? `<circle class="a-ok" cx="72" cy="104" r="12"/><path d="M66 104l4 4l8-8" stroke="#fff" stroke-width="2.5" fill="none"/>
+           <text class="a-txt" x="94" y="109">Signed in as ${esc(lastAccount.email || "")}</text>`
+        : `<rect class="a-box" x="60" y="86" width="220" height="30" rx="8"/><text class="a-mut" x="72" y="106">you@university.edu</text>
+           <rect class="a-hi" x="292" y="86" width="128" height="30" rx="8"/><text class="a-txt" x="304" y="106">Email me a code</text>
+           ${A.cursor(400, 100)}`)));
+  },
+  // a chat with the question to ask
+  chat(app, question) {
+    return A.svg(`${app}: asking about your Citrello library`, A.win(app, `
+      <rect class="a-hi" x="190" y="54" width="250" height="34" rx="12"/><text class="a-txt" x="204" y="76">${esc(question)}</text>
+      <rect class="a-box" x="40" y="100" width="300" height="56" rx="12"/>
+      <text class="a-mut" x="54" y="122">Your library has 42 references in</text><text class="a-mut" x="54" y="142">3 projects. Here are the newest…</text>`));
+  },
+  terminal(lines) {
+    return A.svg("A terminal with the command", `<rect class="a-term" x="20" y="15" width="440" height="180" rx="12"/>` +
+      lines.map((t, i) => `<text class="a-termt" x="40" y="${50 + i * 24}">${esc(t)}</text>`).join(""));
+  },
+  // a browser with the bookmarks bar, and the button dragged onto it
+  bookmarks(stage) {
+    const bar = `<rect class="a-box" x="21" y="44" width="438" height="26"/>`;
+    const chip = (x, hi) => `<rect class="${hi ? "a-hi" : "a-btn"}" x="${x}" y="48" width="120" height="19" rx="6"/>
+      <text class="${hi ? "a-txt" : "a-btnt"}" x="${x + 60}" y="62" text-anchor="middle" style="font-size:11.5px">＋ Add to Citrello</text>`;
+    const body = stage === "bar"
+      ? `${bar}<text class="a-mut" x="34" y="62">Bookmarks bar</text><text class="a-txt" x="240" y="128" text-anchor="middle">Ctrl+Shift+B (Mac: Cmd+Shift+B)</text>`
+      : stage === "drag"
+      ? `${bar}${chip(250, false).replace('y="48"', 'y="150"').replace('y="62"', 'y="164"')}<path class="a-arrow" d="M310 146C300 110 200 100 90 74"/>${chip(30, true)}${A.cursor(110, 62)}`
+      : `${bar}${chip(30, true)}${A.cursor(110, 62)}<text class="a-txt" x="60" y="110">A paper's page (any journal)</text>
+         <rect class="a-line" x="60" y="122" width="300" height="8" rx="4"/><rect class="a-line" x="60" y="140" width="250" height="8" rx="4"/>
+         <rect class="a-win" x="300" y="80" width="140" height="96" rx="10"/><text class="a-txt" x="314" y="104">Add to Citrello</text>
+         <text class="a-mut" x="314" y="126">Found the paper</text><rect class="a-btn" x="314" y="140" width="110" height="24" rx="7"/>
+         <text class="a-btnt" x="369" y="157" text-anchor="middle">Add to library</text>`;
+    return A.svg(stage === "drag" ? "Dragging the button onto the bookmarks bar" : "The bookmarks bar", A.win("Your browser", body));
+  },
+};
+const copyRow = (text) => `<div class="g-copy"><code>${esc(text)}</code><button data-copy="${esc(text)}">Copy</button></div>`;
+const signInStep = () => (lastAccount && lastAccount.signed_in)
+  ? {title: "Sign in to Citrello", art: A.account(), html: `<p>Done: you're signed in as <b>${esc(lastAccount.email || "")}</b>. Click Next.</p>`}
+  : {title: "Sign in to Citrello", art: A.account(), html: `<p>Close this window and use <b>Account</b> at the top of Settings: enter your email and the code we send you. It's free.</p>`};
+const keepOpen = IS_WEB ? "Keep a Citrello tab open while you use it (it can stay in the background)." : "Keep Citrello running while you use it.";
+const GUIDES = {
+  claude: () => ({title: "Connect Claude", steps: [
+    signInStep(),
+    {title: "Open Claude's connector settings", art: A.menu("Claude", ["General", "Account", "Privacy", "Connectors", "Billing"], "Connectors"),
+     html: `<p>On <b>claude.ai</b> (or in the Claude app), open <b>Settings</b>, then <b>Connectors</b>.</p>`},
+    {title: "Add Citrello as a custom connector", art: A.form("Claude", "Add custom connector", [["Name", "Citrello"], ["URL", CONNECTOR]], "Add"),
+     html: `<p>Click <b>Add custom connector</b>. Name: <b>Citrello</b>. URL:</p>${copyRow(CONNECTOR)}<p>Then click <b>Add</b>.</p>`},
+    {title: "Connect and sign in", art: A.signin(),
+     html: `<p>Click <b>Connect</b> next to Citrello. Sign in with the <b>same email</b> as here, and type the code we email you.</p>`},
+    {title: "Ask Claude", art: A.chat("Claude", "What's in my Citrello library?"),
+     html: `<p>In a new chat, ask <i>“What's in my Citrello library?”</i> It works on claude.ai, in the desktop app and on your phone. ${keepOpen}</p>`},
+  ]}),
+  chatgpt: () => ({title: "Connect ChatGPT", steps: [
+    signInStep(),
+    {title: "Turn on Developer mode", art: A.toggle("ChatGPT", "Apps & Connectors · Advanced", "Developer mode"),
+     html: `<p>In ChatGPT open <b>Settings → Apps &amp; Connectors → Advanced settings</b> and turn on <b>Developer mode</b>. It needs a paid plan.</p>`},
+    {title: "Create the Citrello connector", art: A.form("ChatGPT", "New connector", [["Name", "Citrello"], ["MCP server URL", CONNECTOR], ["Authentication", "OAuth"]], "Create"),
+     html: `<p>Back in <b>Apps &amp; Connectors</b>, click <b>Create</b>. Name: <b>Citrello</b>. MCP server URL:</p>${copyRow(CONNECTOR)}<p>Authentication: <b>OAuth</b>. Tick <b>I trust this application</b>, then <b>Create</b>.</p>`},
+    {title: "Sign in", art: A.signin(), html: `<p>Sign in with the <b>same email</b> as here, and type the code we email you.</p>`},
+    {title: "Use it in a chat", art: A.chat("ChatGPT", "What's in my Citrello library?"),
+     html: `<p>In a chat click <b>+ → More → Developer mode</b> and turn on Citrello. Then ask <i>“What's in my Citrello library?”</i> ${keepOpen}</p>`},
+  ]}),
+  code: () => ({title: "Connect Claude Code", steps: [
+    {title: "Add Citrello", art: A.terminal(["$ claude mcp add --transport http citrello \\", "    " + CONNECTOR, "", "Added HTTP MCP server citrello"]),
+     html: `<p>In a terminal, run:</p>${copyRow("claude mcp add --transport http citrello " + CONNECTOR)}`},
+    {title: "Sign in", art: A.terminal(["> /mcp", "", "  citrello · needs sign-in", "  → Authenticate"]),
+     html: `<p>In Claude Code, type <b>/mcp</b>, choose <b>citrello</b> and sign in with the same email as here. ${keepOpen}</p>`},
+  ]}),
+  button: () => ({title: "The browser button", steps: [
+    {title: "Show the bookmarks bar", art: A.bookmarks("bar"),
+     html: `<p>Press <b>Ctrl+Shift+B</b> (Mac: <b>Cmd+Shift+B</b>) so your browser shows its bookmarks bar.</p>`},
+    {title: "Drag the button onto it", art: A.bookmarks("drag"),
+     html: `<p>Close this window and drag <b>＋ Add to Citrello</b> from Settings onto the bookmarks bar.</p>
+            <p class="small muted">Can't drag? <button class="link" data-copy-bookmarklet>Copy the button's code</button>, add a new bookmark, and paste it as the address.</p>`},
+    {title: "Click it on a paper's page", art: A.bookmarks("use"),
+     html: `<p>On any paper's page, click <b>Add to Citrello</b>; a small window shows what it found. To add a paper the page only mentions, select its reference first.</p>`},
+  ]}),
+};
+let guide = null, guideStep = 0;
+function renderGuide() {
+  const st = guide.steps[guideStep], n = guide.steps.length;
+  $("gTitle").textContent = guide.title;
+  $("gArt").innerHTML = st.art;
+  $("gCount").textContent = `Step ${guideStep + 1} of ${n}`;
+  $("gStep").textContent = st.title;
+  $("gText").innerHTML = st.html;
+  $("gDots").innerHTML = guide.steps.map((_, i) => `<i class="${i === guideStep ? "on" : ""}"></i>`).join("");
+  $("gBack").disabled = guideStep === 0;
+  $("gNext").textContent = guideStep === n - 1 ? "Done" : "Next";
+}
+function openGuide(name) {
+  guide = GUIDES[name](); guideStep = 0; renderGuide();
+  $("guide").showModal(); $("gNext").focus();
+}
+document.addEventListener("click", (e) => {
+  const t = e.target.closest("[data-guide]"); if (t) openGuide(t.dataset.guide);
+});
+$("gNext").onclick = () => { if (guideStep < guide.steps.length - 1) { guideStep++; renderGuide(); } else $("guide").close(); };
+$("gBack").onclick = () => { if (guideStep > 0) { guideStep--; renderGuide(); } };
+$("gClose").onclick = () => $("guide").close();
+$("guide").addEventListener("click", async (e) => {
+  if (e.target === $("guide")) return $("guide").close();  // a click outside the window
+  const c = e.target.closest("[data-copy]");
+  if (c) { await navigator.clipboard.writeText(c.dataset.copy).catch(() => {}); c.textContent = "Copied ✓"; }
+  if (e.target.closest("[data-copy-bookmarklet]")) { await navigator.clipboard.writeText(BOOKMARKLET).catch(() => {}); toast("Copied: paste it as a bookmark's address"); }
+});
+$("guide").addEventListener("keydown", (e) => {
+  if (e.key === "ArrowRight" && guideStep < guide.steps.length - 1) { guideStep++; renderGuide(); }
+  if (e.key === "ArrowLeft" && guideStep > 0) { guideStep--; renderGuide(); }
+});
 
 
 // ---------- account ----------
@@ -707,6 +916,7 @@ function renderSideConn(a) {
   $("connText").textContent = !a.signed_in ? "Web connectors: not signed in" : on ? "ChatGPT and web: connected" : "ChatGPT and web: connecting…";
 }
 function renderAccount(a) {
+  lastAccount = a;
   renderSideConn(a);
   show("acctOut", !a.signed_in); show("acctIn", a.signed_in);
   $("connUrl").textContent = a.connector_url || "https://mcp.citrello.app/mcp";
@@ -1126,6 +1336,16 @@ $("impZoteroLocal").onclick = async () => {
   notice("importMsg", "warn", "Reading your Zotero library…");
   try { zoteroDone(await post("/api/library/import-zotero-local", {project: $("importProject").value})); }
   catch (e) { notice("importMsg", "err", esc(e.message)); }
+};
+$("impMendeleyWeb").onclick = async () => {  // the web app: sign in to Mendeley in a pop-up, then import
+  notice("importMsg", "warn", "Sign in to Mendeley in the window that opened…");
+  try {
+    const token = await window.citrelloWeb.mendeleyToken();
+    notice("importMsg", "warn", "Importing your Mendeley library…");
+    const r = await post("/api/web/import-mendeley", {token, project: $("importProject").value});
+    notice("importMsg", "ok", `${r.added} added from Mendeley, ${r.skipped} already in your library.`);
+    loadLibrary();
+  } catch (e) { notice("importMsg", "err", esc(e.message)); }
 };
 $("impZoteroFile").onchange = async () => {  // the web app: Zotero's own file, picked by the person
   const f = $("impZoteroFile").files[0]; $("impZoteroFile").value = "";

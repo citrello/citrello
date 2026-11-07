@@ -6,7 +6,12 @@
   document.documentElement.classList.add("web");
   // a locally served copy can be pointed at a local test bridge: /app/?bridge=http://localhost:8787 (read now:
   // the page tidies the address bar when it starts)
-  const bridge = new URLSearchParams(location.search).get("bridge");
+  const params = new URLSearchParams(location.search);
+  const LOCAL = ["localhost", "127.0.0.1"].includes(location.hostname);
+  const bridge = params.get("bridge");
+  // tests only (a locally served copy): a stand-in for Mendeley's sign-in page and API
+  const mendeleyAuth = (LOCAL && params.get("mendeley_auth")) || "https://api.mendeley.com/oauth/authorize";
+  const mendeleyApi = LOCAL && params.get("mendeley_api");
 
   // ---------- loading screen ----------
   const cover = document.createElement("div");
@@ -30,7 +35,7 @@
     @media (prefers-reduced-motion: reduce) { #webCover .wc-bar div { animation: none; width: 100%; } }`;
   document.head.appendChild(style);
   const coverText = (t, err) => {
-    const p = document.getElementById("webCoverText");
+    const p = cover.querySelector("#webCoverText");  // works before the loading screen is on the page too
     if (p) p.textContent = t;
     cover.classList.toggle("err", !!err);
   };
@@ -47,7 +52,10 @@
   let nextId = 0;
 
   function startWorker() {
-    worker = new Worker("worker.js" + (bridge ? "?bridge=" + encodeURIComponent(bridge) : ""));
+    const q = new URLSearchParams();
+    if (bridge) q.set("bridge", bridge);
+    if (mendeleyApi) q.set("mendeley_api", mendeleyApi);
+    worker = new Worker("worker.js" + (q.toString() ? "?" + q : ""));
     worker.onmessage = (ev) => {
       const m = ev.data;
       if (m.type === "status") coverText(m.text);
@@ -234,7 +242,9 @@
     if (!box) return;
     const { documents } = await (await fetch("/api/web/documents")).json();
     box.innerHTML = "";
-    if (!documents.length) { box.innerHTML = '<p class="muted">None yet.</p>'; return; }
+    const wrap = document.getElementById("webDocsBox");
+    if (wrap) wrap.classList.toggle("hidden", !documents.length);  // only when there's something to download
+    if (!documents.length) return;
     for (const d of documents) {
       const row = document.createElement("div");
       row.className = "row";
@@ -281,5 +291,43 @@
     });
   });
 
-  window.citrelloWeb = { ready };
+  // ---------- settings made at deploy (config.json): e.g. Citrello's Mendeley app ----------
+  let configPromise = null;
+  const config = () => configPromise || (configPromise = realFetch("config.json", { cache: "no-store" })
+    .then((r) => (r.ok ? r.json() : {})).catch(() => ({})));
+
+  // ---------- "Import my Mendeley library": sign in to Mendeley in a pop-up ----------
+  // Mendeley sends the person back to /app/mendeley.html with a short-lived token, which hands it to this tab.
+  // No Citrello server is involved; the library is then read straight from Mendeley by this browser.
+  async function mendeleyToken() {
+    // open the window straight away: Safari only allows pop-ups opened during the click itself
+    const w = window.open("", "citrello-mendeley", "width=520,height=720");
+    if (!w) throw new Error("Your browser blocked the Mendeley window. Allow pop-ups for this site and click again.");
+    const cfg = await config();
+    if (!cfg.mendeley_client_id) {
+      w.close();
+      throw new Error("Mendeley import isn't set up yet. Export from Mendeley instead (see below).");
+    }
+    const state = Array.from(crypto.getRandomValues(new Uint8Array(16)), (b) => b.toString(16).padStart(2, "0")).join("");
+    const url = mendeleyAuth + "?" + new URLSearchParams({ client_id: cfg.mendeley_client_id, response_type: "token",
+      redirect_uri: location.origin + "/app/mendeley.html", scope: "all", state });
+    const ch = new BroadcastChannel("citrello-mendeley");
+    const answer = new Promise((resolve, reject) => {
+      ch.onmessage = (ev) => {
+        const m = ev.data || {};
+        if (m.state !== state) return;
+        ch.close();
+        if (m.access_token) resolve(m.access_token);
+        else reject(new Error("Mendeley didn't sign you in" + (m.error ? ": " + m.error : ".")));
+      };
+    });
+    w.location.href = url;
+    return answer;
+  }
+  config().then((cfg) => {
+    const show = () => document.querySelectorAll(".mendeley-web").forEach((el) => el.classList.toggle("hidden", !cfg.mendeley_client_id));
+    if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", show); else show();
+  });
+
+  window.citrelloWeb = { ready, config, mendeleyToken };
 })();
