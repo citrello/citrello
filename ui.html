@@ -372,6 +372,8 @@
       <p>ChatGPT and Claude can read the papers whose text Citrello has, and check what your sources really say.
         Only the text is kept, on your computer: never the PDF.</p></div></div>
     <div class="card ftsum"><div id="ftSumText" class="ftsum-text"></div><div class="bar"><div id="ftSumBar"></div></div></div>
+    <label class="small" style="display:block;margin:0 0 10px"><input type="checkbox" id="ftVerify" checked>
+      Check the references online first and correct wrong DOIs (recommended: a wrong DOI leads to the wrong page)</label>
     <div class="ft-ways" id="ftWays"></div>
     <div id="papersMsg" role="status"></div>
     <div class="card" id="ftMissingCard"><h2>Still without full text <small class="muted" id="ftMissingN"></small></h2>
@@ -1678,18 +1680,45 @@ window.addEventListener("message", async (e) => {
   window.postMessage({citrelloExt: "api-reply", id: m.id, status, data}, location.origin);
 });
 window.postMessage({citrelloExt: "ping"}, location.origin);  // in case the extension said hello before this page listened
-function fetchWithExtension() {
-  const papers = papersLib.items.filter((i) => !i.fulltext && (i.doi || i.url)).map((i) => ({key: i.key, doi: i.doi, url: i.url, title: i.title, type: i.type}));
-  if (!papers.length) return impNote("ok", "Every reference shown with a DOI or a link already has its full text.");
-  window.postMessage({citrelloExt: "fetch", papers, fast: !!window.CITRELLO_TEST_FAST}, location.origin);
+// Step 1 before fetching texts: check the references online that aren't verified yet, so wrong DOIs are corrected
+// (a wrong DOI leads to the wrong page, or nowhere) and missing ones are found. Returns a sentence for the result.
+async function verifyFirst() {
+  if ($("ftVerify") && !$("ftVerify").checked) return "";
+  const keys = papersLib.items.filter((i) => !i.fulltext && i.reliability !== "verified").map((i) => i.key);
+  if (!keys.length) return "";
+  impNote("warn", `Step 1 of 2: checking ${keys.length} reference${keys.length === 1 ? "" : "s"} online, to correct wrong DOIs…`);
+  const {id} = await post("/api/library/verify", {keys, include_verified: false});
+  let s;
+  for (;;) {
+    s = await api(`/api/verify/${id}`);
+    if (s.done) break;
+    if (s.n) impNote("warn", `Step 1 of 2: checking the references online, to correct wrong DOIs: ${s.i} of ${s.n}…`);
+    await new Promise((r) => setTimeout(r, 700));
+  }
+  if (s.error) throw new Error(s.error);
+  await loadPapers();  // the corrected DOIs
+  const fixed = (s.result.changed || []).filter((c) => c.changes.some((x) => x.startsWith("DOI"))).length;
+  return fixed ? `${fixed} DOI${fixed === 1 ? " was" : "s were"} corrected first. ` : "";
+}
+async function fetchWithExtension() {
+  $("ftExt").disabled = true;
+  try {
+    const first = await verifyFirst();
+    const papers = papersLib.items.filter((i) => !i.fulltext && (i.doi || i.url)).map((i) => ({key: i.key, doi: i.doi, url: i.url, title: i.title, type: i.type}));
+    if (!papers.length) return impNote("ok", first + "Every reference with a DOI or a link already has its full text.");
+    if (first) impNote("ok", first + "Step 2 of 2: the extension is opening the papers…");
+    window.postMessage({citrelloExt: "fetch", papers, fast: !!window.CITRELLO_TEST_FAST}, location.origin);
+  } catch (e) { impNote("err", esc(e.message)); }
+  finally { if ($("ftExt")) $("ftExt").disabled = false; }
 }
 
 // free full texts for the references shown (a job: progress, then a summary)
 async function findFree() {
   $("ftFree").disabled = true; show("ftFreeBarWrap"); $("ftFreeBar").style.width = "3%";
   try {
+    const first = await verifyFirst();  // wrong DOIs corrected first
     const {id, n} = await post("/api/fulltext/find-free", {q: "", project: "*"});  // the whole library
-    impNote("warn", `Looking for free copies of ${n} paper${n === 1 ? "" : "s"}…`);
+    impNote("warn", first + `Looking for free copies of ${n} paper${n === 1 ? "" : "s"}…`);
     const tick = async () => {
       const s = await api(`/api/fulltext/find-free/${id}`);
       if ($("ftFreeBar")) $("ftFreeBar").style.width = s.n ? `${Math.max(3, 100 * s.i / s.n)}%` : "3%";
@@ -1698,7 +1727,7 @@ async function findFree() {
       if (s.error) return impNote("err", esc(s.error));
       const r = s.result;
       if ($("ftFreeMsg")) $("ftFreeMsg").textContent = "";
-      impNote(r.found ? "ok" : "warn", `Free full text found for ${r.found} of ${r.checked} paper${r.checked === 1 ? "" : "s"}.` +
+      impNote(r.found ? "ok" : "warn", first + `Free full text found for ${r.found} of ${r.checked} paper${r.checked === 1 ? "" : "s"}.` +
         (r.missing ? ` ${r.missing} need your access: open them with the browser button, or drop their PDFs above.` : "") +
         (r.no_doi ? ` ${r.no_doi} without a DOI weren't searched.` : ""));
       loadLibrary();

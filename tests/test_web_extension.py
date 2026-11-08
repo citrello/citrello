@@ -66,12 +66,14 @@ def test_extension_fetches_full_texts_and_adds_from_the_toolbar(tmp_path):
             # bulk: the extension's fetch page visits each paper and hands the text to Citrello
             page.click('.side button.navb[data-tab="papers"]')
             expect(page.locator("#ftWays")).to_contain_text("With your university access")
+            page.uncheck("#ftVerify")  # these references point at pretend pages on purpose: no online check
             with ctx.expect_page() as fetch_page:
                 page.click("#ftExt")
             fp = fetch_page.value
             expect(fp.locator("#list li")).to_have_count(3, timeout=15000)
             fp.click("#start")
-            expect(fp.locator("#msg")).to_contain_text("Finished: 2 of 3 full texts added", timeout=180000)
+            expect(fp.locator("#msg")).to_contain_text("Finished:", timeout=180000)
+            expect(fp.locator("#msg")).to_contain_text("Finished: 2 of 3 full texts added", timeout=1000)
             expect(fp.locator("#list")).to_contain_text("No access")
             fp.screenshot(path=os.path.join(shots, "extension-fetch.png"))
             fp.close()
@@ -227,6 +229,7 @@ def test_extension_finds_the_pdf_and_waits_for_you_at_a_check(tmp_path):
             expect(page.locator("#libRows .ref")).to_have_count(4, timeout=60000)
             page.click("#gNext")
             page.click('.side button.navb[data-tab="papers"]')
+            page.uncheck("#ftVerify")  # these references point at pretend pages on purpose: no online check
             with ctx.expect_page() as fetch_page:
                 page.click("#ftExt")
             fp = fetch_page.value
@@ -332,6 +335,7 @@ def test_extension_waits_for_pages_knows_platforms_and_runs_in_parallel(tmp_path
             expect(page.locator("#libRows .ref")).to_have_count(5, timeout=60000)
             page.click("#gNext")
             page.click('.side button.navb[data-tab="papers"]')
+            page.uncheck("#ftVerify")  # these references point at pretend pages on purpose: no online check
             with ctx.expect_page() as fetch_page:
                 page.click("#ftExt")
             fp = fetch_page.value

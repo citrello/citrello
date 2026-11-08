@@ -21,6 +21,7 @@ import base64
 import copy
 import difflib
 import http.server
+import io
 import json
 import os
 import re
@@ -342,9 +343,21 @@ def http_json(url, headers=None, data=None, method=None, timeout=30):
         try:
             with urllib.request.urlopen(req, timeout=timeout) as r:
                 body = r.read()
+                # in the web app (pyodide-http), a 404 or 500 comes back as an ordinary answer: make it the same
+                # error as in Python ("not found" must stay different from a broken answer)
+                status = getattr(r, "status", None) or (r.getcode() if hasattr(r, "getcode") else None) or 200
+                if status >= 400:
+                    raise urllib.error.HTTPError(url, status, f"HTTP {status}", r.headers, io.BytesIO(body))
                 return json.loads(body) if body else None, r.headers
-        except urllib.error.HTTPError:
-            raise  # the server answered (404, 429...): not a connection problem
+        except urllib.error.HTTPError as e:
+            if e.code == 429 and attempt == 1:  # "too many requests": wait as asked (a little), then once more
+                try:
+                    wait = min(float(e.headers.get("Retry-After") or 2), 10)
+                except (TypeError, ValueError, AttributeError):
+                    wait = 2
+                time.sleep(wait)
+                continue
+            raise  # the server answered (404...): not a connection problem
         except Exception as e:
             # a dropped connection or a timeout, or in the web app a browser "NetworkError": try once more, then
             # report it as "no connection" (callers tell that apart from "not found")

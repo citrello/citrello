@@ -671,3 +671,42 @@ def test_web_app_browser_button_takes_the_full_text(browser_name, tmp_path):
             b.close()
     finally:
         srv.shutdown()
+
+
+@pytest.mark.parametrize("browser_name", BROWSERS)
+def test_full_texts_correct_wrong_dois_first(browser_name, tmp_path):
+    """Before fetching full texts, the references are checked online so a wrong DOI is corrected (the extension
+    would otherwise open the wrong page, or none). A stand-in for the extension records what it's given."""
+    import json as _json
+    from playwright.sync_api import expect, sync_playwright
+    refs = [{"id": "topham2017", "type": "article-journal", "title": "Sustainable decommissioning of an offshore wind farm",
+             "author": [{"family": "Topham", "given": "Eva"}, {"family": "McMillan", "given": "David"}],
+             "container-title": "Renewable Energy", "volume": "102", "page": "470-480", "issued": {"date-parts": [[2017]]},
+             "DOI": "10.1016/j.renene.2016.10.999"}]  # wrong: the real one ends in .066
+    lib = tmp_path / "refs.json"
+    lib.write_text(_json.dumps(refs), encoding="utf-8")
+    with sync_playwright() as pw:
+        b = getattr(pw, browser_name).launch()
+        page = b.new_context(viewport={"width": 1280, "height": 900}).new_page()
+        errors = []
+        page.on("pageerror", lambda e: errors.append(str(e)))
+        open_app(page)
+        page.click("#wWebStart")
+        page.click("#openImport")
+        page.click('[data-guide="imp-file"]')
+        page.set_input_files("#importFile", str(lib))
+        expect(page.locator("#gResult")).to_contain_text("1 added", timeout=60000)
+        page.click("#gNext")
+        # a stand-in for the extension: says hello, and keeps what Citrello asks it to fetch
+        page.evaluate("""() => { window.sent = null;
+            window.addEventListener('message', (e) => { if (e.data && e.data.citrelloExt === 'fetch') window.sent = e.data.papers; });
+            window.postMessage({citrelloExt: 'hello', version: 'test'}, location.origin); }""")
+        tab(page, "papers")
+        expect(page.locator("#ftVerify")).to_be_checked()
+        page.click("#ftExt")
+        page.wait_for_function("window.sent !== null", timeout=180000)
+        sent = page.evaluate("window.sent")
+        assert sent[0]["doi"] == "10.1016/j.renene.2016.10.066", sent  # corrected before fetching
+        expect(page.locator("#papersMsg")).to_contain_text("1 DOI was corrected first")
+        assert not errors, errors
+        b.close()

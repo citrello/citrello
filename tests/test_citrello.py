@@ -350,3 +350,39 @@ def test_http_json_tries_once_more_after_a_dropped_connection(monkeypatch):
     with pytest.raises(urllib.error.URLError):
         core.http_json("https://example.org/x")
     assert len(calls) == 1
+
+
+def test_http_json_turns_an_error_answer_into_an_http_error(monkeypatch):
+    """In the web app a 404 comes back as an ordinary answer; it must still be "not found" (an HTTPError), so a wrong
+    DOI leads to a search by title instead of a broken lookup."""
+    import urllib.error
+    import citrello_core as core
+
+    class Resp:
+        status = 404
+        headers = {}
+        def __enter__(self): return self
+        def __exit__(self, *a): return False
+        def read(self): return b"Resource not found."
+    monkeypatch.setattr(core.urllib.request, "urlopen", lambda req, timeout=30: Resp())
+    with pytest.raises(urllib.error.HTTPError) as e:
+        core.http_json("https://api.crossref.org/works/10.1/x")
+    assert e.value.code == 404
+
+
+def test_http_json_waits_and_retries_once_when_told_too_many_requests(monkeypatch):
+    import urllib.error
+    import citrello_core as core
+    calls, waits = [], []
+    monkeypatch.setattr(core.time, "sleep", lambda s: waits.append(s))
+
+    class Resp:
+        def __init__(self, status, body): self.status, self.body, self.headers = status, body, {"Retry-After": "3"}
+        def __enter__(self): return self
+        def __exit__(self, *a): return False
+        def read(self): return self.body
+    def urlopen(req, timeout=30):
+        calls.append(1)
+        return Resp(429, b"slow down") if len(calls) == 1 else Resp(200, b'{"ok": 1}')
+    monkeypatch.setattr(core.urllib.request, "urlopen", urlopen)
+    assert core.http_json("https://api.crossref.org/works/x")[0] == {"ok": 1} and waits == [3.0] and len(calls) == 2

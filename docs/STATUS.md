@@ -91,6 +91,10 @@ People must re-drag the bookmarklet to get the version that takes the text.
   or say "Web page: nothing to read"; up to 3 papers at once, never two from one publisher (DOI prefix), 10–20 s
   between a publisher's papers; "Copy a report" on the fetch page (how failing pages were built, no text) so Armin
   can send it. Armin offered his browser access: declined (credentials); the report is the way to learn paywalled sites.
+- Before fetching full texts (extension or free copies), the references not yet verified are checked online first
+  ("Check the references online first", ticked by default), so wrong DOIs are corrected and missing ones found.
+  Fixed on the way: in the web app a Crossref 404 came back as an ordinary answer, so wrong DOIs were never
+  corrected (verify, add by DOI); `core.http_json` now raises HTTPError for 4xx/5xx answers.
 
 ## The web app
 **Progress:** steps 1 and 2 are live at citrello.app/app and tested in Chromium and WebKit: library in the browser,
