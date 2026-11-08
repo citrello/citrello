@@ -1679,7 +1679,7 @@ window.addEventListener("message", async (e) => {
 });
 window.postMessage({citrelloExt: "ping"}, location.origin);  // in case the extension said hello before this page listened
 function fetchWithExtension() {
-  const papers = papersLib.items.filter((i) => !i.fulltext && (i.doi || i.url)).map((i) => ({key: i.key, doi: i.doi, url: i.url, title: i.title}));
+  const papers = papersLib.items.filter((i) => !i.fulltext && (i.doi || i.url)).map((i) => ({key: i.key, doi: i.doi, url: i.url, title: i.title, type: i.type}));
   if (!papers.length) return impNote("ok", "Every reference shown with a DOI or a link already has its full text.");
   window.postMessage({citrelloExt: "fetch", papers, fast: !!window.CITRELLO_TEST_FAST}, location.origin);
 }

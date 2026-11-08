@@ -84,6 +84,13 @@ People must re-drag the bookmarklet to get the version that takes the text.
   (/api/clip/pdf). "Are you human?" checks are **never answered automatically**: the bulk fetch pauses, shows the
   tab, and continues on "Continue", three times slower on that site afterwards. Not handled yet: PDF buttons that
   start a file download (would need the "downloads" permission).
+- Extension, 8 Nov (Armin's failures: Elsevier, AIP, Wiley, IEEE, web pages): waits for redirects to settle
+  (doi.org → linkinghub → ScienceDirect), for script-built pages, and for security checks that clear by themselves;
+  a rule book of platform PDF addresses (`publisherPdfUrls` in grab.js: IEEE stampPDF, ScienceDirect pdfft, Wiley
+  pdfdirect, Springer, Nature, the "/doi/pdf/" platforms, IOP, MDPI, arXiv, APS); web pages keep their readable text
+  or say "Web page: nothing to read"; up to 3 papers at once, never two from one publisher (DOI prefix), 10–20 s
+  between a publisher's papers; "Copy a report" on the fetch page (how failing pages were built, no text) so Armin
+  can send it. Armin offered his browser access: declined (credentials); the report is the way to learn paywalled sites.
 
 ## The web app
 **Progress:** steps 1 and 2 are live at citrello.app/app and tested in Chromium and WebKit: library in the browser,

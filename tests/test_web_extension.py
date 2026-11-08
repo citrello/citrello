@@ -249,3 +249,139 @@ def test_extension_finds_the_pdf_and_waits_for_you_at_a_check(tmp_path):
             ctx.close()
     finally:
         srv.shutdown()
+
+
+def platform_site(pdf_path):
+    """Pages like the real platforms: a redirect page (like linkinghub.elsevier.com) to an article built by scripts
+    after loading, a security check that clears by itself, a "/doi/" platform page whose PDF is only at the
+    platform's usual address (/doi/pdf/<doi>), a web page with readable text, and a web tool with nothing to read."""
+    import threading
+    from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+    paras = "".join(f"<p>Paragraph {i}. Solar trackers raise the yield of concentrating photovoltaics in hot climates.</p>" for i in range(70))
+    article = f"<article><h2>1. Introduction</h2>{paras}<h2>2. Results</h2><p>More.</p></article>"
+    late = ("<title>Article</title><main id='m'>Loading…</main><script>setTimeout(() => {"
+            f"document.getElementById('m').innerHTML = {article!r}; }}, 2000)</script>")
+    pages = {
+        "/redirect.html": "<title>Redirecting</title><p>Redirecting…</p><script>setTimeout(() => location.replace('/late.html'), 2500)</script>",
+        "/late.html": late,
+        "/autocheck.html": ("<title>Just a moment...</title><p id='c'>Checking your browser before accessing the site.</p>"
+                            f"<script>setTimeout(() => {{ document.title = 'Paper'; document.body.innerHTML = {article!r}; }}, 3000)</script>"),
+        "/doi/10.5555/platform": "<title>A platform paper</title><p>Abstract only. Sign in to read more.</p>",
+        "/tool.html": "<title>Solar path calculator</title><div id='app'>Latitude <input> Longitude <input> <button>Go</button></div>",
+        "/webpage.html": "<title>About solar maps</title><main>" + "".join(
+            f"<p>Line {i} of an explanatory web page about solar radiation maps and how to read them.</p>" for i in range(40)) + "</main>",
+    }
+
+    class H(BaseHTTPRequestHandler):
+        def log_message(self, *a):
+            pass
+
+        def do_GET(self):
+            if self.path == "/doi/pdf/10.5555/platform":
+                body, ctype = open(pdf_path, "rb").read(), "application/pdf"
+            elif self.path in pages:
+                body, ctype = f"<html><head></head><body>{pages[self.path]}</body></html>".encode(), "text/html"
+            else:
+                self.send_response(404)
+                self.end_headers()
+                return
+            self.send_response(200)
+            self.send_header("Content-Type", ctype)
+            self.end_headers()
+            self.wfile.write(body)
+
+    srv = ThreadingHTTPServer(("127.0.0.1", 0), H)
+    threading.Thread(target=srv.serve_forever, daemon=True).start()
+    return srv.server_address[1], srv
+
+
+def test_extension_waits_for_pages_knows_platforms_and_runs_in_parallel(tmp_path):
+    import json
+    from playwright.sync_api import expect, sync_playwright
+    sys.path.insert(0, os.path.dirname(__file__))
+    import test_doccheck as T
+    pdf = str(tmp_path / "paper.pdf")
+    T.make_pdf(pdf, [["A platform paper"] + [f"Section {i}: tracking the sun with rotating prisms." for i in range(40)]])
+    port, srv = platform_site(pdf)
+    a, b = f"http://127.0.0.1:{port}", f"http://localhost:{port}"  # two "publishers", so two run at once
+    refs = [{"id": "redirect", "type": "article-journal", "title": "Behind a redirect", "URL": f"{a}/redirect.html"},
+            {"id": "autocheck", "type": "article-journal", "title": "Behind a check that clears", "URL": f"{b}/autocheck.html"},
+            {"id": "platform", "type": "article-journal", "title": "On a doi platform", "URL": f"{a}/doi/10.5555/platform"},
+            {"id": "webpage", "type": "webpage", "title": "A web page", "URL": f"{b}/webpage.html"},
+            {"id": "tool", "type": "webpage", "title": "A web tool", "URL": f"{a}/tool.html"}]
+    lib = tmp_path / "refs.json"
+    lib.write_text(json.dumps(refs), encoding="utf-8")
+    ext = str(tmp_path / "ext")
+    subprocess.run([sys.executable, os.path.join(ROOT, "packaging", "build_extension.py"), "--test", ext], check=True)
+    try:
+        with sync_playwright() as pw:
+            ctx = pw.chromium.launch_persistent_context(str(tmp_path / "profile"), channel="chromium", headless=True,
+                                                        viewport={"width": 1280, "height": 800},
+                                                        args=[f"--disable-extensions-except={ext}", f"--load-extension={ext}"])
+            page = ctx.pages[0] if ctx.pages else ctx.new_page()
+            errors = []
+            page.on("pageerror", lambda e: errors.append(str(e)))
+            page.goto(BASE + "/app/")
+            page.wait_for_selector("#webCover", state="detached", timeout=LOAD)
+            page.click("#wWebStart")
+            page.wait_for_function("typeof extVersion !== 'undefined' && extVersion", timeout=15000)
+            page.evaluate("window.CITRELLO_TEST_FAST = true")
+            page.click("#openImport")
+            page.click('[data-guide="imp-file"]')
+            page.set_input_files("#importFile", str(lib))
+            expect(page.locator("#libRows .ref")).to_have_count(5, timeout=60000)
+            page.click("#gNext")
+            page.click('.side button.navb[data-tab="papers"]')
+            with ctx.expect_page() as fetch_page:
+                page.click("#ftExt")
+            fp = fetch_page.value
+            fp.click("#start")
+            fp.wait_for_function("document.querySelectorAll('#list li.work').length >= 2", timeout=60000)  # two at once
+            expect(fp.locator("#msg")).to_contain_text("Finished: 4 of 5 full texts added", timeout=240000)
+            items = fp.locator("#list li")
+            expect(items.nth(0)).to_contain_text("Full text ✓")              # waited for the redirect and the script
+            expect(items.nth(1)).to_contain_text("Full text ✓")              # the check cleared by itself: no stop
+            expect(items.nth(2)).to_contain_text("Full text ✓ (PDF)")        # the platform's own PDF address
+            expect(items.nth(3)).to_contain_text("Full text ✓")              # a web page's readable text
+            expect(items.nth(4)).to_contain_text("Web page: nothing to read")  # a tool, not "No access"
+            # the report for what didn't work: how the page was built, no text
+            expect(fp.locator("#report")).to_be_visible()
+            ctx.grant_permissions(["clipboard-read", "clipboard-write"])
+            fp.click("#report")
+            report = fp.evaluate("navigator.clipboard.readText()")
+            assert "A web tool" in report and "Web page: nothing to read" in report and "Solar path calculator" in report
+            fp.close()
+            assert not errors, errors
+            ctx.close()
+    finally:
+        srv.shutdown()
+
+
+def test_platform_pdf_addresses():
+    """The rule book of where platforms keep a paper's PDF (run with node, the same code the extension runs)."""
+    import shutil
+    if not shutil.which("node"):
+        pytest.skip("needs node")
+    js = """
+const src = require('fs').readFileSync(process.argv[1], 'utf8');
+eval(src.match(/function publisherPdfUrls[\\s\\S]*?\\n  }\\n/)[0]);
+console.log(JSON.stringify(JSON.parse(process.argv[2]).map(([u, d]) => publisherPdfUrls(u, d))));"""
+    cases = [["https://ieeexplore.ieee.org/document/7077026", ""],
+             ["https://www.sciencedirect.com/science/article/pii/S1876610214013988?via%3Dihub", "10.1016/j.egypro.2014.10.031"],
+             ["https://onlinelibrary.wiley.com/doi/full/10.1002/pip.2843", ""],
+             ["https://link.springer.com/article/10.1007/abc", "10.1007/abc"],
+             ["https://www.nature.com/articles/s41565-017-0052-4", ""],
+             ["https://www.tandfonline.com/doi/abs/10.1080/1234.5678", ""],
+             ["https://pubs.acs.org/doi/10.1021/nl302516v", ""],
+             ["https://arxiv.org/abs/1706.03762", ""]]
+    import json
+    out = json.loads(subprocess.run(["node", "-e", js, os.path.join(ROOT, "extension", "grab.js"), json.dumps(cases)],
+                                    capture_output=True, text=True, check=True).stdout)
+    assert out[0][0] == "https://ieeexplore.ieee.org/stampPDF/getPDF.jsp?tp=&arnumber=7077026"
+    assert out[1][0].startswith("https://www.sciencedirect.com/science/article/pii/S1876610214013988/pdfft")
+    assert out[2][0] == "https://onlinelibrary.wiley.com/doi/pdfdirect/10.1002/pip.2843?download=true"
+    assert out[3][0] == "https://link.springer.com/content/pdf/10.1007/abc.pdf"
+    assert out[4][0] == "https://www.nature.com/articles/s41565-017-0052-4.pdf"
+    assert out[5][0] == "https://www.tandfonline.com/doi/pdf/10.1080/1234.5678"
+    assert out[6][0] == "https://pubs.acs.org/doi/pdf/10.1021/nl302516v"
+    assert out[7][0] == "https://arxiv.org/pdf/1706.03762"

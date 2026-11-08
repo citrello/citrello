@@ -112,7 +112,8 @@ chrome.runtime.onMessage.addListener((msg, sender, reply) => {
   }
   if (msg.action === "fetch" && Array.isArray(msg.papers) && sender.tab) {  // Citrello: fetch these papers' texts with my access
     const papers = msg.papers.filter((p) => p && p.key && (p.doi || p.url)).slice(0, 2000).map((p) => ({
-      key: String(p.key), doi: String(p.doi || ""), url: String(p.url || ""), title: String(p.title || "").slice(0, 300) }));
+      key: String(p.key), doi: String(p.doi || ""), url: String(p.url || ""), title: String(p.title || "").slice(0, 300),
+      type: String(p.type || "") }));
     // only a local test copy of Citrello may ask to skip the pause between papers
     const testFast = !!msg.fast && /^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(msg.origin || "");
     chrome.storage.local.set({ job: { papers, citrelloTab: sender.tab.id, origin: msg.origin || "", testFast, at: Date.now() } })

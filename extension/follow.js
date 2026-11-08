@@ -27,8 +27,10 @@ async function pdfFrom(url, depth = 0) {
   // a viewer page: the PDF is in an <iframe>, <embed>, <object> or a link on it
   const html = new TextDecoder().decode(buf.slice(0, 3e6));
   const found = [];
-  for (const m of html.matchAll(/(?:src|href|data|content)\s*=\s*["']([^"']+)["']/gi)) {
-    const u = m[1].replace(/&amp;/g, "&");
+  const cands = [...html.matchAll(/(?:src|href|data|content)\s*=\s*["']([^"']+)["']/gi)].map((m) => m[1])
+    .concat([...html.matchAll(/["'](https?:\/\/[^"'\s]+)["']/g)].map((m) => m[1]));  // also addresses in scripts (redirects)
+  for (const raw of cands) {
+    const u = raw.replace(/&amp;/g, "&").replace(/^\d+\s*;\s*url=/i, "").replace(/\\\//g, "/");
     if (/\.pdf(\?|#|$)|\/pdf(ft|direct)?(\/|\?|$)|pdf\.sciencedirectassets|\/content\/pdf\/|\/doi\/pdf/i.test(u)) {
       try { const abs = new URL(u, r.url).href; if (!found.includes(abs) && abs !== url) found.push(abs); } catch (e) { /* skip */ }
     }
