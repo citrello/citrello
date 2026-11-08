@@ -213,6 +213,8 @@ def add_csl(data, csl, project=None, source="manual", raw=None, extra=None, key=
     if existing:
         if project and project not in existing.setdefault("projects", []):
             existing["projects"].append(project)
+        if project and project not in data["projects"]:  # so the project shows in the sidebar too
+            data["projects"].append(project)
         for k, v in (extra or {}).items():  # e.g. remember the Mendeley/Zotero id
             existing.setdefault(k, v)
         return existing, False, how

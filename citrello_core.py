@@ -27,6 +27,7 @@ import re
 import secrets
 import sys
 import threading
+import time
 import unicodedata
 import urllib.error
 import urllib.parse
@@ -337,9 +338,25 @@ def http_json(url, headers=None, data=None, method=None, timeout=30):
     headers.setdefault("User-Agent", "citrello/1.0 (reference converter)")
     headers.setdefault("Accept", "application/json")
     req = urllib.request.Request(url, data=data, headers=headers, method=method)
-    with urllib.request.urlopen(req, timeout=timeout) as r:
-        body = r.read()
-        return json.loads(body) if body else None, r.headers
+    for attempt in (1, 2):
+        try:
+            with urllib.request.urlopen(req, timeout=timeout) as r:
+                body = r.read()
+                return json.loads(body) if body else None, r.headers
+        except urllib.error.HTTPError:
+            raise  # the server answered (404, 429...): not a connection problem
+        except Exception as e:
+            # a dropped connection or a timeout, or in the web app a browser "NetworkError": try once more, then
+            # report it as "no connection" (callers tell that apart from "not found")
+            browser = "NetworkError" in str(e) or e.__class__.__name__ == "JsException"
+            refused = isinstance(e, urllib.error.URLError) and isinstance(getattr(e, "reason", None), ConnectionRefusedError)
+            if attempt == 1 and (browser or isinstance(e, TimeoutError) or
+                                 (isinstance(e, (urllib.error.URLError, OSError)) and not refused)):
+                time.sleep(1.5)
+                continue
+            if browser:
+                raise urllib.error.URLError(str(e)) from e
+            raise
 
 
 def norm(s):

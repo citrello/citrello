@@ -22,7 +22,11 @@ def test_store_package(tmp_path, kind):
         assert os.path.exists(os.path.join(out, f)), f
     assert json.load(open(os.path.join(out, "manifest.json")))["version"] == man["version"]
     # access to all websites only when the person allows it (first bulk fetch), never at install
-    assert "host_permissions" not in man and man["optional_host_permissions"] == ["<all_urls>"]
+    # only the desktop app on this computer is always reachable (for the toolbar panel)
+    assert man["host_permissions"] == ["http://localhost:8585/*", "http://127.0.0.1:8585/*"]
+    assert man["optional_host_permissions"] == ["<all_urls>"]
+    assert man["action"]["default_popup"] == "popup.html"  # a panel under the toolbar button, not a new window
+    assert man["commands"]["_execute_action"]["suggested_key"]["default"] == "Alt+Shift+C"
     assert set(man["permissions"]) == {"activeTab", "scripting", "storage"}
     assert man["content_scripts"][0]["matches"][0] == "https://citrello.app/*"
     if kind == "firefox":
@@ -38,4 +42,23 @@ def test_store_package(tmp_path, kind):
 
 def test_test_copy_runs_on_a_local_citrello(tmp_path):
     man = B.build(str(tmp_path / "t"), "chrome", test=True)
-    assert "http://localhost:8099/*" in man["content_scripts"][0]["matches"] and man["host_permissions"] == ["<all_urls>"]
+    assert "http://localhost:8099/*" in man["content_scripts"][0]["matches"] and "<all_urls>" in man["host_permissions"]
+
+
+def test_desktop_app_lets_the_extension_add_papers_only():
+    """The desktop app refuses API writes from other sites; the extension's panel may use /api/clip/ only."""
+    import http.client
+    sys.path.insert(0, ROOT)
+    import app
+
+    def allowed(origin, path):
+        h = app.Handler.__new__(app.Handler)
+        h.path, h.headers = path, http.client.HTTPMessage()
+        if origin:
+            h.headers["Origin"] = origin
+        return h.same_origin()
+    ext = "chrome-extension://abcdefghijklmnop"
+    assert allowed(ext, "/api/clip/preview") and allowed("moz-extension://x-y", "/api/clip/add")
+    assert not allowed(ext, "/api/library/delete") and not allowed(ext, "/api/config")
+    assert not allowed("https://evil.example", "/api/clip/add")
+    assert allowed("http://localhost:8585", "/api/library/delete") and allowed(None, "/api/config")

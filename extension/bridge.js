@@ -1,6 +1,6 @@
 // Runs on Citrello's own pages (citrello.app/app and the desktop app at localhost:8585). Passes messages between
 // the page and the extension: "the extension is here", "fetch these papers", each paper's text as it arrives, and
-// the text for the "Add to Citrello" pop-up opened by the toolbar button.
+// the toolbar panel's requests (look up, add, keep the text).
 (function () {
   const VERSION = chrome.runtime.getManifest().version;
   const toPage = (m) => window.postMessage(Object.assign({ citrelloExt: "" }, m), location.origin);
@@ -33,20 +33,21 @@
     return true;
   });
 
-  // the "Add to Citrello" pop-up opened by the toolbar button: ask for the paper's text and pass it on, in the same
-  // form the bookmarklet uses ({citrello: "fulltext", text | pdf})
-  if (/\/clip(\.html)?$/.test(location.pathname)) {
-    chrome.runtime.sendMessage({ action: "clip-paper" }).then((g) => {
-      if (!g || g.status === "not-mine") return;
-      const m = { citrello: "fulltext" };
-      if (g && g.text) m.text = g.text;
-      if (g && g.pdf) {
-        const bin = atob(g.pdf), bytes = new Uint8Array(bin.length);
-        for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
-        m.pdf = bytes.buffer;
-      }
-      window.postMessage(m, location.origin);
-    }).catch(() => {});
-  }
+  // the toolbar panel's requests (look a paper up, add it, keep its text), answered by this Citrello page
+  const apiWaiting = new Map();
+  window.addEventListener("message", (e) => {
+    if (e.source !== window || !e.data || e.data.citrelloExt !== "api-reply") return;
+    const done = apiWaiting.get(e.data.id);
+    if (done) { apiWaiting.delete(e.data.id); done({ status: e.data.status, data: e.data.data }); }
+  });
+  chrome.runtime.onMessage.addListener((msg, sender, reply) => {
+    if (!msg || msg.action !== "api") return;
+    const id = Math.random().toString(36).slice(2);
+    apiWaiting.set(id, reply);
+    toPage({ citrelloExt: "api", id, path: msg.path, body: msg.body, pdf: msg.pdf, headers: msg.headers });
+    setTimeout(() => { if (apiWaiting.has(id)) { apiWaiting.delete(id); reply({ error: "Citrello didn't answer in time." }); } }, 120000);
+    return true;
+  });
+  if (!/\/(clip|mendeley)(\.html)?$/.test(location.pathname)) chrome.runtime.sendMessage({ action: "bridge-here" }).catch(() => {});
   hello();
 })();

@@ -1601,6 +1601,20 @@ window.addEventListener("message", async (e) => {
     if (ok) reloadSoon();
   }
 });
+// the extension's toolbar panel: look a paper up, add it, keep its text (only "Add to Citrello" requests)
+window.addEventListener("message", async (e) => {
+  if (e.source !== window || e.origin !== location.origin || !e.data || e.data.citrelloExt !== "api") return;
+  const m = e.data;
+  let status = 403, data = {error: "Not allowed"};
+  if (String(m.path).startsWith("/api/clip/")) {
+    try {
+      const r = await fetch(m.path, {method: "POST", body: m.pdf ? b64Bytes(m.pdf) : m.body, headers: m.headers || {}});
+      status = r.status; data = await r.json().catch(() => ({}));
+      if (r.ok && m.path !== "/api/clip/preview") reloadSoon();
+    } catch (err) { status = 500; data = {error: err.message}; }
+  }
+  window.postMessage({citrelloExt: "api-reply", id: m.id, status, data}, location.origin);
+});
 window.postMessage({citrelloExt: "ping"}, location.origin);  // in case the extension said hello before this page listened
 function fetchWithExtension() {
   const papers = lib.items.filter((i) => !i.fulltext && (i.doi || i.url)).map((i) => ({key: i.key, doi: i.doi, url: i.url, title: i.title}));

@@ -699,8 +699,11 @@ class Handler(BaseHTTPRequestHandler):
             return {}
 
     def same_origin(self):
-        """Refuse API writes coming from other web sites."""
+        """Refuse API writes coming from other web sites. The Citrello browser extension's toolbar panel may use
+        the "Add to Citrello" requests (/api/clip/...) only."""
         origin = self.headers.get("Origin")
+        if origin and origin.startswith(("chrome-extension://", "moz-extension://")):
+            return urllib.parse.urlparse(self.path).path.startswith("/api/clip/")
         return origin is None or origin in (f"http://localhost:{PORT}", f"http://127.0.0.1:{PORT}")
 
     # ---------------- GET ----------------

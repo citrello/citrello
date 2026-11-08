@@ -19,7 +19,7 @@ import zipfile
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SRC = os.path.join(ROOT, "extension")
-FILES = ["background.js", "bridge.js", "grab.js", "fetch.html", "fetch.js", "options.html", "options.js"]
+FILES = ["background.js", "bridge.js", "grab.js", "popup.html", "popup.js", "fetch.html", "fetch.js", "options.html", "options.js"]
 
 
 def icons(out):
@@ -43,7 +43,7 @@ def build(out, kind, test=False):
         man["browser_specific_settings"] = {"gecko": {"id": "extension@citrello.app", "strict_min_version": "128.0"}}
     if test:
         man["content_scripts"][0]["matches"] += ["http://localhost:8099/*", "http://127.0.0.1:8099/*"]
-        man["host_permissions"] = ["<all_urls>"]
+        man["host_permissions"] = man.get("host_permissions", []) + ["<all_urls>"]
     with open(os.path.join(out, "manifest.json"), "w", encoding="utf-8") as f:
         json.dump(man, f, indent=1)
     return man

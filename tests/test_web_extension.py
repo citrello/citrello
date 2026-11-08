@@ -2,7 +2,8 @@
 
 - Bulk: "Fetch the missing ones with my access" opens the extension's fetch page, which visits each paper (pretend
   publisher pages here) in a background tab and hands the text to Citrello; a page without the text is reported.
-- The toolbar button on a paper's page: the "Add to Citrello" pop-up gets the paper's text from the extension.
+- The toolbar panel on a paper's page: looks the paper up in Citrello (the open tab, or one opened in the background)
+  and adds it with its text.
 
   python packaging/build_web_check.py
   (cd site/public && python -m http.server 8099) &
@@ -84,18 +85,41 @@ def test_extension_fetches_full_texts_and_adds_from_the_toolbar(tmp_path):
             expect(page.locator("#detail")).to_contain_text("ChatGPT and Claude can read this paper")
             page.screenshot(path=os.path.join(shots, "extension-library.png"))
 
-            # the toolbar button on a paper's page: the pop-up gets the paper's text from the extension
-            sw.evaluate("url => chrome.storage.local.set({testClipUrl: url})", BASE + "/app/clip.html")
-            paper = ctx.new_page()
-            paper.goto(site + "/article.html")
-            paper.bring_to_front()
-            with ctx.expect_page() as popup:
-                sw.evaluate("""async (url) => { const [tab] = await chrome.tabs.query({url});
-                                                 await self.clipTab(tab); }""", site + "/article.html")
-            pop = popup.value
+            # the toolbar panel on a paper's page (a panel under the button, not a new window): it reads the page,
+            # Citrello (the open tab) looks the paper up, and Add keeps the paper with its text
+            ext_id = sw.url.split("/")[2]
+
+            def panel_for(path):
+                paper = ctx.new_page()
+                paper.goto(site + path)
+                tab_id = sw.evaluate("async (url) => (await chrome.tabs.query({url}))[0].id", site + path)
+                pop = ctx.new_page()  # tests can't click the toolbar: the panel's page, pointed at that tab
+                pop.on("pageerror", lambda e: errors.append("panel: " + str(e)))
+                pop.goto(f"chrome-extension://{ext_id}/popup.html?tab={tab_id}")
+                return paper, pop
+
+            sw.evaluate("base => chrome.storage.local.set({testAppBase: base})", BASE)
+            paper, pop = panel_for("/article.html")
             expect(pop.locator("#title")).to_contain_text("Sustainable decommissioning", timeout=90000)
-            expect(pop.locator("#ftLine")).to_contain_text("Full text found", timeout=30000)
+            expect(pop.locator("#existing")).to_contain_text("[@topham2017]")  # imported above
+            expect(pop.locator("#ft")).to_contain_text("Full text found", timeout=30000)
+            pop.fill("#project", "From the toolbar")
             pop.screenshot(path=os.path.join(shots, "extension-toolbar.png"))
+            pop.click("#add")
+            expect(pop.locator("#doneMsg")).to_contain_text("[@topham2017]", timeout=60000)
+            expect(page.locator("#projNav")).to_contain_text("From the toolbar", timeout=30000)  # the open tab updates
+            pop.close()
+            paper.close()
+
+            # with no Citrello tab open: the extension opens Citrello in a background tab and uses it
+            page.close()
+            paper, pop = panel_for("/pdfonly.html")
+            expect(pop.locator("#title")).to_contain_text("Sailing through end-of-life", timeout=LOAD)
+            expect(pop.locator("#ft")).to_contain_text("Full text found", timeout=30000)
+            pop.click("#add")
+            expect(pop.locator("#doneMsg")).to_contain_text("With its full text", timeout=60000)
+            app_tabs = sw.evaluate("async (base) => (await chrome.tabs.query({})).filter((t) => (t.url || '').startsWith(base + '/app/') && !t.url.includes('clip')).length", BASE)
+            assert app_tabs == 1  # opened once, and left open for next time
             assert not errors, errors
             ctx.close()
     finally:

@@ -15,8 +15,9 @@ Citrello is a free, open-source reference manager built for writing with AI (cit
 
 This extension adds two things:
 
-• One click to add a paper. On any paper's page, click the Citrello button. Citrello finds the paper, checks it
-  against the publisher's record, and keeps the paper's text when the page shows it (with your own access).
+• One click to add a paper. On any paper's page, click the Citrello button (or press Alt+Shift+C). A small panel
+  shows the paper Citrello found, checked against the publisher's record, whether its full text was found (with your
+  own access), and a project to put it in. Click Add.
 
 • Full texts for your whole library. In Citrello (Library → Import → Papers' full text), choose "Fetch the missing
   ones with my access". The extension opens each paper in a background tab with your university or library login,
@@ -40,15 +41,18 @@ Help researchers add papers to their Citrello reference library and keep the tex
 so their AI assistant can read them.
 
 ## Why each permission is needed (Chrome asks for each)
-- activeTab: when the person clicks the toolbar button, read that one page's citation details and text to add the paper.
+- activeTab: when the person opens the toolbar panel (or presses Alt+Shift+C), read that one page's citation details
+  and text to add the paper.
 - scripting: run the small script that reads a paper's details and text, on the page the person clicked on or on a
   paper they asked the extension to fetch.
 - storage: remember the list of papers the person asked to fetch (until finished) and whether they use the web or
   desktop version of Citrello.
 - Host permissions (optional, "<all_urls>"): asked only when the person first fetches papers in bulk, because papers
   are on many different publishers' websites. Used only to open the papers the person asked for.
+- Host permission for localhost:8585 (required): the toolbar panel adds papers to Citrello for desktop, which runs on
+  the person's own computer at that address. Nothing else is reached.
 - Content script on citrello.app and localhost:8585: lets the Citrello app talk to the extension (start a fetch,
-  receive each paper's text).
+  receive each paper's text, answer the toolbar panel).
 
 ## Data usage (Chrome's "Privacy practices" tab)
 - Collects: "Website content" (the text of papers the person asks for), used only on the person's device for the
@@ -61,5 +65,5 @@ so their AI assistant can read them.
 The code is not minified or generated: answer "No" when asked whether the add-on contains minified or machine-generated code.
 
 ## Screenshots
-1280 × 800: use the fetch page ("Full texts with your access") and the "Add to Citrello" pop-up with "Full text
-found". (Ask Claude to make fresh ones at exactly 1280 × 800 if needed.)
+1280 × 800: the fetch page ("Full texts with your access") is in packaging/extension-shots/. For the toolbar panel,
+take a screenshot of a real paper's page with the panel open (Windows: Win+Shift+S; Mac: Cmd+Shift+4), at 1280 × 800.

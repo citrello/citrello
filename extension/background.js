@@ -1,47 +1,81 @@
 // Citrello browser extension: background.
-// - The toolbar button: on a paper's page, opens Citrello's "Add to Citrello" pop-up with the page's details, and
-//   hands the pop-up the paper's text (the article on the page, or its PDF), read with the person's own access.
+// - The toolbar panel (popup.html) asks Citrello to look up and keep papers ("citrello-api"): the desktop app
+//   directly, or the web app through its open tab (opened in the background when there isn't one: the web app's
+//   library lives in that tab, which also keeps ChatGPT and Claude connected).
 // - "Fetch with my access" from Citrello: opens the extension's fetch page, which visits each paper in turn.
-/* global grabPaper, pageInfo */
-if (typeof importScripts === "function" && typeof grabPaper === "undefined") importScripts("grab.js");
 
-const WEB = "https://citrello.app/app/clip.html";
-const DESKTOP = "http://localhost:8585/clip";
-const pendingForClip = new Map(); // pop-up tab id -> promise of the paper's text
+const WEB_APP = "https://citrello.app";
+const DESKTOP = "http://localhost:8585";
+const ready = new Map();  // tab id -> resolve(), when that Citrello tab's bridge says it's there
 
-async function clipUrl() {
-  const { target, testClipUrl } = await chrome.storage.local.get(["target", "testClipUrl"]);
-  return testClipUrl || (target === "desktop" ? DESKTOP : WEB);
+async function settings() {
+  const { target, testAppBase } = await chrome.storage.local.get(["target", "testAppBase"]);
+  return { desktop: target === "desktop", base: testAppBase || WEB_APP };
 }
 
-// the toolbar button (also called directly by the tests, which can't click a toolbar)
-self.clipTab = async (tab) => {
-  if (!tab || !tab.id || !/^https?:/.test(tab.url || "https:")) return;
-  let info;
-  try {
-    [{ result: info }] = await chrome.scripting.executeScript({ target: { tabId: tab.id }, func: pageInfo });
-  } catch (e) {
-    return; // a page extensions can't read (the browser's own pages, the web store…)
+const isAppTab = (t, base) => t.url && t.url.startsWith(base + "/app/") && !/\/app\/(clip|mendeley)/.test(t.url);
+
+// The Citrello web app's tab: the one that's open, or a new one in the background (left open afterwards).
+async function citrelloTab() {
+  const { base } = await settings();
+  const open = (await chrome.tabs.query({})).find((t) => isAppTab(t, base));
+  if (open) return open;
+  const tab = await chrome.tabs.create({ url: base + "/app/", active: false, pinned: false });
+  await new Promise((resolve, reject) => {
+    ready.set(tab.id, resolve);
+    setTimeout(() => { if (ready.delete(tab.id)) reject(new Error("Citrello took too long to open. Try again.")); }, 90000);
+  });
+  return tab;
+}
+
+function bytes(b64) {
+  const bin = atob(b64), out = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
+  return out;
+}
+
+async function citrelloApi(msg) {
+  if (!String(msg.path || "").startsWith("/api/clip/")) return { error: "Not allowed" };
+  const { desktop } = await settings();
+  if (desktop) {  // Citrello for desktop answers on this computer
+    try {
+      const r = await fetch(DESKTOP + msg.path, { method: "POST", headers: msg.headers || {}, body: msg.pdf ? bytes(msg.pdf) : msg.body });
+      return { status: r.status, data: await r.json().catch(() => ({})) };
+    } catch (e) {
+      return { error: "Citrello for desktop isn't running. Start it, or choose the web version in the extension's options." };
+    }
   }
-  const grabbing = chrome.scripting.executeScript({ target: { tabId: tab.id }, func: grabPaper, args: [""] })
-    .then((r) => (r && r[0] && r[0].result) || {}).catch(() => ({}));
-  const url = (await clipUrl()) + "#" + encodeURIComponent(JSON.stringify(info));
-  const win = await chrome.windows.create({ url, type: "popup", width: 560, height: 720 });
-  const popTab = win.tabs && win.tabs[0];
-  if (popTab) pendingForClip.set(popTab.id, grabbing);
-};
-chrome.action.onClicked.addListener((tab) => self.clipTab(tab));
+  const tab = await citrelloTab();
+  return chrome.tabs.sendMessage(tab.id, { action: "api", path: msg.path, body: msg.body || "", pdf: msg.pdf || "", headers: msg.headers || {} });
+}
 
 chrome.runtime.onMessage.addListener((msg, sender, reply) => {
-  if (!msg || !sender.tab) return;
-  if (msg.action === "clip-paper") {  // the pop-up asks for the paper's text
-    const p = pendingForClip.get(sender.tab.id);
-    if (!p) { reply({ status: "not-mine" }); return; }  // opened by the bookmarklet, which sends the text itself
-    pendingForClip.delete(sender.tab.id);
-    p.then((g) => reply(g.status === "ok" ? g : { status: "none" }));
+  if (!msg) return;
+  if (msg.action === "citrello-api") {  // from the toolbar panel
+    citrelloApi(msg).then(reply, (e) => reply({ error: String(e && e.message || e) }));
     return true;
   }
-  if (msg.action === "fetch" && Array.isArray(msg.papers)) {  // Citrello: fetch these papers' texts with my access
+  if (msg.action === "bridge-here" && sender.tab) {  // a Citrello tab has loaded
+    const done = ready.get(sender.tab.id);
+    if (done) { ready.delete(sender.tab.id); done(); }
+    return;
+  }
+  if (msg.action === "badge" && msg.tabId) {  // a ✓ on the icon for that page, for a few seconds
+    chrome.action.setBadgeBackgroundColor({ color: "#3e7b4f", tabId: msg.tabId }).catch(() => {});
+    chrome.action.setBadgeText({ text: "✓", tabId: msg.tabId }).catch(() => {});
+    setTimeout(() => chrome.action.setBadgeText({ text: "", tabId: msg.tabId }).catch(() => {}), 5000);
+    return;
+  }
+  if (msg.action === "open-citrello") {
+    settings().then(async ({ desktop, base }) => {
+      if (desktop) return chrome.tabs.create({ url: DESKTOP + "/" });
+      const open = (await chrome.tabs.query({})).find((t) => isAppTab(t, base));
+      if (open) { chrome.tabs.update(open.id, { active: true }); chrome.windows.update(open.windowId, { focused: true }); }
+      else chrome.tabs.create({ url: base + "/app/" });
+    });
+    return;
+  }
+  if (msg.action === "fetch" && Array.isArray(msg.papers) && sender.tab) {  // Citrello: fetch these papers' texts with my access
     const papers = msg.papers.filter((p) => p && p.key && (p.doi || p.url)).slice(0, 2000).map((p) => ({
       key: String(p.key), doi: String(p.doi || ""), url: String(p.url || ""), title: String(p.title || "").slice(0, 300) }));
     // only a local test copy of Citrello may ask to skip the pause between papers
@@ -53,4 +87,4 @@ chrome.runtime.onMessage.addListener((msg, sender, reply) => {
   }
 });
 
-chrome.tabs.onRemoved.addListener((id) => pendingForClip.delete(id));
+chrome.tabs.onRemoved.addListener((id) => ready.delete(id));

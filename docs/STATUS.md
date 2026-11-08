@@ -71,6 +71,9 @@ button replacing the bookmarklet, and "Fetch the missing ones with my access" (b
 background tabs with the person's login; asks for site access on first use). Built by `packaging/build_extension.py`
 (Chrome/Edge zip, Firefox zip; artifacts of the "Build the browser extension" workflow); tested in Chromium with
 the web app (`tests/test_web_extension.py`). **Not yet in the stores** (Armin: store accounts and submissions).
+The toolbar button opens a **panel** under the icon (like Mendeley/Zotero; Alt+Shift+C), not a window: the web app
+answers through its open tab (the extension opens one in the background if needed and leaves it), the desktop app
+directly (it accepts extension origins for /api/clip/ only).
 People must re-drag the bookmarklet to get the version that takes the text.
 - **Mendeley one-click import works** in the web app (Armin registered a second Mendeley app, 8 Nov).
 

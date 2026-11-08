@@ -298,3 +298,55 @@ def test_endnote_xml_import():
     assert library.parse_any(ENDNOTE_XML.replace('<?xml version="1.0" encoding="UTF-8" ?>', ""), "export.txt")[0]["title"]
     with pytest.raises(ValueError):
         library.parse_any("<xml><records><record><titles>", "broken.xml")
+
+
+def test_adding_an_existing_reference_to_a_project_lists_the_project():
+    """Adding a paper that's already in the library "into a project" puts the project in the sidebar's list too."""
+    c = {"type": "article-journal", "title": "A paper added twice for the project list", "DOI": "10.9999/twice.1"}
+    with library.editing() as data:
+        library.add_csl(data, dict(c))
+    with library.editing() as data:
+        it, created, _ = library.add_csl(data, dict(c), project="Second look")
+    data = library.load()
+    assert not created and "Second look" in it["projects"] and "Second look" in data["projects"]
+
+
+def test_http_json_tries_once_more_after_a_dropped_connection(monkeypatch):
+    """A dropped connection (in the web app: a browser NetworkError) is tried once more, then reported as "no
+    connection"; a refused connection (offline, or no server) and server answers aren't retried."""
+    import urllib.error
+    import citrello_core as core
+    calls = []
+    monkeypatch.setattr(core.time, "sleep", lambda s: None)
+
+    class Resp:
+        headers = {}
+        def __enter__(self): return self
+        def __exit__(self, *a): return False
+        def read(self): return b'{"ok": 1}'
+
+    def flaky(req, timeout=30):
+        calls.append(1)
+        if len(calls) == 1:
+            raise Exception("NetworkError: Failed to execute 'send' on 'XMLHttpRequest'")
+        return Resp()
+    monkeypatch.setattr(core.urllib.request, "urlopen", flaky)
+    assert core.http_json("https://example.org/x")[0] == {"ok": 1} and len(calls) == 2
+
+    def always(req, timeout=30):
+        calls.append(1)
+        raise Exception("NetworkError: Failed to load")
+    calls.clear()
+    monkeypatch.setattr(core.urllib.request, "urlopen", always)
+    with pytest.raises(urllib.error.URLError):
+        core.http_json("https://example.org/x")
+    assert len(calls) == 2
+
+    def refused(req, timeout=30):
+        calls.append(1)
+        raise urllib.error.URLError(ConnectionRefusedError(111, "refused"))
+    calls.clear()
+    monkeypatch.setattr(core.urllib.request, "urlopen", refused)
+    with pytest.raises(urllib.error.URLError):
+        core.http_json("https://example.org/x")
+    assert len(calls) == 1
