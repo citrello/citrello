@@ -143,3 +143,21 @@ def test_app_requests(lib, tmp_path, monkeypatch):
     assert st == 400 and "isn't a PDF" in out["error"]
     assert call("POST", "/api/fulltext/remove", json.dumps({"key": key}).encode())[0] == 200
     assert call("GET", f"/api/fulltext/text?key={key}")[0] == 404
+
+
+def test_text_from_the_papers_page(lib, tmp_path, monkeypatch):
+    """The browser button sends the article as the page shows it (or its PDF); the menus and links are dropped."""
+    import app
+    import webapp
+    monkeypatch.setattr(app, "USER_CONFIG", str(tmp_path / "app.json"))
+    page = "1. Introduction\nDownload PDF\n" + "\n".join(
+        f"Paragraph {i}: removing monopile foundations depends on water depth and vessel day rates." for i in range(40))
+    assert "Download PDF" not in fulltext.clean_page(page) and "\n\nParagraph 1:" in fulltext.clean_page(page)
+    key = lib[TOPHAM["title"]]["key"]
+    st, _, _, out = webapp.handle("POST", "/api/clip/fulltext", {"X-Key": key}, json.dumps({"text": page}).encode())
+    assert st == 200 and json.loads(out)["how"] == "page"
+    assert library.get(library.load(), key)["fulltext"]["source"] == "page"
+    st, _, _, out = webapp.handle("POST", "/api/clip/fulltext", {"X-Key": key}, pdf_bytes(tmp_path))
+    assert st == 200 and json.loads(out)["how"] == "pdf"
+    st, _, _, out = webapp.handle("POST", "/api/clip/fulltext", {"X-Key": key}, json.dumps({"text": "Too short."}).encode())
+    assert st == 400

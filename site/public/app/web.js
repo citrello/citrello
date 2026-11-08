@@ -128,7 +128,7 @@
       } else {
         const r = await apiFetch(url, { method: m.method, headers: m.headers, body: m.body });
         res = { status: r.status, ctype: r.headers.get("Content-Type"), body: new Uint8Array(await r.arrayBuffer()) };
-        if (url.pathname === "/api/clip/add" && r.ok && typeof loadLibrary === "function") loadLibrary();
+        if ((url.pathname === "/api/clip/add" || url.pathname === "/api/clip/fulltext") && r.ok && typeof loadLibrary === "function") loadLibrary();
       }
       channel.postMessage({ type: "response", to: m.from, id: m.id, headers: {}, ...res });
     }

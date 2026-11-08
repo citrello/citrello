@@ -1002,6 +1002,13 @@ class Handler(BaseHTTPRequestHandler):
             if path == "/api/fulltext/remove":
                 fulltext.remove(str(self.json_body().get("key", "")))
                 return self.send(200, {"ok": True})
+            if path == "/api/clip/fulltext":  # browser button: the paper's text from its page, or its PDF
+                key = urllib.parse.unquote(self.headers.get("X-Key", "")).strip()
+                data = self.body()
+                if data.startswith(b"%PDF"):
+                    return self.send(200, dict(fulltext.attach_pdf(data, key), how="pdf"))
+                b = json.loads(data or b"{}")
+                return self.send(200, dict(fulltext.attach(key, fulltext.clean_page(str(b.get("text", ""))), "page"), how="page"))
             if path == "/api/library/delete":
                 return self.send(200, {"deleted": library.delete(self.json_body().get("keys", []))})
             if path == "/api/library/projects-bulk":  # selection bar: add to / move to / remove from a project

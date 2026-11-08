@@ -58,6 +58,14 @@ def clean(text):
     return text[:MAX_CHARS]
 
 
+def clean_page(text):
+    """A paper's text as a browser shows it on the publisher's page (innerText): one paragraph per line."""
+    drop = re.compile(r"^(download pdf|view pdf|open in new tab|google scholar|crossref|cross ?ref|view article|"
+                      r"article google scholar|scopus|pubmed|full size image|view in article|copy|share|cite)$", re.I)
+    lines = [re.sub(r"\s+", " ", l).strip() for l in text.replace("\r", "\n").split("\n")]
+    return "\n\n".join(l for l in lines if len(l) > 2 and not drop.match(l))[:MAX_CHARS]
+
+
 def pdf_text(data):
     """PDF bytes -> (text, metadata title). Raises ValueError with a plain message."""
     from pypdf import PdfReader

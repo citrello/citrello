@@ -704,13 +704,25 @@ $("quit").onclick = async () => {
 // ---------- browser button (bookmarklet) ----------
 // the pop-up: the desktop app's local server, or the web app's own page (it works without a Citrello tab open)
 const CLIP_URL = document.documentElement.classList.contains("web") ? location.origin + "/app/clip.html" : "http://localhost:8585/clip";
+const CLIP_ORIGIN = new URL(CLIP_URL).origin;
+// Runs on the paper's page when the button is clicked. It reads the page's citation details and opens the pop-up;
+// then it looks for the paper's text, with the person's own access: the article on the page if it's there, or else
+// the PDF the page links to. The pop-up asks for it ("ready") and Citrello keeps only the text.
 const BOOKMARKLET_CODE = "(function(){var m={},n=0;document.querySelectorAll('meta[name],meta[property]').forEach(function(e){" +
   "var k=(e.getAttribute('name')||e.getAttribute('property')||'').toLowerCase();" +
   "if(/^(citation_|dc\\.|prism\\.|og:|bepress_|article:published_time$)/.test(k)&&k!=='citation_reference'){" +
   "m[k]=m[k]||[];if(m[k].length<30&&n<400){m[k].push((e.content||'').slice(0,400));n++;}}});" +
   "var d={url:location.href,title:document.title.slice(0,300),meta:m,sel:String(window.getSelection()).slice(0,2000)};" +
-  "var w=window.open('" + CLIP_URL + "#'+encodeURIComponent(JSON.stringify(d)),'citrello','width=560,height=660');" +
-  "if(!w){alert('Citrello: please allow pop-ups for this site, then click again.');}})();";
+  "var w=window.open('" + CLIP_URL + "#'+encodeURIComponent(JSON.stringify(d)),'citrello','width=560,height=700');" +
+  "if(!w){alert('Citrello: please allow pop-ups for this site, then click again.');return;}" +
+  "var O='" + CLIP_ORIGIN + "',best='';" +
+  "['#body','.Body','.article__body','.c-article-body','#article-body','.article-body','.fulltext-view','[itemprop=articleBody]','article','main','[role=main]']" +
+  ".forEach(function(q){document.querySelectorAll(q).forEach(function(e){var t=e.innerText||'';if(t.length>best.length)best=t;});});" +
+  "var ok=best.length>6000&&/introduction|methods?|results|discussion|conclusions?/i.test(best),pdf=(m.citation_pdf_url||[])[0];" +
+  "var got=ok?Promise.resolve({text:best.slice(0,600000)}):pdf?fetch(pdf,{credentials:'include'}).then(function(r){return r.ok?r.arrayBuffer():null})" +
+  ".then(function(b){return b&&new TextDecoder().decode(new Uint8Array(b.slice(0,5)))==='%PDF-'?{pdf:b}:{}}).catch(function(){return {}}):Promise.resolve({});" +
+  "window.addEventListener('message',function f(e){if(e.origin!==O||!e.data||e.data.citrello!=='ready')return;" +
+  "window.removeEventListener('message',f);got.then(function(g){g.citrello='fulltext';try{w.postMessage(g,O)}catch(x){}});});})();";
 const BOOKMARKLET = "javascript:" + encodeURIComponent(BOOKMARKLET_CODE);
 $("bookmarklet").href = BOOKMARKLET;
 $("bookmarklet").onclick = (e) => { e.preventDefault(); toast("Drag this button to your bookmarks bar"); };

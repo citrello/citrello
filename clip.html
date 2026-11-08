@@ -50,6 +50,8 @@
   @media (prefers-reduced-motion: reduce) { .spinner { animation: none; } }
   .hidden { display: none !important; }
   .small { font-size: 12.5px; color: var(--muted); margin-top: 10px; word-break: break-all; }
+  .ftline { margin-top: 10px; font-size: 13px; color: var(--muted); }
+  .ftline.ok { color: var(--ok, #2f6b40); font-weight: 600; }
 </style>
 </head>
 <body>
@@ -63,6 +65,7 @@
       <div class="meta" id="meta"></div>
       <div id="tags"></div>
       <div id="issues"></div>
+      <div class="ftline" id="ftLine">Full text: looking on the page…</div>
     </div>
     <div id="existing" class="notice ok hidden"></div>
     <label>Project (optional)<input id="project" list="projects" placeholder="e.g. the paper you're writing"></label>
@@ -84,6 +87,26 @@ const $ = (id) => document.getElementById(id);
 const show = (id, on = true) => $(id).classList.toggle("hidden", !on);
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 let clip = null, rec = null, key = null;
+
+// The paper's text, from the page the button was clicked on (the article shown there, or its PDF, read with the
+// person's own access). Only the text is kept, so ChatGPT and Claude can read the paper later.
+let paper = null, paperDone = false;
+function showPaper() {
+  const line = $("ftLine"); if (!line) return;
+  line.className = "ftline " + (paper ? "ok" : paperDone ? "none" : "");
+  line.textContent = paper ? "Full text found: ChatGPT and Claude will be able to read this paper."
+    : paperDone ? "No full text on this page. You can add the PDF later (in Citrello: the reference → Full text)."
+    : "Full text: looking on the page…";
+}
+window.addEventListener("message", (e) => {
+  const m = e.data;
+  if (!m || m.citrello !== "fulltext") return;
+  paper = (m.text && m.text.length > 1500) || m.pdf ? m : null;
+  paperDone = true;
+  showPaper();
+});
+try { if (window.opener) window.opener.postMessage({citrello: "ready"}, "*"); } catch (e) {}
+setTimeout(() => { if (!paperDone) { paperDone = true; showPaper(); } }, 15000);
 
 async function post(path, body) {
   const r = await fetch(path, {method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify(body)});
@@ -129,8 +152,17 @@ $("add").onclick = async () => {
     try { localStorage.setItem("citrello-last-project", project); } catch (e) {}
     const r = await post("/api/clip/add", {rec, project});
     key = r.key;
+    let withText = false;
+    if (paper) {  // keep the paper's text with it
+      try {
+        const body = paper.pdf ? paper.pdf : JSON.stringify({text: paper.text});
+        const res = await fetch("/api/clip/fulltext", {method: "POST", body, headers: {"X-Key": encodeURIComponent(key)}});
+        withText = res.ok;
+      } catch (e) {}
+    }
     show("found", false); show("done");
-    $("doneMsg").innerHTML = `${r.created ? "Added" : "Already in your library"}: <code>[@${esc(key)}]</code>${project ? " · project " + esc(project) : ""}`;
+    $("doneMsg").innerHTML = `${r.created ? "Added" : "Already in your library"}: <code>[@${esc(key)}]</code>${project ? " · project " + esc(project) : ""}` +
+      (withText ? "<br>With its full text: ChatGPT and Claude can read it." : "");
     $("copy").focus();
   } catch (e) { $("add").disabled = false; fail(e.message); }
 };

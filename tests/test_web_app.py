@@ -569,3 +569,103 @@ def test_web_app_full_texts(browser_name, tmp_path):
         expect(page.locator("#detail")).to_contain_text("Choose the PDF", timeout=30000)
         assert not errors, errors
         b.close()
+
+
+def publisher_site(pdf_path):
+    """Pretend publisher pages on their own address (another port = another site, like a real publisher)."""
+    import threading
+    from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+    article = " ".join(f"<p>Section {i}. Decommissioning offshore wind farms costs more than planned; removing monopile "
+                       f"foundations depends on water depth and vessel rates, and recycling steel recovers part of it.</p>"
+                       for i in range(40))
+    pages = {
+        "/article.html": f"""<html><head><title>Topham</title><meta name="citation_title" content="Sustainable decommissioning of an offshore wind farm">
+            <meta name="citation_doi" content="10.1016/j.renene.2016.10.066"></head><body><nav>Menu</nav>
+            <article><h2>1. Introduction</h2>{article}<h2>4. Results</h2><p>Recycling composite blades remains hard.</p></article></body></html>""",
+        "/pdfonly.html": """<html><head><title>Vetters</title><meta name="citation_doi" content="10.1016/j.rser.2024.114486">
+            <meta name="citation_pdf_url" content="/vetters.pdf"></head><body><p>Abstract only.</p></body></html>""",
+        "/nothing.html": """<html><head><title>LeCun</title><meta name="citation_doi" content="10.1038/nature14539"></head>
+            <body><p>Abstract only. Buy this article.</p></body></html>""",
+    }
+
+    class H(BaseHTTPRequestHandler):
+        def log_message(self, *a):
+            pass
+
+        def do_GET(self):
+            if self.path == "/vetters.pdf":
+                body, ctype = open(pdf_path, "rb").read(), "application/pdf"
+            elif self.path in pages:
+                body, ctype = pages[self.path].encode(), "text/html; charset=utf-8"
+            else:
+                self.send_response(404)
+                self.end_headers()
+                return
+            self.send_response(200)
+            self.send_header("Content-Type", ctype)
+            self.end_headers()
+            self.wfile.write(body)
+
+    srv = ThreadingHTTPServer(("127.0.0.1", 0), H)
+    threading.Thread(target=srv.serve_forever, daemon=True).start()
+    return f"http://127.0.0.1:{srv.server_address[1]}", srv
+
+
+@pytest.mark.parametrize("browser_name", BROWSERS)
+def test_web_app_browser_button_takes_the_full_text(browser_name, tmp_path):
+    """The browser button on a paper's page: the article shown on the page, or the PDF it links to, becomes the
+    reference's full text (with the person's access; only the text is kept); a page with neither says so."""
+    from playwright.sync_api import expect, sync_playwright
+    sys.path.insert(0, os.path.dirname(__file__))
+    import test_doccheck as T
+    pdf = str(tmp_path / "vetters.pdf")
+    T.make_pdf(pdf, [["Sailing through end-of-life challenges: A comprehensive review for offshore wind"] +
+                     [f"Review section {i}: end-of-life options for offshore wind turbines and their costs." for i in range(40)]])
+    site, srv = publisher_site(pdf)
+    shots = os.environ.get("CITRELLO_E2E_SHOTS") or str(tmp_path)
+    try:
+        with sync_playwright() as pw:
+            b = getattr(pw, browser_name).launch()
+            ctx = b.new_context(viewport={"width": 1280, "height": 860})
+            page = ctx.new_page()
+            errors = []
+            page.on("pageerror", lambda e: errors.append(str(e)))
+            open_app(page)
+            page.click("#wWebStart")
+            tab(page, "settings")
+            code = urllib.parse.unquote(page.get_attribute("#bookmarklet", "href")[len("javascript:"):])
+            tab(page, "library")
+
+            def click_button_on(path):
+                paper = ctx.new_page()
+                paper.goto(site + path)
+                with ctx.expect_page() as popup:
+                    paper.evaluate(code)
+                pop = popup.value
+                pop.on("pageerror", lambda e: errors.append("pop-up: " + str(e)))
+                return paper, pop
+
+            for path, title, how in (("/article.html", "Sustainable decommissioning", "page"),
+                                     ("/pdfonly.html", "Sailing through end-of-life", "pdf")):
+                paper, pop = click_button_on(path)
+                expect(pop.locator("#title")).to_contain_text(title, timeout=90000)
+                expect(pop.locator("#ftLine")).to_contain_text("Full text found", timeout=30000)
+                if how == "page":
+                    pop.screenshot(path=os.path.join(shots, f"web-app-{browser_name}-clip-fulltext.png"))
+                pop.click("#add")
+                expect(pop.locator("#doneMsg")).to_contain_text("With its full text", timeout=60000)
+                pop.close()
+                paper.close()
+            expect(page.locator("#libChips")).to_contain_text("2 with full text", timeout=30000)
+            key = page.locator("#libRows .ref", has_text="Sustainable decommissioning").get_attribute("data-sel")
+            page.click(f'#libRows .ref[data-sel="{key}"]')
+            expect(page.locator("#detail")).to_contain_text("ChatGPT and Claude can read this paper")
+
+            paper, pop = click_button_on("/nothing.html")  # abstract only: nothing to take
+            expect(pop.locator("#ftLine")).to_contain_text("No full text on this page", timeout=30000)
+            pop.close()
+            paper.close()
+            assert not errors, errors
+            b.close()
+    finally:
+        srv.shutdown()
