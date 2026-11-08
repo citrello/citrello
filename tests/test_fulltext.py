@@ -239,3 +239,16 @@ def test_find_free_full_texts(lib, tmp_path, monkeypatch, web):
         assert fulltext.find_free()["checked"] == 1  # only the one still without text
     finally:
         srv.shutdown()
+
+
+def test_the_extension_on_a_pdf_itself(lib, tmp_path, monkeypatch):
+    """The extension's panel on a PDF: its text goes to the matching reference (no reference picked by hand)."""
+    import app
+    import webapp
+    monkeypatch.setattr(app, "USER_CONFIG", str(tmp_path / "app.json"))
+    st, _, _, out = webapp.handle("POST", "/api/clip/pdf", {}, pdf_bytes(tmp_path))
+    res = json.loads(out)
+    assert st == 200 and res["key"] == lib[TOPHAM["title"]]["key"] and res["how"] == "doi"
+    other = [["An unrelated paper about bees and flowers in spring meadows."] * 40]
+    st, _, _, out = webapp.handle("POST", "/api/clip/pdf", {}, pdf_bytes(tmp_path, other, "bees.pdf"))
+    assert st == 200 and json.loads(out)["unmatched"]

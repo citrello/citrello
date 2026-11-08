@@ -18,7 +18,7 @@ import zipfile
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SRC = os.path.join(ROOT, "extension")
-FILES = ["background.js", "bridge.js", "grab.js", "popup.html", "popup.js", "fetch.html", "fetch.js", "options.html", "options.js"]
+FILES = ["background.js", "bridge.js", "grab.js", "follow.js", "popup.html", "popup.js", "fetch.html", "fetch.js", "options.html", "options.js"]
 
 
 def icons(out):

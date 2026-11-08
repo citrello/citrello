@@ -1,12 +1,12 @@
 // The toolbar panel ("Add to Citrello"): what's on this page, the paper's text if the page shows it (with the
 // person's own access), a project, and Add. Citrello itself looks the paper up and keeps it: the open Citrello tab
 // (opened in the background when there isn't one), or the desktop app. See background.js (citrello-api).
-/* global grabPaper, pageInfo */
+/* global grabPaper, pageInfo, pdfFrom, clickPdfButton */
 const $ = (id) => document.getElementById(id);
 const show = (id, on = true) => $(id).classList.toggle("hidden", !on);
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 const params = new URLSearchParams(location.search);  // ?tab=<id>: the tests open this page in a tab of its own
-let tabId = null, rec = null, key = null, paper = null, grabbing = null;
+let tabId = null, rec = null, key = null, paper = null, grabbing = null, grabbed = null;
 
 function fail(msg) { show("loading", false); $("error").textContent = msg; show("error"); }
 
@@ -21,8 +21,66 @@ async function call(path, body, headers = {}, pdf = "") {
 function showText() {
   const ft = $("ft");
   ft.className = "ft " + (paper ? "ok" : "");
-  ft.textContent = paper ? "Full text found: ChatGPT and Claude will be able to read this paper."
-    : grabbing === null ? "" : "No full text on this page. You can add the PDF later in Citrello.";
+  if (paper) { ft.textContent = "Full text found: ChatGPT and Claude will be able to read this paper."; return; }
+  if (!grabbed) { ft.textContent = "Full text: looking on the page…"; return; }
+  if (grabbed.status === "captcha") {
+    ft.textContent = "This page wants to check that you're a person. Answer the check on the page, then click the Citrello button again.";
+  } else if ((grabbed.pdfLinks && grabbed.pdfLinks.length) || grabbed.pdfButton) {
+    ft.innerHTML = 'No full text on the page itself. <a href="#" id="openPdf">Open the PDF</a>, then click the Citrello button on it.';
+    $("openPdf").onclick = async (e) => {
+      e.preventDefault();
+      if (grabbed.pdfLinks && grabbed.pdfLinks.length) await chrome.tabs.create({ url: grabbed.pdfLinks[0] });
+      else {  // the page's PDF button: click it, then open where it wanted to go (the browser blocks it otherwise)
+        await chrome.scripting.executeScript({ target: { tabId }, func: clickPdfButton, world: "MAIN" });
+        await new Promise((res) => setTimeout(res, 1500));
+        const [{ result }] = await chrome.scripting.executeScript({ target: { tabId }, func: () => document.documentElement.dataset.citrelloOpen || "" });
+        if (result) await chrome.tabs.create({ url: result });
+      }
+      window.close();
+    };
+  } else {
+    ft.textContent = "No full text on this page. You can add the PDF later in Citrello.";
+  }
+}
+
+// the paper's text: what the page gave, or a PDF it links to, fetched here with the extension's access
+async function getPaper() {
+  let g = {};
+  try { g = (await chrome.scripting.executeScript({ target: { tabId }, func: grabPaper, args: [""] }))[0].result || {}; } catch (e) { /* off-limits */ }
+  if (g.status === "no-access") {
+    for (const u of g.pdfLinks || []) {
+      const pdf = await pdfFrom(u);
+      if (pdf) { g = { status: "ok", how: "pdf", pdf, host: g.host }; break; }
+    }
+  }
+  return g;
+}
+
+// on a PDF itself: its text goes to the matching reference (found by its DOI or title; added if it's new)
+async function pdfMode() {
+  show("loading", false); show("found");
+  $("title").textContent = "This is a PDF";
+  $("meta").textContent = "Citrello reads it, finds its reference in your library (or adds it), and keeps only its text.";
+  $("tags").innerHTML = ""; $("ft").textContent = "";
+  $("add").textContent = "Add its text to my library";
+  $("add").onclick = async () => {
+    $("add").disabled = true; $("add").textContent = "Reading the PDF…";
+    try {
+      const g = await grabbing;
+      if (!g || !g.pdf) throw new Error("Citrello couldn't read this PDF here. Download it and drop it in Citrello (Full texts).");
+      const project = $("project").value.trim();
+      const r = await call("/api/clip/pdf", "", { "X-Project": encodeURIComponent(project) }, g.pdf);
+      if (r.unmatched) throw new Error("Couldn't tell which paper this is (no DOI or matching title in it). Add it in Citrello: open the reference → Full text.");
+      key = r.key;
+      show("found", false); show("done");
+      $("doneMsg").innerHTML = `Full text added to <code>[@${esc(key)}]</code>` + (r.how === "added" ? " (new in your library)" : "") +
+        ".<br>ChatGPT and Claude can read it.";
+      chrome.runtime.sendMessage({ action: "badge", tabId });
+    } catch (e) {
+      $("add").disabled = false; $("add").textContent = "Add its text to my library";
+      fail(e.message);
+    }
+  };
 }
 
 async function start() {
@@ -33,9 +91,9 @@ async function start() {
   } catch (e) {
     return fail("Citrello can't read this page (the browser's own pages and the web store are off-limits). Open a paper's page and click again.");
   }
-  grabbing = chrome.scripting.executeScript({ target: { tabId }, func: grabPaper, args: [""] })
-    .then((r) => (r && r[0] && r[0].result) || {}).catch(() => ({}));
-  grabbing.then((g) => { paper = g.status === "ok" ? g : null; showText(); });
+  grabbing = getPaper();
+  grabbing.then((g) => { grabbed = g; paper = g.status === "ok" ? g : null; showText(); });
+  if (info.isPdf) return pdfMode();
   const slow = setTimeout(async () => {
     const { target } = await chrome.storage.local.get("target");
     $("loadingText").textContent = target === "desktop" ? "Asking Citrello on this computer…"

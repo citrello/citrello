@@ -1,11 +1,13 @@
 // The extension's fetch page: visits each paper Citrello asked for, one at a time, in a background tab with the
 // person's own access, takes its text and hands it to the Citrello tab, which keeps only the text.
-/* global grabPaper */
+/* global grabPaper, pdfFrom, clickAndFollow */
 const $ = (id) => document.getElementById(id);
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 let job = null, state = "idle", current = 0, results = [];
-const STATUS = { ok: "Full text ✓", page: "Full text ✓", pdf: "Full text ✓ (PDF)", "no-access": "No access",
+let checkTab = null;                // the tab showing an "are you human?" check, waiting for the person
+const slowHosts = new Set();        // sites that asked for a check: go slower there
+const STATUS = { ok: "Full text ✓", page: "Full text ✓", pdf: "Full text ✓ (PDF)", "no-access": "No access", captcha: "Needs you",
                  "other-page": "Didn't reach the paper", failed: "Couldn't save", error: "Didn't load", work: "Reading…", wait: "" };
 
 async function load() {
@@ -20,7 +22,7 @@ async function load() {
 }
 
 function render() {
-  const n = job.papers.length, done = results.filter((r) => r !== "wait" && r !== "work").length;
+  const n = job.papers.length, done = results.filter((r) => r !== "wait" && r !== "work" && r !== "captcha").length;
   const ok = results.filter((r) => r === "page" || r === "pdf").length;
   $("count").textContent = `${done} of ${n} done · ${ok} full text${ok === 1 ? "" : "s"} added`;
   $("bar").style.width = `${(100 * done) / n}%`;
@@ -40,18 +42,37 @@ function waitForLoad(tabId, timeout = 45000) {
   });
 }
 
-async function fetchOne(p) {
-  const url = p.doi ? "https://doi.org/" + p.doi : p.url;
-  const tab = await chrome.tabs.create({ url, active: false });
+// One paper: its page in a background tab (or the tab already open for an "are you human?" check), then the text:
+// the article on the page, or a PDF it links to (fetched here, with the extension's own access, when the page can't),
+// or the PDF its button opens. A check page is left open for the person.
+async function fetchOne(p, existingTab = null) {
+  let tabId = existingTab;
+  if (!tabId) {
+    const url = p.doi ? "https://doi.org/" + p.doi : p.url;
+    tabId = (await chrome.tabs.create({ url, active: false })).id;
+  }
+  let keep = false;
   try {
-    await waitForLoad(tab.id);
-    await sleep(3000);  // pages that build the article with scripts
-    const [{ result }] = await chrome.scripting.executeScript({ target: { tabId: tab.id }, func: grabPaper, args: [p.doi] });
-    return result || { status: "error" };
+    await waitForLoad(tabId);                 // (after a check, the page usually reloads to the article)
+    await sleep(existingTab ? 2000 : 3000);   // pages that build the article with scripts
+    const [{ result }] = await chrome.scripting.executeScript({ target: { tabId }, func: grabPaper, args: [p.doi] });
+    const g = result || { status: "error" };
+    if (g.status === "captcha") { keep = true; return Object.assign(g, { tabId }); }
+    if (g.status !== "no-access") return g;
+    for (const u of g.pdfLinks || []) {  // the page's PDF links, fetched with the extension's access
+      const pdf = await pdfFrom(u);
+      if (pdf) return { status: "ok", how: "pdf", pdf, host: g.host };
+    }
+    if (g.pdfButton) {                     // a PDF button that works with scripts: click it and follow it
+      const u = await clickAndFollow(tabId);
+      const pdf = u && await pdfFrom(u);
+      if (pdf) return { status: "ok", how: "pdf", pdf, host: g.host };
+    }
+    return g;
   } catch (e) {
     return { status: "error", error: String(e && e.message || e) };
   } finally {
-    chrome.tabs.remove(tab.id).catch(() => {});
+    if (!keep) chrome.tabs.remove(tabId).catch(() => {});
   }
 }
 
@@ -71,7 +92,19 @@ async function run() {
   while (current < job.papers.length && state === "running") {
     const p = job.papers[current];
     results[current] = "work"; render();
-    const g = await fetchOne(p);
+    const g = await fetchOne(p, checkTab);
+    checkTab = null;
+    if (g.status === "captcha") {  // a person has to answer it: show them the tab and wait
+      checkTab = g.tabId;
+      slowHosts.add(g.host);
+      results[current] = "captcha"; render();
+      state = "check";
+      chrome.tabs.update(g.tabId, { active: true }).catch(() => {});
+      $("msg").innerHTML = `<div class="notice"><b>${esc(g.host)}</b> wants to check that you're a person (a CAPTCHA). We've opened that page:
+        answer the check there, then come back to this tab and click <b>Continue</b>. Citrello never answers these for you,
+        and it will go more slowly on that site from now on.</div>`;
+      break;
+    }
     let r = g.status === "ok" ? g.how : g.status;
     if (g.status === "ok") {
       try {
@@ -95,7 +128,8 @@ async function run() {
       noAccess[g.host] = 0;
       break;
     }
-    if (current < job.papers.length && state === "running") await sleep(job.testFast ? 300 : 10000 + Math.random() * 10000);
+    const slow = slowHosts.has(g.host) ? 3 : 1;  // after a check on that site, three times slower
+    if (current < job.papers.length && state === "running") await sleep(job.testFast ? 300 : slow * (10000 + Math.random() * 10000));
   }
   if (current >= job.papers.length) {
     state = "done";
@@ -104,14 +138,15 @@ async function run() {
       (ok < job.papers.length ? " The others had no access or no text; you can add their PDFs in Citrello." : "") + `</div>`;
     $("pause").classList.add("hidden"); $("stop").classList.add("hidden");
     chrome.storage.local.remove("job");
-  } else if (state === "paused") {
-    $("start").textContent = "Resume"; $("start").classList.remove("hidden"); $("pause").classList.add("hidden");
+  } else if (state === "paused" || state === "check") {
+    $("start").textContent = state === "check" ? "Continue" : "Resume";
+    $("start").classList.remove("hidden"); $("pause").classList.add("hidden");
   }
 }
 
 $("start").onclick = () => run();
 $("pause").onclick = () => { state = "paused"; $("start").textContent = "Resume"; $("start").classList.remove("hidden"); $("pause").classList.add("hidden");
                               $("msg").innerHTML = `<div class="notice">Paused after this paper.</div>`; };
-$("stop").onclick = () => { state = "stopped"; chrome.storage.local.remove("job"); $("pause").classList.add("hidden"); $("stop").classList.add("hidden");
+$("stop").onclick = () => { state = "stopped"; if (checkTab) chrome.tabs.remove(checkTab).catch(() => {}); checkTab = null; chrome.storage.local.remove("job"); $("pause").classList.add("hidden"); $("stop").classList.add("hidden");
                              $("msg").innerHTML = `<div class="notice">Stopped. What was fetched is in Citrello.</div>`; };
 load();

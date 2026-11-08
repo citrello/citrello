@@ -1036,6 +1036,15 @@ class Handler(BaseHTTPRequestHandler):
             if path == "/api/fulltext/remove":
                 fulltext.remove(str(self.json_body().get("key", "")))
                 return self.send(200, {"ok": True})
+            if path == "/api/clip/pdf":  # the extension on a PDF itself: its text goes to the matching reference
+                data = self.body()
+                res = fulltext.attach_pdf(data)
+                if res.get("unmatched") and res.get("doi"):  # not in the library yet: add it by its DOI
+                    it, created, _ = library.add_reference("doi:" + res["doi"],
+                                                           urllib.parse.unquote(self.headers.get("X-Project", "")).strip() or None,
+                                                           email=load_config().get("email"))
+                    res = dict(fulltext.attach_pdf(data, it["key"]), how="added", created=created)
+                return self.send(200, res)
             if path == "/api/clip/fulltext":  # browser button: the paper's text from its page, or its PDF
                 key = urllib.parse.unquote(self.headers.get("X-Key", "")).strip()
                 data = self.body()

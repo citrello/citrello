@@ -76,6 +76,14 @@ answers through its open tab (the extension opens one in the background if neede
 directly (it accepts extension origins for /api/clip/ only).
 People must re-drag the bookmarklet to get the version that takes the text.
 - **Mendeley one-click import works** in the web app (Armin registered a second Mendeley app, 8 Nov).
+- **Full texts tab** (sidebar, under Library; 8 Nov): summary, the three ways (extension with university access,
+  free copies, PDFs you have), and the list of references still without text (Open paper / Add PDF). Moved out of
+  Import because it's a main feature. Extension: when the page doesn't show the article it tries the page's PDF
+  links (fetched with the extension's access when the page can't), PDF viewer pages, and script PDF buttons (it
+  catches where the button wanted to open); on a PDF itself, the panel adds its text to the matching reference
+  (/api/clip/pdf). "Are you human?" checks are **never answered automatically**: the bulk fetch pauses, shows the
+  tab, and continues on "Continue", three times slower on that site afterwards. Not handled yet: PDF buttons that
+  start a file download (would need the "downloads" permission).
 
 ## The web app
 **Progress:** steps 1 and 2 are live at citrello.app/app and tested in Chromium and WebKit: library in the browser,

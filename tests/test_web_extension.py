@@ -64,8 +64,8 @@ def test_extension_fetches_full_texts_and_adds_from_the_toolbar(tmp_path):
             page.click("#gNext")
 
             # bulk: the extension's fetch page visits each paper and hands the text to Citrello
-            page.click('[data-guide="imp-papers"]')
-            expect(page.locator("#guide")).to_contain_text("Papers behind your university login")
+            page.click('.side button.navb[data-tab="papers"]')
+            expect(page.locator("#ftWays")).to_contain_text("With your university access")
             with ctx.expect_page() as fetch_page:
                 page.click("#ftExt")
             fp = fetch_page.value
@@ -76,7 +76,7 @@ def test_extension_fetches_full_texts_and_adds_from_the_toolbar(tmp_path):
             fp.screenshot(path=os.path.join(shots, "extension-fetch.png"))
             fp.close()
             page.bring_to_front()
-            page.keyboard.press("Escape")
+            page.click('.side button.navb[data-tab="library"]')
             expect(page.locator("#libChips")).to_contain_text("2 with full text", timeout=30000)
             expect(page.locator('#libRows .ref[data-sel="topham2017"] .ftmark')).to_be_visible()
             expect(page.locator('#libRows .ref[data-sel="vetters2024"] .ftmark')).to_be_visible()
@@ -145,6 +145,106 @@ def test_extension_fetches_full_texts_and_adds_from_the_toolbar(tmp_path):
             expect(pop.locator("#doneMsg")).to_contain_text("With its full text", timeout=60000)
             app_tabs = sw.evaluate("async (base) => (await chrome.tabs.query({})).filter((t) => (t.url || '').startsWith(base + '/app/') && !t.url.includes('clip')).length", BASE)
             assert app_tabs == 1  # opened once, and left open for next time
+            assert not errors, errors
+            ctx.close()
+    finally:
+        srv.shutdown()
+
+
+def hard_publisher(pdf_path):
+    """Pretend publisher pages where the text isn't on the page: a PDF link to another site (only the extension may
+    fetch from there), a script button that opens the PDF in a new tab, a link to a viewer page with the PDF inside,
+    and an "are you human?" check that turns into the article once answered (state["solved"])."""
+    import threading
+    from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+    state = {"solved": False}
+    article = "<article><h2>1. Introduction</h2>" + "".join(
+        f"<p>Section {i}. Leaving scour protection in place protects marine habitats and lowers the cost of removal.</p>"
+        for i in range(60)) + "<h2>Results</h2></article>"
+
+    class H(BaseHTTPRequestHandler):
+        def log_message(self, *a):
+            pass
+
+        def do_GET(self):
+            other = f"http://localhost:{self.server.server_address[1]}"  # another site than 127.0.0.1
+            page = {
+                "/link.html": f'<title>Link</title><p>Abstract only.</p><a href="{other}/files/paper.pdf">Download PDF</a>',
+                "/button.html": "<title>Button</title><p>Abstract only.</p><button onclick=\"window.open('/files/paper.pdf')\">View PDF</button>",
+                "/viewer.html": f'<title>Viewer</title><p>Abstract only.</p><a href="{other}/epdf/paper">PDF</a>',
+                "/epdf/paper": '<title>Reader</title><iframe src="/files/paper.pdf"></iframe>',
+                "/check.html": article if state["solved"] else
+                    "<title>Just a moment...</title><p>Verify you are human by completing the action below.</p>",
+            }.get(self.path)
+            if self.path == "/files/paper.pdf":
+                body, ctype = open(pdf_path, "rb").read(), "application/pdf"
+            elif page:
+                body, ctype = f"<html><head></head><body>{page}</body></html>".encode(), "text/html"
+            else:
+                self.send_response(404)
+                self.end_headers()
+                return
+            self.send_response(200)
+            self.send_header("Content-Type", ctype)
+            self.end_headers()
+            self.wfile.write(body)
+
+    srv = ThreadingHTTPServer(("127.0.0.1", 0), H)
+    threading.Thread(target=srv.serve_forever, daemon=True).start()
+    return f"http://127.0.0.1:{srv.server_address[1]}", srv, state
+
+
+def test_extension_finds_the_pdf_and_waits_for_you_at_a_check(tmp_path):
+    from playwright.sync_api import expect, sync_playwright
+    sys.path.insert(0, os.path.dirname(__file__))
+    import test_doccheck as T
+    pdf = str(tmp_path / "paper.pdf")
+    T.make_pdf(pdf, [["A paper only available as a PDF"] +
+                     [f"Section {i}: decommissioning offshore wind farms costs more than planned." for i in range(40)]])
+    site, srv, state = hard_publisher(pdf)
+    ext = str(tmp_path / "ext")
+    subprocess.run([sys.executable, os.path.join(ROOT, "packaging", "build_extension.py"), "--test", ext], check=True)
+    bib = tmp_path / "refs.bib"
+    bib.write_text("".join(f"@article{{{k}, title={{Paper behind a {k}}}, year={{2020}}, url={{{site}/{k}.html}}}}\n"
+                           for k in ("link", "button", "viewer", "check")), encoding="utf-8")
+    shots = os.environ.get("CITRELLO_E2E_SHOTS") or str(tmp_path)
+    try:
+        with sync_playwright() as pw:
+            ctx = pw.chromium.launch_persistent_context(str(tmp_path / "profile"), channel="chromium", headless=True,
+                                                        viewport={"width": 1280, "height": 800},
+                                                        args=[f"--disable-extensions-except={ext}", f"--load-extension={ext}"])
+            page = ctx.pages[0] if ctx.pages else ctx.new_page()
+            errors = []
+            page.on("pageerror", lambda e: errors.append(str(e)))
+            page.goto(BASE + "/app/")
+            page.wait_for_selector("#webCover", state="detached", timeout=LOAD)
+            page.click("#wWebStart")
+            page.wait_for_function("typeof extVersion !== 'undefined' && extVersion", timeout=15000)
+            page.evaluate("window.CITRELLO_TEST_FAST = true")
+            page.click("#openImport")
+            page.click('[data-guide="imp-file"]')
+            page.set_input_files("#importFile", str(bib))
+            expect(page.locator("#libRows .ref")).to_have_count(4, timeout=60000)
+            page.click("#gNext")
+            page.click('.side button.navb[data-tab="papers"]')
+            with ctx.expect_page() as fetch_page:
+                page.click("#ftExt")
+            fp = fetch_page.value
+            fp.click("#start")
+            # the check: the extension stops, shows the page to the person and waits
+            expect(fp.locator("#msg")).to_contain_text("wants to check that you're a person", timeout=180000)
+            expect(fp.locator("#start")).to_have_text("Continue")
+            fp.screenshot(path=os.path.join(shots, "extension-check.png"))
+            check = next(p for p in ctx.pages if p.url.endswith("/check.html"))
+            state["solved"] = True  # the person answers it; the page then shows the article
+            check.reload()
+            fp.bring_to_front()
+            fp.click("#start")
+            expect(fp.locator("#msg")).to_contain_text("Finished: 4 of 4 full texts added", timeout=180000)
+            fp.screenshot(path=os.path.join(shots, "extension-fetch-hard.png"))
+            fp.close()
+            page.bring_to_front()
+            expect(page.locator("#ftSumText")).to_contain_text("4 of 4 references have their full text", timeout=30000)
             assert not errors, errors
             ctx.close()
     finally:

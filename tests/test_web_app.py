@@ -530,10 +530,12 @@ def test_web_app_full_texts(browser_name, tmp_path):
         page.click("#gNext")
 
         # many PDFs at once: matched, or said that they fit nothing
-        page.click('[data-guide="imp-papers"]')
+        tab(page, "papers")  # its own tab in the sidebar
+        expect(page.locator("#ftSumText")).to_contain_text("None of your 2 references")
+        expect(page.locator("#ftMissing .ftrow")).to_have_count(2)
         page.uncheck("#ftAdd")
         page.set_input_files("#ftFiles", [pdfs["topham.pdf"], pdfs["bees.pdf"]])
-        expect(page.locator("#gResult")).to_contain_text("Full text added for 1 paper", timeout=90000)
+        expect(page.locator("#papersMsg")).to_contain_text("Full text added for 1 paper", timeout=90000)
         expect(page.locator("#ftLog")).to_contain_text("topham.pdf → topham2017")
         expect(page.locator("#ftLog")).to_contain_text("bees.pdf: no matching reference")
         page.screenshot(path=os.path.join(shots, f"web-app-{browser_name}-fulltext-bulk.png"))
@@ -541,18 +543,18 @@ def test_web_app_full_texts(browser_name, tmp_path):
         page.check("#ftAdd")
         page.set_input_files("#ftFiles", pdfs["vetters.pdf"])
         expect(page.locator("#ftLog")).to_contain_text("added to your library", timeout=90000)
-        page.click("#gNext")
+        expect(page.locator("#ftSumText")).to_contain_text("2 of 3 references have their full text", timeout=30000)
+        expect(page.locator("#navFt")).to_have_text("2/3")
+        page.set_input_files('#ftMissing input[data-ft-key="burton2011"]', pdfs["burton.pdf"])  # from the list
+        expect(page.locator("#ftMissingCard")).to_be_hidden(timeout=60000)  # none left without
+        page.locator("#tab-papers").screenshot(path=os.path.join(shots, f"web-app-{browser_name}-fulltext-tab.png"))
+        tab(page, "library")
 
         expect(page.locator('#libRows .ref[data-sel="topham2017"] .ftmark')).to_be_visible()
-        expect(page.locator("#libChips")).to_contain_text("2 with full text")
-        page.click('#libChips [data-ft="no"]')  # only the ones without
-        expect(page.locator("#libRows .ref")).to_have_count(1)
+        expect(page.locator("#libChips")).to_contain_text("3 with full text")
+        expect(page.locator('#libChips [data-ft="no"]')).to_have_count(0)  # none without: no "without" chip
         page.click('#libRows .ref[data-sel="burton2011"]')
-        page.set_input_files("#detail input[data-ft-key]", pdfs["burton.pdf"])  # one PDF for this reference
-        expect(page.locator("#toast")).to_contain_text("Full text added", timeout=60000)
-        expect(page.locator("#libRows .ref")).to_have_count(0)  # none left without full text
-        page.click('#libChips [data-ft="no"]')  # show all again
-        page.click('#libRows .ref[data-sel="burton2011"]')
+        expect(page.locator("#detail h2")).to_have_text("Wind Energy Handbook")  # its panel, not the last one's
         expect(page.locator("#detail")).to_contain_text("ChatGPT and Claude can read this paper", timeout=30000)
         page.screenshot(path=os.path.join(shots, f"web-app-{browser_name}-fulltext-detail.png"))
         with page.expect_download() as dl:

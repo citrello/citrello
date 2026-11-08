@@ -152,6 +152,17 @@
   .a-btnt { fill: var(--accent-ink); font: 700 13px Figtree, system-ui, sans-serif; } .a-ok { fill: var(--ok); }
   .a-dot { fill: var(--line); } .a-term { fill: #14213d; } .a-termt { fill: #e8edf8; font: 500 12.5px ui-monospace, Menlo, monospace; }
   .a-cur { fill: #14213d; stroke: #fff; stroke-width: 1.5; } .a-arrow { stroke: var(--accent); stroke-width: 3; fill: none; stroke-dasharray: 6 5; }
+  .ftsum-text { font-size: 16px; } .ftsum .bar div { background: var(--leaf); }
+  .ft-ways { display: grid; grid-template-columns: repeat(auto-fit, minmax(270px, 1fr)); gap: 14px; max-width: 980px; }
+  .ftway { margin: 0; display: flex; flex-direction: column; } .ftway h3 { margin: 10px 0 4px; font-size: 17px; }
+  .ftway p { margin: 0 0 10px; font-size: 14px; }
+  .ftway-art { border-radius: 10px; background: var(--bg); border: 1px solid var(--line); overflow: hidden; }
+  .ftway-art svg { display: block; width: 100%; height: auto; }
+  #papersMsg { max-width: 980px; margin: 12px 0; }
+  .ftlist .ftrow { display: flex; gap: 8px; align-items: center; padding: 8px 0; border-top: 1px solid var(--line); }
+  .ftlist .ftrow:first-child { border-top: 0; }
+  .ftrow .t { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .ftrow .m { font-size: 13px; color: var(--muted); } .ftrow .btn { padding: 6px 12px; font-size: 14px; }
   .ftmark { font: 700 11px Figtree, sans-serif; color: var(--ok); background: var(--ok-soft); padding: 1px 7px; border-radius: 99px; }
   .chip.ft { background: var(--ok-soft); color: var(--ok); }
   .chipsep { display: inline-block; width: 1px; height: 18px; background: var(--line); margin: 0 4px; vertical-align: middle; }
@@ -250,6 +261,7 @@
   <div class="tagline">References, the sweet part.</div>
   <nav aria-label="Sections">
     <button class="navb active" data-tab="library">Library <small id="navCount"></small></button>
+    <button class="navb" data-tab="papers">Full texts <small id="navFt"></small></button>
     <button class="navb" data-tab="documents">Documents</button>
     <button class="navb" data-tab="settings">Settings</button>
   </nav>
@@ -316,8 +328,6 @@
             <span><b>Mendeley</b><span class="small muted">Sign in, or use an exported file</span></span></button>
           <button class="guide-tile" data-guide="imp-endnote" role="listitem"><span class="gt-icon gt-3" aria-hidden="true">E</span>
             <span><b>EndNote</b><span class="small muted">From an exported file</span></span></button>
-          <button class="guide-tile" data-guide="imp-papers" role="listitem"><span class="gt-icon gt-2" aria-hidden="true">¶</span>
-            <span><b>Papers' full text</b><span class="small muted">Drop PDFs: the AI can then read them</span></span></button>
         </div>
         <div class="row"><input type="text" id="importProject" list="projectList" placeholder="Put into project (optional)"></div>
         <div id="importMsg"></div>
@@ -354,6 +364,19 @@
       <p class="small muted" style="margin-top:10px">Tick references to add them to a project, move them or delete them. Shift-click ticks a range.</p>
     </div>
     <aside class="detail" id="detail" aria-live="polite"><div class="empty-detail"><b>Pick a reference</b>Its details, citation marker and formatted reference appear here.</div></aside>
+  </section>
+
+  <!-- ================= FULL TEXTS ================= -->
+  <section id="tab-papers" class="hidden">
+    <div class="page-head"><div><h1>Full texts</h1>
+      <p>ChatGPT and Claude can read the papers whose text Citrello has, and check what your sources really say.
+        Only the text is kept, on your computer: never the PDF.</p></div></div>
+    <div class="card ftsum"><div id="ftSumText" class="ftsum-text"></div><div class="bar"><div id="ftSumBar"></div></div></div>
+    <div class="ft-ways" id="ftWays"></div>
+    <div id="papersMsg" role="status"></div>
+    <div class="card" id="ftMissingCard"><h2>Still without full text <small class="muted" id="ftMissingN"></small></h2>
+      <p class="small muted" style="margin:0 0 6px">Open a paper and click the Citrello browser button on it, or add its PDF here.</p>
+      <div id="ftMissing" class="ftlist"></div></div>
   </section>
 
   <!-- ================= DOCUMENTS ================= -->
@@ -640,7 +663,8 @@ function notice(el, kind, html) { $(el).innerHTML = `<div class="notice ${kind}"
 document.querySelectorAll(".side button.navb").forEach((b) => b.onclick = () => {
   document.querySelectorAll(".side button.navb").forEach((x) => x.classList.toggle("active", x === b));
   window.scrollTo(0, 0);
-  ["library", "documents", "settings"].forEach((t) => show("tab-" + t, t === b.dataset.tab));
+  ["library", "papers", "documents", "settings"].forEach((t) => show("tab-" + t, t === b.dataset.tab));
+  if (b.dataset.tab === "papers") { $("papersMsg").innerHTML = ""; loadPapers(); }
   if (b.dataset.tab === "library") loadLibrary();
   if (b.dataset.tab === "documents") loadBibExports();
   if (b.dataset.tab === "settings") { loadAccount(); if (!status.web) { loadClaude(); loadCodex(); loadWord(); } }
@@ -952,26 +976,6 @@ Object.assign(A, {
   },
 });
 Object.assign(GUIDES, {
-  "imp-papers": () => ({title: "Add papers' full text", sections: [
-    {art: A.papers(), title: "Drop the PDFs you have",
-     html: `<p>Citrello matches each PDF to its reference (by DOI or title) and keeps only its <b>text</b>, so ChatGPT and Claude can check what the paper says. The PDFs aren't kept.</p>
-       <label class="drop" for="ftFiles"><input type="file" id="ftFiles" accept=".pdf" multiple hidden><strong>Choose PDFs</strong> or drag them here</label>
-       <div class="row" style="margin-top:8px"><label class="btn" for="ftFolder">Choose a whole folder…</label><input type="file" id="ftFolder" webkitdirectory multiple hidden>
-         <label class="small"><input type="checkbox" id="ftAdd" checked> Add papers that aren't in my library yet</label></div>
-       <div id="ftLog" class="small"></div>`},
-    {art: A.freeTexts(), title: "Find the free ones for me",
-     html: `<p>For references with a DOI, Citrello looks for a legal free copy (open access: Unpaywall, Europe PMC, arXiv) and keeps its text. Papers behind a paywall need your access: open them with the browser button.</p>
-       <button class="primary" id="ftFree">Find free full texts</button>
-       <p class="small muted web-only" style="margin:6px 0 0">Free PDFs come through Citrello's server, because most repositories don't let web pages download them. Only the DOI is sent and nothing is kept.</p>
-       <div class="bar hidden" id="ftFreeBarWrap"><div id="ftFreeBar"></div></div><div id="ftFreeMsg" class="small"></div>`},
-    {art: A.extension(), title: "Papers behind your university login",
-     html: extVersion
-       ? `<p>The Citrello extension visits each paper without full text in a background tab, with your access, and brings its text here. Slowly, about one paper every 15 seconds.</p>
-          <button class="primary" id="ftExt">Fetch the missing ones with my access</button> <span class="small muted" id="ftExtCount"></span>`
-       : `<p>The <b>Citrello browser extension</b> does this for you: it visits each paper with your university or library login and brings its text here, while you keep working.</p>
-          <a class="btn" href="https://citrello.app/extension" target="_blank" rel="noopener">Get the extension</a>
-          <p class="small muted" style="margin:6px 0 0">Without it: open each paper and click the Citrello browser button on it.</p>`},
-  ]}),
   "imp-file": () => ({title: "Import from a file", sections: [
     {art: A.files(), title: "RIS, BibTeX, CSL-JSON or EndNote XML", html: `<p>Exported from any reference manager: Zotero (right-click a collection → Export), Mendeley, EndNote, Papers, JabRef… Your keys and duplicates are handled for you.</p>${fileDrop("a file")}`},
   ]}),
@@ -1242,6 +1246,7 @@ async function loadLibrary() {
   $("libRows").querySelectorAll(".ref").forEach((r) => r.classList.toggle("sel", r.dataset.sel === selKey));
   renderDetail();
   setExportLinks();
+  loadPapers();
 }
 const REL_TEXT = {verified: "Verified: matches the publisher's record", check: "Check: some details need a look",
                   problem: "Problem: retracted, or a wrong DOI", complete: "Complete: details look complete, not checked online"};
@@ -1496,9 +1501,10 @@ $("addGo").onclick = async () => {
   $("addGo").disabled = false; $("addMsg").textContent = "";
 };
 // ---------- import (the windows behind the Import tiles) ----------
-function impNote(kind, html) {  // the result, in the window and under the tiles
+function impNote(kind, html) {  // the result: in the window, under the Import tiles, and in the Full texts tab
   notice("importMsg", kind, html);
   if ($("gResult")) notice("gResult", kind, html);
+  notice("papersMsg", kind, html);
 }
 const impProject = () => $("importProject").value;
 async function importFile(f) {
@@ -1579,6 +1585,62 @@ async function attachPdfs(files) {
     (missed ? `; ${missed} couldn't be matched or read (listed below).` : ". ChatGPT and Claude can now read them."));
   loadLibrary();
 }
+// ---------- the Full texts tab ----------
+let papersLib = {items: []};
+function renderPapersWays() {
+  const card = (art, title, html) => `<div class="card ftway"><div class="ftway-art">${art}</div><h3>${title}</h3>${html}</div>`;
+  $("ftWays").innerHTML =
+    card(A.extension(), "With your university access", extVersion
+      ? `<p>The Citrello extension opens each paper without full text in a background tab, with your login, and brings its text here.
+         Slowly, about one paper every 15 seconds, while you keep working.</p>
+         <button class="primary" id="ftExt">Fetch the missing ones with my access</button>`
+      : `<p>The <b>Citrello browser extension</b> opens each paper with your university or library login and brings its text here, while you keep working.</p>
+         <a class="btn primary" href="https://citrello.app/extension" target="_blank" rel="noopener">Get the extension</a>
+         <p class="small muted" style="margin:8px 0 0">Without it: open each paper and click the Citrello browser button on it.</p>`) +
+    card(A.freeTexts(), "Free copies", `<p>For papers with a DOI, Citrello looks for a legal free copy (Unpaywall, Europe PMC, arXiv) and keeps its text.</p>
+       <button id="ftFree">Find free full texts</button>
+       <p class="small muted web-only" style="margin:6px 0 0">Free PDFs come through Citrello's server, because most repositories don't let web pages download them. Only the DOI is sent and nothing is kept.</p>
+       <div class="bar hidden" id="ftFreeBarWrap"><div id="ftFreeBar"></div></div><div id="ftFreeMsg" class="small"></div>`) +
+    card(A.papers(), "PDFs you already have", `<p>Drop them here: each is matched to its reference (by DOI or title) and only its text is kept.</p>
+       <label class="drop" for="ftFiles" style="padding:14px"><input type="file" id="ftFiles" accept=".pdf" multiple hidden><strong>Choose PDFs</strong> or drag them here</label>
+       <div class="row" style="margin-top:8px"><label class="btn" for="ftFolder">Choose a whole folder…</label><input type="file" id="ftFolder" webkitdirectory multiple hidden></div>
+       <label class="small" style="display:block;margin-top:6px"><input type="checkbox" id="ftAdd" checked> Add papers that aren't in my library yet</label>
+       <div id="ftLog" class="small"></div>`);
+}
+async function loadPapers() {
+  try { papersLib = await api("/api/library?q=&project=*"); } catch (e) { return; }
+  const total = papersLib.items.length, withText = papersLib.items.filter((i) => i.fulltext).length;
+  $("navFt").textContent = total ? `${withText}/${total}` : "";
+  if ($("tab-papers").classList.contains("hidden")) return;
+  if (!$("ftWays").innerHTML || $("ftWays").dataset.ext !== String(!!extVersion)) { renderPapersWays(); $("ftWays").dataset.ext = String(!!extVersion); }
+  $("ftSumText").innerHTML = !total ? "Your library is empty. Add references first (Library), then their full texts here."
+    : !withText ? `None of your ${total} reference${total === 1 ? "" : "s"} has its full text yet. Add them below, and ChatGPT and Claude can read the papers.`
+    : `<b>${withText} of ${total}</b> reference${total === 1 ? " has its" : "s have their"} full text: ChatGPT and Claude can read ${withText === 1 ? "it" : "them"}.`;
+  $("ftSumBar").style.width = total ? `${100 * withText / total}%` : "0";
+  const missing = papersLib.items.filter((i) => !i.fulltext);
+  $("ftMissingN").textContent = missing.length ? `(${missing.length})` : "";
+  show("ftMissingCard", missing.length > 0);
+  const shown = missing.slice(0, 150);
+  $("ftMissing").innerHTML = shown.map((i) => {
+    const link = i.doi ? `https://doi.org/${encodeURIComponent(i.doi).replace(/%2F/g, "/")}` : i.url;
+    return `<div class="ftrow"><div class="grow" style="min-width:0"><div class="t">${esc(i.title)}</div>
+        <div class="m">${[i.authors, i.year, i.container].filter(Boolean).map(esc).join(" · ")}</div></div>
+      ${link ? `<a class="btn" href="${esc(link)}" target="_blank" rel="noopener">Open paper</a>` : ""}
+      <label class="btn">Add PDF<input type="file" accept=".pdf" data-ft-key="${esc(i.key)}" hidden></label></div>`;
+  }).join("") + (missing.length > shown.length ? `<p class="small muted">…and ${missing.length - shown.length} more.</p>` : "");
+}
+$("tab-papers").addEventListener("click", (e) => {
+  const b = e.target.closest("button[id]");
+  if (b && IMPORT_ACTIONS[b.id]) IMPORT_ACTIONS[b.id]();
+});
+$("tab-papers").addEventListener("change", (e) => {
+  if (e.target.dataset.ftKey) { attachPdfTo(e.target.dataset.ftKey, e.target.files[0]); e.target.value = ""; return; }
+  if (e.target.id !== "ftFiles" && e.target.id !== "ftFolder") return;
+  const files = [...e.target.files]; e.target.value = ""; attachPdfs(files);
+});
+$("tab-papers").addEventListener("dragover", (e) => { if (e.target.closest(".drop")) e.preventDefault(); });
+$("tab-papers").addEventListener("drop", (e) => { if (e.target.closest(".drop")) { e.preventDefault(); attachPdfs(e.dataTransfer.files); } });
+
 // ---------- the Citrello browser extension (it runs on this page: see extension/bridge.js) ----------
 let extVersion = null;
 let libReload = null;
@@ -1587,7 +1649,7 @@ const b64Bytes = (b64) => { const bin = atob(b64), out = new Uint8Array(bin.leng
 window.addEventListener("message", async (e) => {
   if (e.source !== window || e.origin !== location.origin || !e.data || typeof e.data.citrelloExt !== "string") return;
   const m = e.data;
-  if (m.citrelloExt === "hello") extVersion = m.version;
+  if (m.citrelloExt === "hello") { extVersion = m.version; loadPapers(); }
   if (m.citrelloExt === "fetch-started") impNote("ok", `The extension is fetching ${m.n} paper${m.n === 1 ? "" : "s"} in its own tab. The texts appear here as they come in.`);
   if (m.citrelloExt === "fetch-failed") impNote("err", esc(m.error || "The extension didn't start."));
   if (m.citrelloExt === "fulltext") {  // one paper's text, fetched by the extension with the person's access
@@ -1617,7 +1679,7 @@ window.addEventListener("message", async (e) => {
 });
 window.postMessage({citrelloExt: "ping"}, location.origin);  // in case the extension said hello before this page listened
 function fetchWithExtension() {
-  const papers = lib.items.filter((i) => !i.fulltext && (i.doi || i.url)).map((i) => ({key: i.key, doi: i.doi, url: i.url, title: i.title}));
+  const papers = papersLib.items.filter((i) => !i.fulltext && (i.doi || i.url)).map((i) => ({key: i.key, doi: i.doi, url: i.url, title: i.title}));
   if (!papers.length) return impNote("ok", "Every reference shown with a DOI or a link already has its full text.");
   window.postMessage({citrelloExt: "fetch", papers, fast: !!window.CITRELLO_TEST_FAST}, location.origin);
 }
@@ -1626,8 +1688,7 @@ function fetchWithExtension() {
 async function findFree() {
   $("ftFree").disabled = true; show("ftFreeBarWrap"); $("ftFreeBar").style.width = "3%";
   try {
-    const p = $("projectFilter").value;
-    const {id, n} = await post("/api/fulltext/find-free", {q: $("q").value, project: p});
+    const {id, n} = await post("/api/fulltext/find-free", {q: "", project: "*"});  // the whole library
     impNote("warn", `Looking for free copies of ${n} paper${n === 1 ? "" : "s"}…`);
     const tick = async () => {
       const s = await api(`/api/fulltext/find-free/${id}`);
