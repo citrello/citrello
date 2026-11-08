@@ -111,6 +111,31 @@ def test_extension_fetches_full_texts_and_adds_from_the_toolbar(tmp_path):
             pop.close()
             paper.close()
 
+            # the panel again, twice: it uses the open Citrello tab and never opens another one (which would say
+            # "already open in another tab"); also after the extension lost track of the tab (e.g. a tab opened
+            # before the extension was installed): it finds the tab and adds its page script
+            app_tabs = lambda: sw.evaluate("""async (base) => (await chrome.tabs.query({url: base + '/app/*'}))
+                .filter((t) => !t.url.includes('clip')).length""", BASE)  # noqa: E731
+            for forget in (False, True):
+                if forget:
+                    sw.evaluate("chrome.storage.session.clear()")
+                paper, pop = panel_for("/article.html")
+                expect(pop.locator("#existing")).to_contain_text("[@topham2017]", timeout=60000)
+                pop.close()
+                paper.close()
+                assert app_tabs() == 1
+            # a second Citrello tab ("already open in another tab") doesn't confuse it
+            second = ctx.new_page()
+            second.goto(BASE + "/app/")
+            expect(second.locator("#webCover")).to_contain_text("already open in another tab", timeout=30000)
+            sw.evaluate("chrome.storage.session.clear()")
+            paper, pop = panel_for("/article.html")
+            expect(pop.locator("#existing")).to_contain_text("[@topham2017]", timeout=60000)
+            pop.close()
+            paper.close()
+            second.close()
+            assert app_tabs() == 1
+
             # with no Citrello tab open: the extension opens Citrello in a background tab and uses it
             page.close()
             paper, pop = panel_for("/pdfonly.html")

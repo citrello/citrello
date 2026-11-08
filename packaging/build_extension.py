@@ -7,8 +7,7 @@ Build the Citrello browser extension (extension/) for the stores:
 
   python packaging/build_extension.py            the store packages
   python packaging/build_extension.py --test DIR a Chrome copy for the tests: it also runs on a locally served
-                                                 Citrello (localhost:8099) and already has access to all sites,
-                                                 because tests can't click the browser's permission prompt
+                                                 Citrello (localhost:8099) and may reach the local test sites
 """
 import argparse
 import json
@@ -43,7 +42,9 @@ def build(out, kind, test=False):
         man["browser_specific_settings"] = {"gecko": {"id": "extension@citrello.app", "strict_min_version": "128.0"}}
     if test:
         man["content_scripts"][0]["matches"] += ["http://localhost:8099/*", "http://127.0.0.1:8099/*"]
-        man["host_permissions"] = man.get("host_permissions", []) + ["<all_urls>"]
+        # the local test sites (any port) instead of the real ones; NOT access to every site, so the tests see what
+        # people see (e.g. which tabs' addresses the extension may read)
+        man["host_permissions"] = ["http://localhost/*", "http://127.0.0.1/*"]
     with open(os.path.join(out, "manifest.json"), "w", encoding="utf-8") as f:
         json.dump(man, f, indent=1)
     return man

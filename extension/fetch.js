@@ -58,7 +58,7 @@ async function fetchOne(p) {
 async function run() {
   // access to publishers' sites: asked once, now (not when the extension was installed)
   const origins = ["<all_urls>"];
-  if (!(await chrome.permissions.contains({ origins }))) {
+  if (!job.testFast && !(await chrome.permissions.contains({ origins }))) {  // (a local test copy skips the prompt)
     if (!(await chrome.permissions.request({ origins }))) {
       $("msg").innerHTML = `<div class="notice">The extension needs to read publishers' pages to take the papers' text. Click Start again and allow it.</div>`;
       return;

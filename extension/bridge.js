@@ -2,6 +2,8 @@
 // the page and the extension: "the extension is here", "fetch these papers", each paper's text as it arrives, and
 // the toolbar panel's requests (look up, add, keep the text).
 (function () {
+  // the extension may add this again to a tab (one open before it, or one it lost track of): just say hello again
+  if (window.__citrelloAnnounce) { window.__citrelloAnnounce(); return; }
   const VERSION = chrome.runtime.getManifest().version;
   const toPage = (m) => window.postMessage(Object.assign({ citrelloExt: "" }, m), location.origin);
   const hello = () => toPage({ citrelloExt: "hello", version: VERSION });
@@ -48,6 +50,15 @@
     setTimeout(() => { if (apiWaiting.has(id)) { apiWaiting.delete(id); reply({ error: "Citrello didn't answer in time." }); } }, 120000);
     return true;
   });
-  if (!/\/(clip|mendeley)(\.html)?$/.test(location.pathname)) chrome.runtime.sendMessage({ action: "bridge-here" }).catch(() => {});
+  // Tell the extension "this is the Citrello tab", so it uses this one instead of opening another. In the web app only
+  // the tab that holds the library says so (a second tab shows "already open in another tab" and stays quiet).
+  const announce = () => chrome.runtime.sendMessage({ action: "bridge-here" }).catch(() => {});
+  const root = document.documentElement;
+  window.__citrelloAnnounce = () => { if (!root.classList.contains("web") || root.dataset.citrelloMain) announce(); };
+  if (!/\/(clip|mendeley)(\.html)?$/.test(location.pathname)) {
+    if (!root.classList.contains("web") || root.dataset.citrelloMain) announce();
+    else new MutationObserver((_, obs) => { if (root.dataset.citrelloMain) { obs.disconnect(); announce(); } })
+      .observe(root, { attributes: true, attributeFilter: ["data-citrello-main"] });
+  }
   hello();
 })();

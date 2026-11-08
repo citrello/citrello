@@ -52,6 +52,8 @@
   let nextId = 0;
 
   function startWorker() {
+    // this tab holds the library (one tab at a time): the Citrello extension uses this one, never a second
+    document.documentElement.dataset.citrelloMain = "1";
     const q = new URLSearchParams();
     if (bridge) q.set("bridge", bridge);
     if (mendeleyApi) q.set("mendeley_api", mendeleyApi);

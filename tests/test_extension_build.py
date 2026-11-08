@@ -22,8 +22,8 @@ def test_store_package(tmp_path, kind):
         assert os.path.exists(os.path.join(out, f)), f
     assert json.load(open(os.path.join(out, "manifest.json")))["version"] == man["version"]
     # access to all websites only when the person allows it (first bulk fetch), never at install
-    # only the desktop app on this computer is always reachable (for the toolbar panel)
-    assert man["host_permissions"] == ["http://localhost:8585/*", "http://127.0.0.1:8585/*"]
+    # citrello.app (to find the Citrello tab) and the desktop app on this computer (for the toolbar panel)
+    assert man["host_permissions"] == ["https://citrello.app/*", "http://localhost:8585/*", "http://127.0.0.1:8585/*"]
     assert man["optional_host_permissions"] == ["<all_urls>"]
     assert man["action"]["default_popup"] == "popup.html"  # a panel under the toolbar button, not a new window
     assert man["commands"]["_execute_action"]["suggested_key"]["default"] == "Alt+Shift+C"
@@ -42,7 +42,7 @@ def test_store_package(tmp_path, kind):
 
 def test_test_copy_runs_on_a_local_citrello(tmp_path):
     man = B.build(str(tmp_path / "t"), "chrome", test=True)
-    assert "http://localhost:8099/*" in man["content_scripts"][0]["matches"] and "<all_urls>" in man["host_permissions"]
+    assert "http://localhost:8099/*" in man["content_scripts"][0]["matches"] and "<all_urls>" not in man["host_permissions"]
 
 
 def test_desktop_app_lets_the_extension_add_papers_only():

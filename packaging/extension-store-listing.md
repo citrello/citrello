@@ -49,8 +49,9 @@ so their AI assistant can read them.
   desktop version of Citrello.
 - Host permissions (optional, "<all_urls>"): asked only when the person first fetches papers in bulk, because papers
   are on many different publishers' websites. Used only to open the papers the person asked for.
-- Host permission for localhost:8585 (required): the toolbar panel adds papers to Citrello for desktop, which runs on
-  the person's own computer at that address. Nothing else is reached.
+- Host permissions for citrello.app and localhost:8585 (required): to find the person's open Citrello tab (so the
+  panel uses it instead of opening another), and to add papers to Citrello for desktop, which runs on the person's
+  own computer at localhost:8585. Nothing else is reached.
 - Content script on citrello.app and localhost:8585: lets the Citrello app talk to the extension (start a fetch,
   receive each paper's text, answer the toolbar panel).
 
