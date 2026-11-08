@@ -40,7 +40,10 @@
   Developer Program, not done.
 
 ## Things Armin still needs to do (remind him)
-- **Register Citrello's Mendeley app** so "Import my Mendeley library" appears in the web app: dev.mendeley.com →
+- **Publish the browser extension** (steps given 8 Nov): Chrome Web Store developer account ($5 once), Microsoft
+  Partner Center for Edge Add-ons (free), Firefox Add-ons account (free); upload the zips from the "Build the
+  browser extension" workflow's artifacts; then put the store links on site/public/extension.html.
+- (Done 8 Nov) **Register Citrello's Mendeley app** so "Import my Mendeley library" appears in the web app: dev.mendeley.com →
   My Apps; Armin already has an app and its ID/secret in GitHub (7 Nov). The app's redirect URL must be
   `https://citrello.app/app/mendeley.html`, and the ID must be in GitHub as `MENDELEY_CLIENT_ID` (a variable or
   a secret; site.yml reads both). Re-run "Deploy website" after changing it. Until then the button stays
@@ -63,9 +66,13 @@ so the AI can read it (`read_paper`, `find_in_papers`). Done (8 Nov): (1) PDFs d
 matched to references, marks and filters in the library; (2) the browser button takes the text from the paper's
 page (the article on the page, or its PDF) with the person's access; (3) "Find free full texts" for imported
 libraries: Europe PMC (read by the browser), Unpaywall's open-access PDFs (desktop: direct; web: through the
-bridge's `/api/oa-pdf`, DOI only, nothing stored). Next: (4) a browser extension for bulk texts behind the
-person's university login (needs Chrome/Edge/Firefox store accounts: Armin's decision). People must re-drag the
-browser button to get the version that takes the text.
+bridge's `/api/oa-pdf`, DOI only, nothing stored); (4) the **browser extension** (`extension/`, 8 Nov): a toolbar
+button replacing the bookmarklet, and "Fetch the missing ones with my access" (bulk, one paper every 10–20 s, in
+background tabs with the person's login; asks for site access on first use). Built by `packaging/build_extension.py`
+(Chrome/Edge zip, Firefox zip; artifacts of the "Build the browser extension" workflow); tested in Chromium with
+the web app (`tests/test_web_extension.py`). **Not yet in the stores** (Armin: store accounts and submissions).
+People must re-drag the bookmarklet to get the version that takes the text.
+- **Mendeley one-click import works** in the web app (Armin registered a second Mendeley app, 8 Nov).
 
 ## The web app
 **Progress:** steps 1 and 2 are live at citrello.app/app and tested in Chromium and WebKit: library in the browser,

@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Citrello browser extension</title>
+<meta name="description" content="The Citrello browser extension: add papers with one click, and give ChatGPT and Claude the full text of the papers you have access to.">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Gloock&family=Figtree:wght@400;500;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/site.css">
+<style>
+.ex-hero{padding:40px 0 24px}
+.ex-hero h1{font-size:clamp(38px,5vw,60px);margin-bottom:12px}
+.ex-hero p{font-size:19px;max-width:38em;margin:0;color:var(--ink)}
+.stores{display:grid;grid-template-columns:repeat(3,1fr);gap:20px;padding:28px 0 8px}
+.store{border:2px solid var(--line);border-radius:20px;padding:22px;background:#fff}
+.store h2{font-size:26px;margin-bottom:6px}
+.store p{margin:0 0 14px;color:var(--muted);font-size:15px}
+.store .soon{display:inline-block;font:700 13px Figtree,sans-serif;background:var(--lemon-soft);color:var(--ink);border-radius:999px;padding:4px 12px}
+.does{padding:48px 0 80px}
+.does h2{font-size:clamp(28px,3.4vw,40px);margin-bottom:16px}
+.does dl{margin:0}.does dt{font-weight:700;color:var(--cobalt);margin-top:18px;font-size:18px}.does dd{margin:6px 0 0;max-width:46em}
+@media (max-width:900px){.stores{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+<div class="tiles" aria-hidden="true"></div>
+<header class="wrap nav">
+  <a class="logo" href="/" aria-label="Citrello home">citr<span>ello</span></a>
+  <nav aria-label="Main">
+    <a href="/check">Check a paper</a>
+    <a href="/#problems">What it fixes</a>
+    <a href="https://github.com/citrello/citrello">GitHub</a>
+    <a class="nav-cta" href="/app/">Open Citrello</a>
+  </nav>
+</header>
+
+<main id="main">
+<section class="wrap ex-hero">
+  <h1>The Citrello browser extension</h1>
+  <p>Add the paper you're reading with one click, and let ChatGPT and Claude read the full text of the papers you have
+    access to through your university or library. Only the text is kept, in your Citrello library on your computer.</p>
+</section>
+
+<section class="wrap stores" aria-label="Get the extension">
+  <article class="store" id="chrome"><h2>Chrome</h2><p>Also for Brave, Opera and Arc.</p><span class="soon">Coming soon</span></article>
+  <article class="store" id="edge"><h2>Microsoft Edge</h2><p>From Microsoft's add-ons store.</p><span class="soon">Coming soon</span></article>
+  <article class="store" id="firefox"><h2>Firefox</h2><p>From Firefox Add-ons.</p><span class="soon">Coming soon</span></article>
+</section>
+
+<section class="wrap does">
+  <h2>What it does</h2>
+  <dl>
+    <dt>One click to add a paper</dt>
+    <dd>On any paper's page, click the Citrello button in your toolbar. Citrello finds the paper, checks it, and keeps its text when the page shows it.</dd>
+    <dt>Full texts for your whole library</dt>
+    <dd>In Citrello: Library → Import → Papers' full text → "Fetch the missing ones with my access". The extension opens each paper in a background tab with your login, takes its text and closes the tab. It goes slowly (one paper every 10–20 seconds), because publishers don't allow fast automatic downloading.</dd>
+    <dt>What it can see</dt>
+    <dd>It reads a page only when you click its button, or when it opens a paper you asked for. It asks for access to websites the first time you fetch full texts in bulk, not when you install it. Nothing goes to Citrello's servers: the text goes to your Citrello library.</dd>
+  </dl>
+</section>
+</main>
+
+<footer>
+  <div class="tiles" aria-hidden="true"></div>
+  <div class="wrap foot">
+    <a class="logo" href="/">citr<span>ello</span></a>
+    <p>References, the sweet part.</p>
+    <nav aria-label="Footer">
+      <a href="https://github.com/citrello/citrello">GitHub</a>
+      <a href="/privacy">Privacy</a>
+      <a href="https://github.com/citrello/citrello/blob/main/LICENSE">Licence (AGPL)</a>
+    </nav>
+    <p class="small">© 2026 Armin Hosseinghorbani. Citrello™ is a trademark of Armin Hosseinghorbani.</p>
+  </div>
+</footer>
+</body>
+</html>

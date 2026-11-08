@@ -1,0 +1,27 @@
+name: Build the browser extension
+
+# Builds the store packages of the Citrello browser extension (extension/) whenever it changes, or by hand.
+# Download them from the run's "Artifacts" and upload them to the Chrome Web Store, Microsoft Edge Add-ons and
+# Firefox Add-ons. (The extension is tested with the web app in site.yml.)
+on:
+  push:
+    branches: [main]
+    paths: ["extension/**", "packaging/build_extension.py", "brand_icon.py", ".github/workflows/extension.yml"]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install Pillow
+      - run: python packaging/build_extension.py
+      - uses: actions/upload-artifact@v4
+        with:
+          name: citrello-extension
+          path: |
+            dist/citrello-extension-chrome.zip
+            dist/citrello-extension-firefox.zip

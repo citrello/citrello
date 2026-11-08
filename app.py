@@ -369,7 +369,7 @@ def item_public(it):
             "doi": c.get("DOI", ""), "type": c.get("type", ""), "projects": it.get("projects", []),
             "reliability": it.get("reliability"), "checks": it.get("checks", []), "added": it.get("added", ""),
             "mendeley": bool(it.get("mendeley_id")), "zotero": bool(it.get("zotero_key")),
-            "fulltext": (it.get("fulltext") or {}).get("words", 0)}
+            "fulltext": (it.get("fulltext") or {}).get("words", 0), "url": c.get("URL", "")}
 
 
 # --------------------------------------------------------------------------

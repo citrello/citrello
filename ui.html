@@ -489,6 +489,7 @@
         <span class="small muted">← drag this to your bookmarks bar</span>
         <button class="link" data-guide="button">Show me how</button>
       </div>
+      <p class="small muted" style="margin:8px 0 0">Or use the <a href="https://citrello.app/extension" target="_blank" rel="noopener">Citrello browser extension</a>: a button in your toolbar, and it can fetch the full text of all your papers with your university access.</p>
     </div>
     <div class="card desktop-only">
       <h2>Word</h2>
@@ -919,6 +920,17 @@ Object.assign(A, {
 const fileDrop = (what) => `<label class="drop" for="importFile"><input type="file" id="importFile" accept=".ris,.bib,.json,.txt,.xml" hidden>
   <strong>Choose ${esc(what)}</strong> or drag it here</label>`;
 Object.assign(A, {
+  // the browser with the Citrello extension's button, fetching papers in background tabs
+  extension() {
+    const tab = (x, label, on) => `<rect class="${on ? "a-hi" : "a-box"}" x="${x}" y="40" width="96" height="22" rx="6"/>
+      <text class="${on ? "a-txt" : "a-mut"}" x="${x + 10}" y="55" style="font-size:11px">${label}</text>`;
+    return A.svg("The Citrello extension visiting papers in background tabs", A.win("Your browser",
+      tab(40, "Citrello", true) + tab(142, "Paper 1 ✓", false) + tab(244, "Paper 2…", false) +
+      `<circle class="a-btn" cx="430" cy="51" r="11"/><text class="a-btnt" x="430" y="56" text-anchor="middle" style="font-size:12px">C</text>
+       <text class="a-txt" x="60" y="104">Fetching full texts with your access</text>
+       <rect class="a-line" x="60" y="118" width="360" height="8" rx="4"/><rect class="a-ok" x="60" y="118" width="150" height="8" rx="4"/>
+       <text class="a-mut" x="60" y="150">12 of 30 · 10 full texts added</text>`));
+  },
   // a list of references, the free ones getting their text
   freeTexts() {
     const rows = [["Topham2017", true], ["Vetters2024", true], ["LeCun2015", false]].map(([k, ok], i) => {
@@ -952,6 +964,13 @@ Object.assign(GUIDES, {
        <button class="primary" id="ftFree">Find free full texts</button>
        <p class="small muted web-only" style="margin:6px 0 0">Free PDFs come through Citrello's server, because most repositories don't let web pages download them. Only the DOI is sent and nothing is kept.</p>
        <div class="bar hidden" id="ftFreeBarWrap"><div id="ftFreeBar"></div></div><div id="ftFreeMsg" class="small"></div>`},
+    {art: A.extension(), title: "Papers behind your university login",
+     html: extVersion
+       ? `<p>The Citrello extension visits each paper without full text in a background tab, with your access, and brings its text here. Slowly, about one paper every 15 seconds.</p>
+          <button class="primary" id="ftExt">Fetch the missing ones with my access</button> <span class="small muted" id="ftExtCount"></span>`
+       : `<p>The <b>Citrello browser extension</b> does this for you: it visits each paper with your university or library login and brings its text here, while you keep working.</p>
+          <a class="btn" href="https://citrello.app/extension" target="_blank" rel="noopener">Get the extension</a>
+          <p class="small muted" style="margin:6px 0 0">Without it: open each paper and click the Citrello browser button on it.</p>`},
   ]}),
   "imp-file": () => ({title: "Import from a file", sections: [
     {art: A.files(), title: "RIS, BibTeX, CSL-JSON or EndNote XML", html: `<p>Exported from any reference manager: Zotero (right-click a collection → Export), Mendeley, EndNote, Papers, JabRef… Your keys and duplicates are handled for you.</p>${fileDrop("a file")}`},
@@ -1560,6 +1579,35 @@ async function attachPdfs(files) {
     (missed ? `; ${missed} couldn't be matched or read (listed below).` : ". ChatGPT and Claude can now read them."));
   loadLibrary();
 }
+// ---------- the Citrello browser extension (it runs on this page: see extension/bridge.js) ----------
+let extVersion = null;
+let libReload = null;
+const reloadSoon = () => { clearTimeout(libReload); libReload = setTimeout(loadLibrary, 800); };
+const b64Bytes = (b64) => { const bin = atob(b64), out = new Uint8Array(bin.length); for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i); return out; };
+window.addEventListener("message", async (e) => {
+  if (e.source !== window || e.origin !== location.origin || !e.data || typeof e.data.citrelloExt !== "string") return;
+  const m = e.data;
+  if (m.citrelloExt === "hello") extVersion = m.version;
+  if (m.citrelloExt === "fetch-started") impNote("ok", `The extension is fetching ${m.n} paper${m.n === 1 ? "" : "s"} in its own tab. The texts appear here as they come in.`);
+  if (m.citrelloExt === "fetch-failed") impNote("err", esc(m.error || "The extension didn't start."));
+  if (m.citrelloExt === "fulltext") {  // one paper's text, fetched by the extension with the person's access
+    let ok = false, error = "";
+    try {
+      const body = m.pdf ? b64Bytes(m.pdf) : JSON.stringify({text: m.text});
+      const r = await fetch("/api/clip/fulltext", {method: "POST", body, headers: {"X-Key": encodeURIComponent(m.key)}});
+      ok = r.ok; if (!ok) error = (await r.json().catch(() => ({}))).error || r.statusText;
+    } catch (err) { error = err.message; }
+    window.postMessage({citrelloExt: "saved", id: m.id, ok, error}, location.origin);
+    if (ok) reloadSoon();
+  }
+});
+window.postMessage({citrelloExt: "ping"}, location.origin);  // in case the extension said hello before this page listened
+function fetchWithExtension() {
+  const papers = lib.items.filter((i) => !i.fulltext && (i.doi || i.url)).map((i) => ({key: i.key, doi: i.doi, url: i.url, title: i.title}));
+  if (!papers.length) return impNote("ok", "Every reference shown with a DOI or a link already has its full text.");
+  window.postMessage({citrelloExt: "fetch", papers, fast: !!window.CITRELLO_TEST_FAST}, location.origin);
+}
+
 // free full texts for the references shown (a job: progress, then a summary)
 async function findFree() {
   $("ftFree").disabled = true; show("ftFreeBarWrap"); $("ftFreeBar").style.width = "3%";
@@ -1585,6 +1633,7 @@ async function findFree() {
 }
 const hide = (id) => show(id, false);
 IMPORT_ACTIONS.ftFree = findFree;
+IMPORT_ACTIONS.ftExt = fetchWithExtension;
 $("guide").addEventListener("change", (e) => {
   if (e.target.id !== "ftFiles" && e.target.id !== "ftFolder") return;
   const files = [...e.target.files]; e.target.value = ""; attachPdfs(files);

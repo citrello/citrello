@@ -101,7 +101,9 @@ function showPaper() {
 window.addEventListener("message", (e) => {
   const m = e.data;
   if (!m || m.citrello !== "fulltext") return;
-  paper = (m.text && m.text.length > 1500) || m.pdf ? m : null;
+  const found = (m.text && m.text.length > 1500) || m.pdf ? m : null;
+  if (paper && !found) return;  // a text already arrived (the button and the extension may both answer)
+  paper = found;
   paperDone = true;
   showPaper();
 });
