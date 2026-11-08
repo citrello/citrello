@@ -132,3 +132,39 @@ def test_browser_tab_is_the_device(browser_name, tmp_path):
         assert tool(token, "search_references", {"query": "offshore"})["isError"]
         assert not errors, errors
         b.close()
+
+
+@pytest.mark.parametrize("browser_name", BROWSERS)
+def test_find_free_full_texts_in_the_browser(browser_name, tmp_path):
+    """"Find free full texts" in the web app, against the real services: a paper free in Europe PMC (read by the
+    browser), one free in a university repository (its PDF through the bridge's /api/oa-pdf), one behind a paywall."""
+    from playwright.sync_api import expect, sync_playwright
+    bib = tmp_path / "three.bib"
+    bib.write_text("""@article{plos2007, title={Organismal complexity and the evolution of gene regulation}, year={2007},
+  doi={10.1371/journal.pone.0000217}}
+@article{vetters2024, title={Sailing through end-of-life challenges}, year={2024}, doi={10.1016/j.rser.2024.114486}}
+@article{lecun2015, title={Deep learning}, year={2015}, doi={10.1038/nature14539}}
+""", encoding="utf-8")
+    with sync_playwright() as pw:
+        b = getattr(pw, browser_name).launch()
+        page = b.new_context(viewport={"width": 1280, "height": 900}).new_page()
+        errors = []
+        page.on("pageerror", lambda e: errors.append(str(e)))
+        page.goto(f"{BASE}/app/?bridge={urllib.parse.quote(B.bc.BRIDGE)}")
+        page.wait_for_selector("#webCover", state="detached", timeout=LOAD)
+        page.click("#wWebStart")
+        page.click("#openImport")
+        page.click('[data-guide="imp-file"]')
+        page.set_input_files("#importFile", str(bib))
+        expect(page.locator("#libRows .ref")).to_have_count(3, timeout=60000)
+        page.click("#gNext")
+        page.click('[data-guide="imp-papers"]')
+        page.click("#ftFree")
+        expect(page.locator("#gResult")).to_contain_text("Free full text found for 2 of 3", timeout=240000)
+        expect(page.locator("#gResult")).to_contain_text("1 need your access")
+        page.click("#gNext")
+        expect(page.locator('#libRows .ref[data-sel="vetters2024"] .ftmark')).to_be_visible()
+        expect(page.locator('#libRows .ref[data-sel="plos2007"] .ftmark')).to_be_visible()
+        expect(page.locator('#libRows .ref[data-sel="lecun2015"] .ftmark')).to_have_count(0)
+        assert not errors, errors
+        b.close()

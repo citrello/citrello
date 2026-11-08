@@ -919,6 +919,15 @@ Object.assign(A, {
 const fileDrop = (what) => `<label class="drop" for="importFile"><input type="file" id="importFile" accept=".ris,.bib,.json,.txt,.xml" hidden>
   <strong>Choose ${esc(what)}</strong> or drag it here</label>`;
 Object.assign(A, {
+  // a list of references, the free ones getting their text
+  freeTexts() {
+    const rows = [["Topham2017", true], ["Vetters2024", true], ["LeCun2015", false]].map(([k, ok], i) => {
+      const y = 70 + i * 36;
+      return `<rect class="a-box" x="50" y="${y - 20}" width="380" height="30" rx="8"/><text class="a-txt" x="64" y="${y}">${k}</text>
+        <text class="${ok ? "a-ok" : "a-mut"}" x="300" y="${y}" style="font:700 12px Figtree,sans-serif">${ok ? "Free text ✓" : "Needs your access"}</text>`;
+    }).join("");
+    return A.svg("References getting their free full text", A.win("Citrello", rows));
+  },
   // PDFs going into Citrello, and only their text staying
   papers() {
     const pdf = (x, y) => `<path class="a-win" d="M${x} ${y}h40l14 14v62a6 6 0 0 1-6 6h-48a6 6 0 0 1-6-6v-70a6 6 0 0 1 6-6z"/>
@@ -938,6 +947,11 @@ Object.assign(GUIDES, {
        <div class="row" style="margin-top:8px"><label class="btn" for="ftFolder">Choose a whole folder…</label><input type="file" id="ftFolder" webkitdirectory multiple hidden>
          <label class="small"><input type="checkbox" id="ftAdd" checked> Add papers that aren't in my library yet</label></div>
        <div id="ftLog" class="small"></div>`},
+    {art: A.freeTexts(), title: "Find the free ones for me",
+     html: `<p>For references with a DOI, Citrello looks for a legal free copy (open access: Unpaywall, Europe PMC, arXiv) and keeps its text. Papers behind a paywall need your access: open them with the browser button.</p>
+       <button class="primary" id="ftFree">Find free full texts</button>
+       <p class="small muted web-only" style="margin:6px 0 0">Free PDFs come through Citrello's server, because most repositories don't let web pages download them. Only the DOI is sent and nothing is kept.</p>
+       <div class="bar hidden" id="ftFreeBarWrap"><div id="ftFreeBar"></div></div><div id="ftFreeMsg" class="small"></div>`},
   ]}),
   "imp-file": () => ({title: "Import from a file", sections: [
     {art: A.files(), title: "RIS, BibTeX, CSL-JSON or EndNote XML", html: `<p>Exported from any reference manager: Zotero (right-click a collection → Export), Mendeley, EndNote, Papers, JabRef… Your keys and duplicates are handled for you.</p>${fileDrop("a file")}`},
@@ -1546,6 +1560,31 @@ async function attachPdfs(files) {
     (missed ? `; ${missed} couldn't be matched or read (listed below).` : ". ChatGPT and Claude can now read them."));
   loadLibrary();
 }
+// free full texts for the references shown (a job: progress, then a summary)
+async function findFree() {
+  $("ftFree").disabled = true; show("ftFreeBarWrap"); $("ftFreeBar").style.width = "3%";
+  try {
+    const p = $("projectFilter").value;
+    const {id, n} = await post("/api/fulltext/find-free", {q: $("q").value, project: p});
+    impNote("warn", `Looking for free copies of ${n} paper${n === 1 ? "" : "s"}…`);
+    const tick = async () => {
+      const s = await api(`/api/fulltext/find-free/${id}`);
+      if ($("ftFreeBar")) $("ftFreeBar").style.width = s.n ? `${Math.max(3, 100 * s.i / s.n)}%` : "3%";
+      if (!s.done) { if ($("ftFreeMsg")) $("ftFreeMsg").textContent = s.n ? `Checking ${s.i + 1} of ${s.n}: ${s.key}` : ""; return setTimeout(tick, 700); }
+      if ($("ftFree")) $("ftFree").disabled = false;
+      if (s.error) return impNote("err", esc(s.error));
+      const r = s.result;
+      if ($("ftFreeMsg")) $("ftFreeMsg").textContent = "";
+      impNote(r.found ? "ok" : "warn", `Free full text found for ${r.found} of ${r.checked} paper${r.checked === 1 ? "" : "s"}.` +
+        (r.missing ? ` ${r.missing} need your access: open them with the browser button, or drop their PDFs above.` : "") +
+        (r.no_doi ? ` ${r.no_doi} without a DOI weren't searched.` : ""));
+      loadLibrary();
+    };
+    tick();
+  } catch (e) { $("ftFree").disabled = false; hide("ftFreeBarWrap"); impNote("err", esc(e.message)); }
+}
+const hide = (id) => show(id, false);
+IMPORT_ACTIONS.ftFree = findFree;
 $("guide").addEventListener("change", (e) => {
   if (e.target.id !== "ftFiles" && e.target.id !== "ftFolder") return;
   const files = [...e.target.files]; e.target.value = ""; attachPdfs(files);

@@ -90,3 +90,10 @@ citrello.app/app connects like the desktop app, but browsers can't put headers o
 device token as a subprotocol: `new WebSocket("wss://mcp.citrello.app/device/connect", ["citrello", token])`.
 `/device/connect` accepts that (only there), and the Relay answers with `Sec-WebSocket-Protocol: citrello`.
 `tests/test_web_bridge_e2e.py` tests it in Chromium and WebKit against a local bridge.
+
+## Free PDFs for the web app (`/api/oa-pdf?doi=…`)
+
+"Find free full texts" in the web app asks here for papers Unpaywall lists as open access, because most
+repositories don't let web pages download their files. The Worker looks the DOI up on Unpaywall, fetches the free
+PDF (up to four locations, 40 MB max, must start with `%PDF-`) and returns it; nothing is stored. Tested by
+`tests/test_web_bridge_e2e.py::test_find_free_full_texts_in_the_browser` against the real services.

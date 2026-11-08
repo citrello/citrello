@@ -222,3 +222,96 @@ def passages(text, query, n=4):
 def summary(it):
     ft = it.get("fulltext")
     return dict(ft) if ft else None
+
+
+# --------------------------------------------------------------------------
+# Free (open-access) full texts, for many references at once
+# --------------------------------------------------------------------------
+
+UNPAYWALL = os.environ.get("CITRELLO_UNPAYWALL") or "https://api.unpaywall.org/v2/"
+EPMC = os.environ.get("CITRELLO_EPMC") or "https://www.ebi.ac.uk/europepmc/webservices/rest/"
+CONTACT = "hello@citrello.app"  # Unpaywall asks for a contact address with each request
+
+
+def _get(url, accept="application/json", timeout=40):
+    import urllib.request
+    req = urllib.request.Request(url, headers={"Accept": accept, "User-Agent": f"Citrello/{core.VERSION} ({CONTACT})"})
+    with urllib.request.urlopen(req, timeout=timeout) as r:
+        return r.read()
+
+
+def _epmc_text(doi):
+    """Europe PMC's open full text (life sciences, medicine): XML -> paragraphs. None when there isn't one."""
+    import json as _json
+    import urllib.parse
+    hits = _json.loads(_get(EPMC + "search?format=json&resultType=lite&query=" + urllib.parse.quote(f'DOI:"{doi}"')))
+    rec = next((r for r in hits.get("resultList", {}).get("result", []) if r.get("pmcid") and r.get("isOpenAccess") == "Y"), None)
+    if not rec:
+        return None
+    xml = _get(EPMC + rec["pmcid"] + "/fullTextXML", "application/xml").decode("utf-8", "replace")
+    body = xml.split("<body", 1)[1] if "<body" in xml else xml
+    paras = [re.sub(r"<[^>]+>", " ", p) for p in re.findall(r"<(?:p|title)[^>]*>(.*?)</(?:p|title)>", body, re.S)]
+    text = "\n\n".join(re.sub(r"\s+", " ", p).strip() for p in paras if p.strip())
+    return text if len(text) >= MIN_CHARS else None
+
+
+def _free_pdf(doi):
+    """The free PDF's bytes: straight from where Unpaywall says it is (desktop app), or, in the web app, through
+    Citrello's bridge, because most repositories don't let web pages download their files (only the DOI is sent)."""
+    import json as _json
+    import urllib.parse
+    if os.environ.get("CITRELLO_WEB"):
+        import bridge_client
+        try:
+            data = _get(bridge_client.BRIDGE + "/api/oa-pdf?doi=" + urllib.parse.quote(doi), "application/pdf", 90)
+            return data if data.startswith(b"%PDF") else None
+        except Exception:
+            return None
+    info = _json.loads(_get(UNPAYWALL + urllib.parse.quote(doi) + "?email=" + CONTACT))
+    locs = [info.get("best_oa_location")] + (info.get("oa_locations") or [])
+    urls = list(dict.fromkeys(l["url_for_pdf"] for l in locs if l and l.get("url_for_pdf")))[:4]
+    for u in urls:
+        try:
+            data = _get(u, "application/pdf", 60)
+            if data.startswith(b"%PDF") and len(data) < 40_000_000:
+                return data
+        except Exception:
+            continue
+    return None
+
+
+def find_free(keys=None, progress=None):
+    """For references without full text (all, or the given keys) that have a DOI: look for a free copy (Europe PMC,
+    then Unpaywall's open-access locations) and keep its text. Returns a summary; never stops over one paper."""
+    data = library.load()
+    items = [it for it in data["items"] if not it.get("fulltext") and it["csl"].get("DOI")
+             and (not keys or it["key"] in keys)]
+    found, missing, n = [], [], len(items)
+    for i, it in enumerate(items):
+        if progress:
+            progress(i, n, it["key"])
+        doi = it["csl"]["DOI"]
+        text, source = None, None
+        try:
+            text, source = _epmc_text(doi), "open access (Europe PMC)"
+        except Exception:
+            pass
+        if not text:
+            try:
+                pdf = _free_pdf(doi)
+                if pdf:
+                    text, source = pdf_text(pdf)[0], "open access"
+            except Exception:
+                text = None
+        if text:
+            try:
+                attach(it["key"], text, source)
+                found.append(it["key"])
+                continue
+            except (ValueError, KeyError):
+                pass
+        missing.append(it["key"])
+    if progress:
+        progress(n, n, "")
+    no_doi = sum(1 for it in data["items"] if not it.get("fulltext") and not it["csl"].get("DOI"))
+    return {"checked": n, "found": len(found), "found_keys": found, "missing": len(missing), "no_doi": no_doi}

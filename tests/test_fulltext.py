@@ -161,3 +161,81 @@ def test_text_from_the_papers_page(lib, tmp_path, monkeypatch):
     assert st == 200 and json.loads(out)["how"] == "pdf"
     st, _, _, out = webapp.handle("POST", "/api/clip/fulltext", {"X-Key": key}, json.dumps({"text": "Too short."}).encode())
     assert st == 400
+
+
+def oa_services(pdf):
+    """Stand-ins for Europe PMC (one open paper), Unpaywall (one free PDF elsewhere) and the bridge's /api/oa-pdf."""
+    import threading
+    from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+    xml = "<article><body><sec><title>Introduction</title>" + "".join(
+        f"<p>Paragraph {i} about recycling wind turbine blades made of composite materials.</p>" for i in range(60)) + "</sec></body></article>"
+
+    class H(BaseHTTPRequestHandler):
+        def log_message(self, *a):
+            pass
+
+        def do_GET(self):
+            p = self.path
+            if p.startswith("/epmc/search"):
+                hit = "10.1016%2Fj.renene.2016.10.066" in p or "10.1016/j.renene.2016.10.066" in p
+                body = json.dumps({"resultList": {"result": [{"pmcid": "PMC1", "isOpenAccess": "Y"}] if hit else []}})
+            elif p.startswith("/epmc/PMC1/fullTextXML"):
+                body = xml
+            elif p.startswith("/unpaywall/"):
+                free = "rser" in p
+                body = json.dumps({"is_oa": free, "best_oa_location": {"url_for_pdf": base + "/files/vetters.pdf"} if free else None,
+                                   "oa_locations": []})
+            elif p in ("/files/vetters.pdf", ) or (p.startswith("/api/oa-pdf") and "rser" in p):
+                self.send_response(200)
+                self.send_header("Content-Type", "application/pdf")
+                self.end_headers()
+                self.wfile.write(pdf)
+                return
+            else:
+                self.send_response(404)
+                self.end_headers()
+                return
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.end_headers()
+            self.wfile.write(body.encode())
+
+    srv = ThreadingHTTPServer(("127.0.0.1", 0), H)
+    base = f"http://127.0.0.1:{srv.server_address[1]}"
+    threading.Thread(target=srv.serve_forever, daemon=True).start()
+    return base, srv
+
+
+@pytest.mark.parametrize("web", [False, True])
+def test_find_free_full_texts(lib, tmp_path, monkeypatch, web):
+    """Free copies for references without full text: Europe PMC's text, or the PDF Unpaywall points to (in the web
+    app through the bridge); papers with no free copy are counted, not guessed."""
+    import bridge_client
+    vetters = pdf_bytes(tmp_path, [["Sailing through end-of-life challenges"] +
+                                   [f"Review section {i}: end-of-life options for offshore wind turbines." for i in range(40)]], "v.pdf")
+    base, srv = oa_services(vetters)
+    monkeypatch.setattr(fulltext, "EPMC", base + "/epmc/")
+    monkeypatch.setattr(fulltext, "UNPAYWALL", base + "/unpaywall/")
+    monkeypatch.setattr(bridge_client, "BRIDGE", base)
+    if web:
+        monkeypatch.setenv("CITRELLO_WEB", "1")
+    else:
+        monkeypatch.delenv("CITRELLO_WEB", raising=False)
+    try:
+        with library.editing() as data:
+            library.add_csl(data, {"type": "article-journal", "title": "Sailing through end-of-life challenges",
+                                   "DOI": "10.1016/j.rser.2024.114486", "issued": {"date-parts": [[2024]]}}, source="test")
+            library.add_csl(data, {"type": "article-journal", "title": "Deep learning", "DOI": "10.1038/nature14539",
+                                   "issued": {"date-parts": [[2015]]}}, source="test")
+        steps = []
+        r = fulltext.find_free(progress=lambda i, n, k: steps.append((i, n)))
+        assert r["checked"] == 3 and r["found"] == 2 and r["missing"] == 1 and r["no_doi"] == 1  # Burton has no DOI
+        assert steps[-1] == (3, 3)
+        items = {it["csl"]["title"]: it for it in library.load()["items"]}
+        assert items[TOPHAM["title"]]["fulltext"]["source"] == "open access (Europe PMC)"
+        assert "composite materials" in fulltext.read(items[TOPHAM["title"]])
+        assert items["Sailing through end-of-life challenges"]["fulltext"]["source"] == "open access"
+        assert not items["Deep learning"].get("fulltext")
+        assert fulltext.find_free()["checked"] == 1  # only the one still without text
+    finally:
+        srv.shutdown()

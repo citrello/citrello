@@ -59,10 +59,13 @@
 ## Current focus: papers' full text (decided 8 Nov 2026)
 Armin's direction: claim checking against abstracts is what Claude already does well; the real value is the
 **full text people have access to but never download**. Keep **only the text** (not PDFs), tied to each reference,
-so the AI can read it (`read_paper`, `find_in_papers`). Step 1 done (PDFs dropped one by one or in bulk, matched to
-references; marks and filters in the library). Next: (2) the browser button grabs the text from the paper's page
-with the person's access; (3) bulk open-access texts for imported libraries; (4) a browser extension for bulk
-texts behind the person's university login (needs Chrome/Edge/Firefox store accounts: Armin's decision).
+so the AI can read it (`read_paper`, `find_in_papers`). Done (8 Nov): (1) PDFs dropped one by one or in bulk,
+matched to references, marks and filters in the library; (2) the browser button takes the text from the paper's
+page (the article on the page, or its PDF) with the person's access; (3) "Find free full texts" for imported
+libraries: Europe PMC (read by the browser), Unpaywall's open-access PDFs (desktop: direct; web: through the
+bridge's `/api/oa-pdf`, DOI only, nothing stored). Next: (4) a browser extension for bulk texts behind the
+person's university login (needs Chrome/Edge/Firefox store accounts: Armin's decision). People must re-drag the
+browser button to get the version that takes the text.
 
 ## The web app
 **Progress:** steps 1 and 2 are live at citrello.app/app and tested in Chromium and WebKit: library in the browser,

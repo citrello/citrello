@@ -325,6 +325,9 @@ def _running():
     for cid, st in list(app.CHECKS.items()):
         if st.get("state") == "checking":
             out["/api/doccheck/" + cid] = app.check_public(cid)
+    for fid, st in list(app.FREE.items()):
+        if not st.get("done"):
+            out["/api/fulltext/find-free/" + fid] = st
     for lid, lj in list(app.LATEX.items()):
         if lj.get("convert") and not lj["convert"].get("done"):
             out["/api/latex/" + lid] = app.latex_public(lid)
@@ -408,7 +411,10 @@ def start(device_name="Web browser"):
     threading.Thread = _LaterThread  # app.py looks it up each time it starts a job
     import doccheck
     import latex
-    for mod, name in ((library, "verify"), (doccheck, "check"), (latex, "convert_thebibliography")):
+    import fulltext
+    os.environ["CITRELLO_WEB"] = "1"  # free PDFs come through the bridge (repositories don't let web pages download)
+    for mod, name in ((library, "verify"), (doccheck, "check"), (latex, "convert_thebibliography"),
+                      (fulltext, "find_free")):
         if not hasattr(getattr(mod, name), "__wrapped__"):
             setattr(mod, name, _with_progress(getattr(mod, name)))
     library.migrate_legacy_data()

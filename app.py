@@ -108,6 +108,7 @@ OAUTH_STATES = set()
 CHECKS = {}  # document checks: id -> {"state", "i", "n", "step", "report", "error", "dir", "name"}
 LATEX = {}   # LaTeX checks: id -> {"files", "report", "name", "convert": {...}}
 VERIFY = {}  # verification runs: id -> {"done", "i", "n", "key", "result", "error"}
+FREE = {}    # "find free full texts" runs: the same shape
 
 
 def start_verify(keys, include_verified):
@@ -126,6 +127,24 @@ def start_verify(keys, include_verified):
         state["done"] = True
     threading.Thread(target=run, daemon=True).start()
     return vid
+
+
+def start_find_free(keys):
+    fid = secrets.token_hex(6)
+    state = FREE[fid] = {"done": False, "i": 0, "n": len(keys), "key": "", "result": None, "error": None}
+
+    def progress(i, n, key):
+        state.update(i=i, n=n, key=key)
+
+    def run():
+        try:
+            state["result"] = fulltext.find_free(keys, progress)
+        except Exception as e:
+            traceback.print_exc()
+            state["error"] = str(e)
+        state["done"] = True
+    threading.Thread(target=run, daemon=True).start()
+    return fid
 
 
 def check_public(cid):
@@ -789,6 +808,9 @@ class Handler(BaseHTTPRequestHandler):
             except BaseException as e:
                 return self.redirect("/?login_error=" + urllib.parse.quote(str(e)))
             return self.redirect("/?connected=1")
+        m = re.fullmatch(r"/api/fulltext/find-free/(\w+)", path)
+        if m and m.group(1) in FREE:
+            return self.send(200, FREE[m.group(1)])
         m = re.fullmatch(r"/api/verify/(\w+)", path)
         if m and m.group(1) in VERIFY:
             return self.send(200, VERIFY[m.group(1)])
@@ -999,6 +1021,15 @@ class Handler(BaseHTTPRequestHandler):
                                                            email=load_config().get("email"))
                     res = dict(fulltext.attach_pdf(data, it["key"]), how="added", created=created)
                 return self.send(200, res)
+            if path == "/api/fulltext/find-free":  # free copies for the references shown that have no full text
+                b = self.json_body()
+                data = library.load()
+                project = b.get("project") or ""
+                items = library.search(data, b.get("q", ""), None if project in ("", "*", "-") else project)
+                keys = [it["key"] for it in items if not it.get("fulltext") and it["csl"].get("DOI")]
+                if not keys:
+                    return self.send(400, {"error": "Every reference shown with a DOI already has its full text."})
+                return self.send(200, {"id": start_find_free(keys), "n": len(keys)})
             if path == "/api/fulltext/remove":
                 fulltext.remove(str(self.json_body().get("key", "")))
                 return self.send(200, {"ok": True})

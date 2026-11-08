@@ -516,6 +516,35 @@ async function mcp(request, env) {
 // Anonymous usage count (the app sends one ping a day; no personal data)
 // ---------------------------------------------------------------------------
 
+// ---------------------------------------------------------------------------
+// Free (open-access) PDFs for the web app's "Find free full texts"
+// ---------------------------------------------------------------------------
+// Most repositories don't let web pages download their files, so the web app asks here with a DOI. Only copies
+// Unpaywall lists as open access are fetched; the PDF goes straight back to the browser (which keeps only its
+// text) and nothing is stored here. Only the DOI is sent.
+const OA_UA = "Citrello/1.0 (hello@citrello.app)";
+async function oaPdf(request) {
+  const doi = (new URL(request.url).searchParams.get("doi") || "").trim();
+  if (!/^10\.\d{4,9}\/[^\s?#]{1,300}$/.test(doi)) throw new HttpError(400, "bad_doi", "That isn't a DOI.");
+  const up = await fetch(`https://api.unpaywall.org/v2/${encodeURI(doi)}?email=hello@citrello.app`,
+                         { headers: { "User-Agent": OA_UA, Accept: "application/json" } });
+  if (!up.ok) throw new HttpError(404, "not_found", "No free copy found.");
+  const d = await up.json();
+  const urls = [...new Set([d.best_oa_location, ...(d.oa_locations || [])]
+    .filter((l) => l && l.url_for_pdf).map((l) => l.url_for_pdf))].slice(0, 4);
+  for (const u of urls) {
+    try {
+      if (!/^https?:\/\//.test(u)) continue;
+      const r = await fetch(u, { headers: { "User-Agent": OA_UA, Accept: "application/pdf" }, redirect: "follow" });
+      if (!r.ok) continue;
+      const buf = await r.arrayBuffer();
+      if (buf.byteLength > 40e6 || new TextDecoder().decode(new Uint8Array(buf.slice(0, 5))) !== "%PDF-") continue;
+      return new Response(buf, { headers: { "Content-Type": "application/pdf", "Cache-Control": "no-store", ...CORS } });
+    } catch {}
+  }
+  throw new HttpError(404, "not_found", "No free copy could be downloaded.");
+}
+
 async function usagePing(request, env) {
   const b = await readBody(request);
   const id = String(b.install_id || "");
@@ -671,6 +700,7 @@ async function route(request, env, ctx) {
 
   if (path === "/api/ping" && m === "POST") return usagePing(request, env);
   if (path === "/api/latest" && m === "GET") return latestRelease(request, env, ctx);
+  if (path === "/api/oa-pdf" && m === "GET") return oaPdf(request);
   if (path === "/api/auth/start" && m === "POST") return apiAuthStart(request, env);
   if (path === "/api/auth/verify" && m === "POST") return apiAuthVerify(request, env);
   if (path === "/api/me" && (m === "GET" || m === "POST")) return apiMe(request, env);
