@@ -353,7 +353,12 @@ def test_web_app_browser_button_and_zotero(browser_name, tmp_path):
         db = tmp_path / "zotero.sqlite"
         Z.make_db(str(db))
         page.click("#openImport")
-        page.click('[data-guide="imp-mendeley"]')  # without Citrello's Mendeley app: only the export way
+        # without Citrello's Mendeley app ID (whatever the deploy has): only the export way
+        ctx.route("**/app/config.json", lambda r: r.fulfill(json={"mendeley_client_id": ""}))
+        page.reload()
+        page.wait_for_selector("#webCover", state="detached", timeout=LOAD)
+        page.click("#openImport")
+        page.click('[data-guide="imp-mendeley"]')
         expect(page.locator("#guide")).to_contain_text("Mendeley Reference Manager")
         expect(page.locator("#impMendeleyWeb")).to_be_hidden()
         page.click("#gNext")
