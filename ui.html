@@ -152,6 +152,9 @@
   .a-btnt { fill: var(--accent-ink); font: 700 13px Figtree, system-ui, sans-serif; } .a-ok { fill: var(--ok); }
   .a-dot { fill: var(--line); } .a-term { fill: #14213d; } .a-termt { fill: #e8edf8; font: 500 12.5px ui-monospace, Menlo, monospace; }
   .a-cur { fill: #14213d; stroke: #fff; stroke-width: 1.5; } .a-arrow { stroke: var(--accent); stroke-width: 3; fill: none; stroke-dasharray: 6 5; }
+  .ftmark { font: 700 11px Figtree, sans-serif; color: var(--ok); background: var(--ok-soft); padding: 1px 7px; border-radius: 99px; }
+  .chip.ft { background: var(--ok-soft); color: var(--ok); }
+  .chipsep { display: inline-block; width: 1px; height: 18px; background: var(--line); margin: 0 4px; vertical-align: middle; }
   .notice { padding: 10px 14px; border-radius: 10px; margin-top: 12px; font-size: 14px; }
   .notice.err { background: var(--err-soft); color: var(--err); }
   .notice.warn { background: var(--warn-soft); color: var(--warn); }
@@ -313,6 +316,8 @@
             <span><b>Mendeley</b><span class="small muted">Sign in, or use an exported file</span></span></button>
           <button class="guide-tile" data-guide="imp-endnote" role="listitem"><span class="gt-icon gt-3" aria-hidden="true">E</span>
             <span><b>EndNote</b><span class="small muted">From an exported file</span></span></button>
+          <button class="guide-tile" data-guide="imp-papers" role="listitem"><span class="gt-icon gt-2" aria-hidden="true">¶</span>
+            <span><b>Papers' full text</b><span class="small muted">Drop PDFs: the AI can then read them</span></span></button>
         </div>
         <div class="row"><input type="text" id="importProject" list="projectList" placeholder="Put into project (optional)"></div>
         <div id="importMsg"></div>
@@ -901,7 +906,27 @@ Object.assign(A, {
 });
 const fileDrop = (what) => `<label class="drop" for="importFile"><input type="file" id="importFile" accept=".ris,.bib,.json,.txt,.xml" hidden>
   <strong>Choose ${esc(what)}</strong> or drag it here</label>`;
+Object.assign(A, {
+  // PDFs going into Citrello, and only their text staying
+  papers() {
+    const pdf = (x, y) => `<path class="a-win" d="M${x} ${y}h40l14 14v62a6 6 0 0 1-6 6h-48a6 6 0 0 1-6-6v-70a6 6 0 0 1 6-6z"/>
+      <text class="a-mut" x="${x + 24}" y="${y + 50}" text-anchor="middle">PDF</text>`;
+    return A.svg("PDFs going into Citrello, which keeps their text for the AI", pdf(40, 40) + pdf(70, 60) + pdf(100, 80) +
+      `<path class="a-arrow" d="M175 115h80"/><rect class="a-win" x="270" y="44" width="180" height="130" rx="12"/>
+       <text class="a-txt" x="290" y="72">Topham2017</text><text class="a-ok" x="290" y="92" style="font:700 12px Figtree,sans-serif">Full text ✓</text>
+       <rect class="a-line" x="290" y="106" width="140" height="7" rx="3"/><rect class="a-line" x="290" y="122" width="120" height="7" rx="3"/>
+       <rect class="a-line" x="290" y="138" width="130" height="7" rx="3"/><text class="a-mut" x="290" y="162">The AI can read it</text>`);
+  },
+});
 Object.assign(GUIDES, {
+  "imp-papers": () => ({title: "Add papers' full text", sections: [
+    {art: A.papers(), title: "Drop the PDFs you have",
+     html: `<p>Citrello matches each PDF to its reference (by DOI or title) and keeps only its <b>text</b>, so ChatGPT and Claude can check what the paper says. The PDFs aren't kept.</p>
+       <label class="drop" for="ftFiles"><input type="file" id="ftFiles" accept=".pdf" multiple hidden><strong>Choose PDFs</strong> or drag them here</label>
+       <div class="row" style="margin-top:8px"><label class="btn" for="ftFolder">Choose a whole folder…</label><input type="file" id="ftFolder" webkitdirectory multiple hidden>
+         <label class="small"><input type="checkbox" id="ftAdd" checked> Add papers that aren't in my library yet</label></div>
+       <div id="ftLog" class="small"></div>`},
+  ]}),
   "imp-file": () => ({title: "Import from a file", sections: [
     {art: A.files(), title: "RIS, BibTeX, CSL-JSON or EndNote XML", html: `<p>Exported from any reference manager: Zotero (right-click a collection → Export), Mendeley, EndNote, Papers, JabRef… Your keys and duplicates are handled for you.</p>${fileDrop("a file")}`},
   ]}),
@@ -1147,7 +1172,12 @@ async function loadLibrary() {
     `<button class="chip" data-rel="all" aria-pressed="${!relFilter.size}" title="Show all">${lib.items.length}${lib.items.length !== lib.total ? " of " + lib.total : ""} references</button>` +
     chip("verified", "ok", () => "verified") + chip("complete", "", () => "complete") +
     chip("check", "warn", () => "to check") + chip("problem", "bad", (n) => n === 1 ? "problem" : "problems");
-  const items = lib.items.filter((i) => !relFilter.size || relFilter.has(relOf(i)));
+  const withText = lib.items.filter((i) => i.fulltext).length;
+  if (lib.items.length) $("libChips").innerHTML += `<span class="chipsep"></span>` +
+    `<button class="chip ft ${ftFilter === "no" ? "dim" : ""}" data-ft="yes" aria-pressed="${ftFilter === "yes"}" title="The AI can read these papers">${withText} with full text</button>` +
+    (lib.items.length - withText || ftFilter === "no" ? `<button class="chip ${ftFilter === "yes" ? "dim" : ""}" data-ft="no" aria-pressed="${ftFilter === "no"}" title="Add their text so the AI can read them">${lib.items.length - withText} without</button>` : "");
+  const items = lib.items.filter((i) => (!relFilter.size || relFilter.has(relOf(i))) &&
+                                        (!ftFilter || (ftFilter === "yes") === !!i.fulltext));
   shown = items.map((i) => i.key);
   for (const k of [...picked]) if (!shown.includes(k)) picked.delete(k);  // never act on references you can't see
   $("libEmpty").style.display = lib.total ? "none" : "block";
@@ -1159,7 +1189,7 @@ async function loadLibrary() {
       <input type="checkbox" class="pick" data-pick="${esc(i.key)}" ${picked.has(i.key) ? "checked" : ""} aria-label="Select ${esc(i.title)}">
       <div class="rb" title="${esc(REL_TEXT[i.reliability] || "")}"></div>
       <div style="min-width:0"><div class="t">${esc(i.title)}</div>
-        <div class="m">${[i.authors, i.year, i.container].filter(Boolean).map(esc).join(" · ")}${issue ? ` · <span class="${issue.level}">${esc(issue.text)}</span>` : ""}</div></div>
+        <div class="m">${i.fulltext ? '<span class="ftmark" title="Full text: ChatGPT and Claude can read this paper">Full text</span> ' : ""}${[i.authors, i.year, i.container].filter(Boolean).map(esc).join(" · ")}${issue ? ` · <span class="${issue.level}">${esc(issue.text)}</span>` : ""}</div></div>
       <code class="key" data-key="${esc(i.key)}" title="Copy [@${esc(i.key)}]">${esc(i.key)}</code></div>`;
   }).join("");
   renderSelection();
@@ -1204,12 +1234,40 @@ async function renderDetail() {
     <div class="copyline">[@${esc(it.key)}]<button data-copy="[@${esc(it.key)}]">Copy</button></div>
     <div class="copyline">\\cite{${esc(it.key)}}<button data-copy="\\cite{${esc(it.key)}}">Copy</button></div>
     ${f.reference ? `<h4>In ${esc(f.style)}</h4><div class="formatted">${esc(f.reference)}</div><p class="small muted" style="margin:6px 0 0">In the text: ${esc(f.citation)}</p>` : ""}
+    <h4>Full text</h4>${fullTextBox(it)}
     <h4>Projects</h4>
     <div>${it.projects.length ? it.projects.map((p) => `<span class="tag">${esc(p)}</span>`).join("") : '<span class="small muted">None</span>'}</div>
     <div class="row" style="margin-top:18px"><button data-proj="${esc(it.key)}">Change projects</button><button class="danger" data-del="${esc(it.key)}">Delete</button></div>`;
 }
+function fullTextBox(it) {
+  const ft = it.fulltext_info;
+  if (ft) return `<p class="small" style="margin:0"><span class="ftmark">Full text</span> ChatGPT and Claude can read this paper
+      (${ft.words.toLocaleString()} words, added ${esc(ft.added)}).</p>
+    <div class="row" style="margin-top:6px"><a class="btn" href="/api/fulltext/text?key=${encodeURIComponent(it.key)}">See the text</a>
+      <button class="link" data-ft-remove="${esc(it.key)}">Remove</button></div>`;
+  return `<p class="small muted" style="margin:0">Add the paper's text so ChatGPT and Claude can check what it says. Only the text is kept, not the PDF.</p>
+    <label class="drop ftdrop" style="padding:12px;margin-top:6px"><input type="file" accept=".pdf" data-ft-key="${esc(it.key)}" hidden>
+      <strong>Choose the PDF</strong> or drop it here</label>`;
+}
+async function attachPdfTo(key, file) {
+  if (!file) return;
+  toast("Reading the PDF…");
+  try {
+    await api("/api/fulltext/attach", {method: "POST", body: await file.arrayBuffer(), headers: {"X-Key": encodeURIComponent(key)}});
+    toast("Full text added"); loadLibrary();
+  } catch (e) { toast(e.message); }
+}
+$("detail").addEventListener("change", (ev) => { if (ev.target.dataset.ftKey) attachPdfTo(ev.target.dataset.ftKey, ev.target.files[0]); });
+$("detail").addEventListener("dragover", (ev) => { if (ev.target.closest(".ftdrop")) ev.preventDefault(); });
+$("detail").addEventListener("drop", (ev) => {
+  const d = ev.target.closest(".ftdrop"); if (!d) return;
+  ev.preventDefault(); attachPdfTo(d.querySelector("input").dataset.ftKey, ev.dataTransfer.files[0]);
+});
 $("detail").onclick = async (ev) => {
   const t = ev.target;
+  if (t.dataset.ftRemove && confirm("Remove this paper's text? ChatGPT and Claude won't be able to read it.")) {
+    await post("/api/fulltext/remove", {key: t.dataset.ftRemove}); loadLibrary();
+  }
   if (t.dataset.copy) { await navigator.clipboard.writeText(t.dataset.copy).catch(() => {}); toast("Copied " + t.dataset.copy); }
   if (t.dataset.del && confirm(`Delete ${t.dataset.del} from your library?`)) { await post("/api/library/delete", {keys: [t.dataset.del]}); selKey = null; loadLibrary(); }
   if (t.dataset.proj) {
@@ -1255,7 +1313,12 @@ $("projectFilter").onchange = loadLibrary;
 
 // ---------- filters and selecting many ----------
 const relFilter = new Set(), picked = new Set();
+let ftFilter = null;  // "yes": only references with full text, "no": only those without
 let shown = [], lastPick = null;
+$("libChips").addEventListener("click", (ev) => {
+  const b = ev.target.closest("[data-ft]"); if (!b) return;
+  ftFilter = ftFilter === b.dataset.ft ? null : b.dataset.ft; loadLibrary();
+});
 $("libChips").onclick = (ev) => {
   const b = ev.target.closest("[data-rel]"); if (!b) return;
   const k = b.dataset.rel;
@@ -1446,7 +1509,34 @@ $("guide").addEventListener("change", async (e) => {
         headers: {"X-Project": encodeURIComponent(impProject())}}));
     } catch (err) { impNote("err", esc(err.message)); }
   }
-  if (e.target.type === "file") e.target.value = "";
+  if (e.target.type === "file" && !e.target.id.startsWith("ft")) e.target.value = "";
+});
+// many PDFs at once: each one's text goes to its reference (the PDFs themselves aren't kept)
+async function attachPdfs(files) {
+  files = [...files].filter((f) => /\.pdf$/i.test(f.name));
+  if (!files.length) return impNote("err", "No PDFs there.");
+  const log = $("ftLog"), add = $("ftAdd") && $("ftAdd").checked;
+  let ok = 0, added = 0, missed = 0;
+  log.innerHTML = "";
+  for (const [n, f] of files.entries()) {
+    impNote("warn", `Reading ${n + 1} of ${files.length}: ${esc(f.name)}`);
+    let line;
+    try {
+      const r = await api("/api/fulltext/attach", {method: "POST", body: await f.arrayBuffer(),
+        headers: {"X-Filename": encodeURIComponent(f.name), "X-Add-Missing": add ? "1" : "0", "X-Project": encodeURIComponent(impProject())}});
+      if (r.unmatched) { missed++; line = `<li class="check">${esc(f.name)}: no matching reference${r.doi ? ` (DOI ${esc(r.doi)})` : ""}. Open the reference and choose the PDF there.</li>`; }
+      else { ok++; if (r.how === "added") added++;
+             line = `<li class="ok">${esc(f.name)} → <code class="key">${esc(r.key)}</code>${r.how === "added" ? " (added to your library)" : ""}</li>`; }
+    } catch (e) { missed++; line = `<li class="problem">${esc(f.name)}: ${esc(e.message)}</li>`; }
+    log.insertAdjacentHTML("beforeend", `<ul class="issues" style="margin:2px 0">${line}</ul>`);
+  }
+  impNote(missed ? "warn" : "ok", `Full text added for ${ok} paper${ok === 1 ? "" : "s"}` + (added ? ` (${added} new to your library)` : "") +
+    (missed ? `; ${missed} couldn't be matched or read (listed below).` : ". ChatGPT and Claude can now read them."));
+  loadLibrary();
+}
+$("guide").addEventListener("change", (e) => {
+  if (e.target.id !== "ftFiles" && e.target.id !== "ftFolder") return;
+  const files = [...e.target.files]; e.target.value = ""; attachPdfs(files);
 });
 $("guide").addEventListener("dragover", (e) => { if (e.target.closest(".drop")) e.preventDefault(); });
 $("guide").addEventListener("drop", (e) => {
@@ -1454,6 +1544,7 @@ $("guide").addEventListener("drop", (e) => {
   e.preventDefault();
   const input = e.target.closest(".drop").querySelector("input[type=file]");
   if (input && input.id === "importFile") importFile(e.dataTransfer.files[0]);
+  if (input && input.id === "ftFiles") attachPdfs(e.dataTransfer.files);
 });
 function setExportLinks() {
   const q = encodeURIComponent($("q").value), p = encodeURIComponent($("projectFilter").value);

@@ -25,6 +25,7 @@ _PROTOCOL_OUT = sys.stdout.buffer if hasattr(sys.stdout, "buffer") else None
 sys.stdout = sys.stderr
 
 import citeformat  # noqa: E402
+import fulltext  # noqa: E402
 import latex  # noqa: E402
 import library  # noqa: E402
 import citrello_core as core  # noqa: E402
@@ -45,6 +46,12 @@ How to cite:
 - When editing existing text, keep every citation marker exactly as it is unless asked to change citations.
 - Check add_reference's reliability result and tell the user about problems (retracted paper, wrong DOI, ...).
 - Use a project name (e.g. the paper's title) to keep references of one paper together.
+
+Full texts:
+- Citrello keeps the text of papers the user added (search_references shows full_text: true). To check whether a
+  cited paper supports a sentence, call read_paper with the sentence as the query and quote the passage you rely on.
+  find_in_papers searches inside all the user's papers. When a paper has no full text, say so instead of guessing
+  from the title, and tell the user how to add it (the Citrello browser button on the paper's page, or its PDF).
 
 LaTeX / Overleaf:
 - Cite with the library keys: \\cite{Key}, \\citep{Key1,Key2}, \\citet{Key}, or the biblatex commands \\parencite / \\textcite.
@@ -71,6 +78,7 @@ def _summary(it):
         out["reliability"] = it["reliability"]
     if it.get("checks"):
         out["issues"] = [ch["text"] for ch in it["checks"]]
+    out["full_text"] = bool(it.get("fulltext"))  # read_paper can read it
     return out
 
 
@@ -131,6 +139,55 @@ def t_search(query="", project=None, limit=25):
     hits = library.search(data, query, project)
     return {"total_in_library": len(data["items"]), "matches": len(hits),
             "references": [_summary(it) for it in hits[:max(1, min(int(limit or 25), 200))]]}
+
+
+NO_TEXT = ("Citrello doesn't have the full text of {ref} yet. The user can add it: open the paper in their browser and "
+           "click the Citrello browser button, or drop the PDF on the reference in Citrello (only the text is kept).")
+
+
+def t_read_paper(key, query=None, max_chars=12000):
+    data = library.load()
+    it = library.get(data, key)
+    if not it:
+        raise ValueError(f"No reference {key} in the library.")
+    text = fulltext.read(it)
+    if not text:
+        return {"key": it["key"], "reference": library.short_ref(it), "full_text": False,
+                "message": NO_TEXT.format(ref=library.short_ref(it))}
+    out = {"key": it["key"], "reference": library.short_ref(it), "full_text": True,
+           "words": len(text.split()), "source": it["fulltext"].get("source")}
+    if query:
+        out["passages"] = fulltext.passages(text, query, n=5)  # "at": how far into the paper (%)
+        out["note"] = "The passages of the paper that best match the query. Ask again with other words, or without a query to read from the start."
+    else:
+        limit = max(2000, min(int(max_chars or 12000), 60000))
+        out["text"] = text[:limit]
+        out["truncated"] = len(text) > limit
+    return out
+
+
+def t_find_in_papers(query, project=None, keys=None, limit=8):
+    data = library.load()
+    items = [it for it in data["items"] if it.get("fulltext")]
+    if keys:
+        want = {k.lstrip("@") for k in keys}
+        items = [it for it in items if it["key"] in want]
+    if project:
+        items = [it for it in items if project in it.get("projects", [])]
+    hits = []
+    for it in items:
+        text = fulltext.read(it)
+        if not text:
+            continue
+        best = fulltext.passages(text, query, n=1)
+        if best:
+            score = len(set(fulltext._words(query)) & set(fulltext._words(best[0]["text"])))
+            hits.append((score, {"key": it["key"], "citation_marker": f"[@{it['key']}]", "reference": library.short_ref(it),
+                                 "passage": best[0]["text"], "at": best[0]["at"]}))
+    hits.sort(key=lambda h: -h[0])
+    without = sum(1 for it in data["items"] if not it.get("fulltext"))
+    return {"searched": len(items), "without_full_text": without,
+            "results": [h for _, h in hits[:max(1, min(int(limit or 8), 25))]]}
 
 
 def t_get(key, style=None):
@@ -376,6 +433,18 @@ TOOLS = {
                              "and re-render every citation and the bibliography in a style. Overwrites the file unless "
                              "output_path is given.",
                              S({"path": STR, "style": STYLE, "output_path": STR}, ["path"])),
+    "read_paper": (t_read_paper, "Read the full text of a paper in the user's library (Citrello keeps the text of papers "
+                   "the user added). With a query (e.g. the sentence that cites it), returns the passages that match best; "
+                   "without, the text from the start. Use it to check whether a cited paper really says what a sentence "
+                   "claims, quoting the passage. search_references shows which references have full_text.",
+                   S({"key": STR, "query": {"type": "string", "description": "What to look for, e.g. the citing sentence"},
+                      "max_chars": {"type": "integer", "description": "Without a query: how much text (default 12000)"}},
+                     ["key"])),
+    "find_in_papers": (t_find_in_papers, "Search inside the full texts of the papers in the user's library (all, a project, "
+                       "or given keys) and return the best passage of each matching paper. Good for 'which of my papers "
+                       "says X?' and for finding a source for a claim.",
+                       S({"query": STR, "project": PROJECT, "keys": {"type": "array", "items": STR},
+                          "limit": {"type": "integer"}}, ["query"])),
     "get_bibtex": (t_bibtex, "BibTeX or biblatex entries for references (by keys, a project, or the whole library), "
                    "with the same stable keys as [@Key] markers, for LaTeX / Overleaf (\\cite{Key}). Returns the .bib "
                    "text, or saves it when output_path is given.",
@@ -421,6 +490,8 @@ ANNOTATIONS = {
     "check_citations": ("Check citation markers", True, False, False),
     "create_word_document": ("Create a Word document", False, False, True),
     "update_word_document": ("Update a Word document", False, True, True),  # rewrites the file unless told not to
+    "read_paper": ("Read a paper's full text", True, False, False),
+    "find_in_papers": ("Search inside papers", True, False, False),
     "get_bibtex": ("Get BibTeX", False, False, False),                      # can save a .bib file
     "check_latex_project": ("Check a LaTeX project", True, False, True),
     "prepare_arxiv": ("Make an arXiv-ready .zip", False, False, False),

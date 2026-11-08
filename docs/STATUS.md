@@ -56,7 +56,15 @@
   tested on generated files only).
 - Try citrello.app/check with a real paper.
 
-## Current focus: the web app
+## Current focus: papers' full text (decided 8 Nov 2026)
+Armin's direction: claim checking against abstracts is what Claude already does well; the real value is the
+**full text people have access to but never download**. Keep **only the text** (not PDFs), tied to each reference,
+so the AI can read it (`read_paper`, `find_in_papers`). Step 1 done (PDFs dropped one by one or in bulk, matched to
+references; marks and filters in the library). Next: (2) the browser button grabs the text from the paper's page
+with the person's access; (3) bulk open-access texts for imported libraries; (4) a browser extension for bulk
+texts behind the person's university login (needs Chrome/Edge/Firefox store accounts: Armin's decision).
+
+## The web app
 **Progress:** steps 1 and 2 are live at citrello.app/app and tested in Chromium and WebKit: library in the browser,
 import/export, backup/restore, check and fix Word/PDF/LaTeX, arXiv .zip, style search, progress bars. Step 3 too:
 sign in in the web app and the open citrello.app tab answers ChatGPT/Claude (the bridge accepts the browser's token).

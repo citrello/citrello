@@ -28,7 +28,7 @@ APP_OUT = os.path.join(ROOT, "site", "public", "app")
 # everything app.py imports, plus the web runtime
 APP_MODULES = ["webapp.py", "app.py", "citrello_core.py", "library.py", "citeformat.py", "doccheck.py", "latex.py",
                "arxiv.py", "zotero_local.py", "bridge_client.py", "usage.py", "updater.py", "word_addin.py",
-               "codex_config.py", "mcp_server.py"]
+               "codex_config.py", "mcp_server.py", "fulltext.py"]
 APP_WHEELS = WHEELS + ["pybtex==0.26.1", "latexcodec==3.0.1"]
 # from Pyodide's own repository (compiled for the browser)
 APP_PYODIDE = ["lxml", "micropip", "typing-extensions", "sqlite3", "ssl", "pyyaml"]

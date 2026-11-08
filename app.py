@@ -41,6 +41,7 @@ import bridge_client
 import citrello_core as core
 import codex_config
 import doccheck
+import fulltext
 import arxiv
 import latex
 import updater
@@ -348,7 +349,8 @@ def item_public(it):
             "year": core.year_of(c), "container": c.get("container-title") or c.get("publisher", ""),
             "doi": c.get("DOI", ""), "type": c.get("type", ""), "projects": it.get("projects", []),
             "reliability": it.get("reliability"), "checks": it.get("checks", []), "added": it.get("added", ""),
-            "mendeley": bool(it.get("mendeley_id")), "zotero": bool(it.get("zotero_key"))}
+            "mendeley": bool(it.get("mendeley_id")), "zotero": bool(it.get("zotero_key")),
+            "fulltext": (it.get("fulltext") or {}).get("words", 0)}
 
 
 # --------------------------------------------------------------------------
@@ -840,7 +842,7 @@ class Handler(BaseHTTPRequestHandler):
             out["names"] = [(" ".join(x for x in (a.get("given"), a.get("family")) if x) or a.get("literal", ""))
                             for a in c.get("author", [])]
             out.update(volume=c.get("volume", ""), issue=c.get("issue", ""), page=c.get("page", ""),
-                       url=c.get("URL", ""), raw=it.get("raw", ""))
+                       url=c.get("URL", ""), raw=it.get("raw", ""), fulltext_info=fulltext.summary(it))
             style = qs.get("style", [""])[0] or load_config().get("style") or "apa"
             try:
                 r = citeformat.Renderer(style, {it["key"]: c})
@@ -851,6 +853,13 @@ class Handler(BaseHTTPRequestHandler):
             except Exception as e:
                 out["formatted"] = {"error": str(e)}
             return self.send(200, out)
+        if path == "/api/fulltext/text":  # the paper's text, as Citrello and the AI see it
+            it = library.get(library.load(), qs.get("key", [""])[0])
+            text = fulltext.read(it) if it else None
+            if not text:
+                return self.send(404, {"error": "No full text for this reference."})
+            return self.send(200, text, "text/plain; charset=utf-8",
+                             {"Content-Disposition": "attachment; filename*=UTF-8''" + urllib.parse.quote(it["key"] + ".txt")})
         if path == "/api/library/export":
             data = library.load()
             project = qs.get("project", [""])[0]
@@ -980,6 +989,19 @@ class Handler(BaseHTTPRequestHandler):
                                                             "reliability": rec.get("reliability") or "check"})
                     key = it["key"]
                 return self.send(200, {"key": key, "created": created})
+            if path == "/api/fulltext/attach":  # a PDF: its text is kept for one reference, or matched to one
+                data = self.body()
+                key = urllib.parse.unquote(self.headers.get("X-Key", "")).strip() or None
+                res = fulltext.attach_pdf(data, key)
+                if res.get("unmatched") and res.get("doi") and self.headers.get("X-Add-Missing") == "1":
+                    it, created, _ = library.add_reference("doi:" + res["doi"],  # not in the library yet: add it
+                                                           urllib.parse.unquote(self.headers.get("X-Project", "")).strip() or None,
+                                                           email=load_config().get("email"))
+                    res = dict(fulltext.attach_pdf(data, it["key"]), how="added", created=created)
+                return self.send(200, res)
+            if path == "/api/fulltext/remove":
+                fulltext.remove(str(self.json_body().get("key", "")))
+                return self.send(200, {"ok": True})
             if path == "/api/library/delete":
                 return self.send(200, {"deleted": library.delete(self.json_body().get("keys", []))})
             if path == "/api/library/projects-bulk":  # selection bar: add to / move to / remove from a project

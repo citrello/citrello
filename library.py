@@ -852,8 +852,13 @@ def delete(keys):
     keys = {k.lstrip("@") for k in keys}
     with editing() as data:
         before = len(data["items"])
+        gone = [it for it in data["items"] if it["key"] in keys or it["id"] in keys]
         data["items"] = [it for it in data["items"] if it["key"] not in keys and it["id"] not in keys]
-        return before - len(data["items"])
+    for it in gone:  # its full text goes with it
+        if it.get("fulltext"):
+            with contextlib.suppress(OSError):
+                os.remove(os.path.join(HOME, "fulltext", re.sub(r"[^\w\-]", "_", it["id"]) + ".txt"))
+    return before - len(data["items"])
 
 
 def set_projects(key, projects):
