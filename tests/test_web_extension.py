@@ -45,7 +45,7 @@ def test_extension_fetches_full_texts_and_adds_from_the_toolbar(tmp_path):
     try:
         with sync_playwright() as pw:
             ctx = pw.chromium.launch_persistent_context(str(tmp_path / "profile"), channel="chromium", headless=True,
-                                                        viewport={"width": 1280, "height": 900},
+                                                        viewport={"width": 1280, "height": 800},  # the stores' screenshot size
                                                         args=[f"--disable-extensions-except={ext}", f"--load-extension={ext}"])
             sw = ctx.service_workers[0] if ctx.service_workers else ctx.wait_for_event("serviceworker", timeout=15000)
             page = ctx.pages[0] if ctx.pages else ctx.new_page()
@@ -80,6 +80,9 @@ def test_extension_fetches_full_texts_and_adds_from_the_toolbar(tmp_path):
             expect(page.locator('#libRows .ref[data-sel="topham2017"] .ftmark')).to_be_visible()
             expect(page.locator('#libRows .ref[data-sel="vetters2024"] .ftmark')).to_be_visible()
             expect(page.locator('#libRows .ref[data-sel="lecun2015"] .ftmark')).to_have_count(0)
+            page.click('#libRows .ref[data-sel="topham2017"]')
+            expect(page.locator("#detail")).to_contain_text("ChatGPT and Claude can read this paper")
+            page.screenshot(path=os.path.join(shots, "extension-library.png"))
 
             # the toolbar button on a paper's page: the pop-up gets the paper's text from the extension
             sw.evaluate("url => chrome.storage.local.set({testClipUrl: url})", BASE + "/app/clip.html")
