@@ -7,7 +7,7 @@
 // pageInfo: what the page says about the paper (citation <meta> tags), for the "Add to Citrello" panel.
 // clickPdfButton: clicks the page's PDF button (one that works with scripts, not a plain link).
 
-/* exported grabPaper, pageInfo, clickPdfButton */
+/* exported grabPaper, pageInfo, clickPdfButton, isChallenge */
 
 async function grabPaper(expectDoi, kind) {
   // Where the big publishing platforms keep a paper's PDF, from the page's address and the DOI. This covers most
@@ -75,8 +75,8 @@ async function grabPaper(expectDoi, kind) {
     const pdf = await tryPdf(location.href);
     return pdf ? { status: "ok", how: "pdf", pdf, host, isPdfPage: true } : { status: "no-access", host, isPdfPage: true, page: describe() };
   }
-  // a security check: many clear by themselves in a few seconds (wait for that); the rest need the person
-  for (let i = 0; i < 20 && challenge(); i++) await sleep(1000);
+  // a security check (the extension waits for those to clear first; see isChallenge in fetch.js): still there
+  for (let i = 0; i < 3 && challenge(); i++) await sleep(1000);
   if (challenge()) return { status: "captcha", host, page: describe() };
 
   const doi = cleanDoi(meta("citation_doi") || meta("dc.identifier") || meta("prism.doi") ||
@@ -175,4 +175,11 @@ function pageInfo() {
   });
   return { url: location.href, title: document.title.slice(0, 300), meta: m, sel: String(window.getSelection()).slice(0, 2000),
            isPdf: document.contentType === "application/pdf" };
+}
+
+// Is this page a security check ("Just a moment…", Cloudflare, a CAPTCHA)? Sent into the page on its own.
+function isChallenge() {
+  const top = ((document.title || "") + " " + (document.body ? document.body.innerText.slice(0, 1500) : "")).toLowerCase();
+  return /just a moment|verify (that )?you are (a )?human|are you a robot|unusual traffic|attention required|press (and|&) hold|checking your browser|confirm you are human|i'?m not a robot|human verification|performing security verification|security check to access/.test(top) ||
+    !!document.querySelector('iframe[src*="captcha"], iframe[src*="challenges.cloudflare.com"], #challenge-form, .g-recaptcha, .h-captcha, #px-captcha');
 }

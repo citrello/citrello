@@ -95,6 +95,9 @@ People must re-drag the bookmarklet to get the version that takes the text.
   ("Check the references online first", ticked by default), so wrong DOIs are corrected and missing ones found.
   Fixed on the way: in the web app a Crossref 404 came back as an ordinary answer, so wrong DOIs were never
   corrected (verify, add by DOI); `core.http_json` now raises HTTPError for 4xx/5xx answers.
+- Security checks that pass by themselves (Cloudflare "Just a moment…", e.g. science.org): the extension watches
+  from outside the page (`isChallenge`, `passCheck` in fetch.js) for up to a minute, following the reload when it
+  passes; only a check still there after that pauses for the person.
 
 ## The web app
 **Progress:** steps 1 and 2 are live at citrello.app/app and tested in Chromium and WebKit: library in the browser,

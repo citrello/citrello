@@ -280,6 +280,16 @@ def platform_site(pdf_path):
             pass
 
         def do_GET(self):
+            if self.path == "/cfcheck.html":  # like Cloudflare: a check that passes by itself, sets a cookie, reloads
+                passed = "cf_clearance=1" in (self.headers.get("Cookie") or "")
+                page = (article if passed else "<title>Just a moment...</title><p>Performing security verification</p>"
+                        "<script>setTimeout(() => { document.cookie = 'cf_clearance=1; path=/'; location.reload(); }, 4000)</script>")
+                body = f"<html><head></head><body>{page}</body></html>".encode()
+                self.send_response(200)
+                self.send_header("Content-Type", "text/html")
+                self.end_headers()
+                self.wfile.write(body)
+                return
             if self.path == "/doi/pdf/10.5555/platform":
                 body, ctype = open(pdf_path, "rb").read(), "application/pdf"
             elif self.path in pages:
@@ -311,7 +321,8 @@ def test_extension_waits_for_pages_knows_platforms_and_runs_in_parallel(tmp_path
             {"id": "autocheck", "type": "article-journal", "title": "Behind a check that clears", "URL": f"{b}/autocheck.html"},
             {"id": "platform", "type": "article-journal", "title": "On a doi platform", "URL": f"{a}/doi/10.5555/platform"},
             {"id": "webpage", "type": "webpage", "title": "A web page", "URL": f"{b}/webpage.html"},
-            {"id": "tool", "type": "webpage", "title": "A web tool", "URL": f"{a}/tool.html"}]
+            {"id": "tool", "type": "webpage", "title": "A web tool", "URL": f"{a}/tool.html"},
+            {"id": "cfcheck", "type": "article-journal", "title": "Behind a check that reloads", "URL": f"{b}/cfcheck.html"}]
     lib = tmp_path / "refs.json"
     lib.write_text(json.dumps(refs), encoding="utf-8")
     ext = str(tmp_path / "ext")
@@ -332,7 +343,7 @@ def test_extension_waits_for_pages_knows_platforms_and_runs_in_parallel(tmp_path
             page.click("#openImport")
             page.click('[data-guide="imp-file"]')
             page.set_input_files("#importFile", str(lib))
-            expect(page.locator("#libRows .ref")).to_have_count(5, timeout=60000)
+            expect(page.locator("#libRows .ref")).to_have_count(6, timeout=60000)
             page.click("#gNext")
             page.click('.side button.navb[data-tab="papers"]')
             page.uncheck("#ftVerify")  # these references point at pretend pages on purpose: no online check
@@ -341,13 +352,14 @@ def test_extension_waits_for_pages_knows_platforms_and_runs_in_parallel(tmp_path
             fp = fetch_page.value
             fp.click("#start")
             fp.wait_for_function("document.querySelectorAll('#list li.work').length >= 2", timeout=60000)  # two at once
-            expect(fp.locator("#msg")).to_contain_text("Finished: 4 of 5 full texts added", timeout=240000)
+            expect(fp.locator("#msg")).to_contain_text("Finished: 5 of 6 full texts added", timeout=240000)
             items = fp.locator("#list li")
             expect(items.nth(0)).to_contain_text("Full text ✓")              # waited for the redirect and the script
             expect(items.nth(1)).to_contain_text("Full text ✓")              # the check cleared by itself: no stop
             expect(items.nth(2)).to_contain_text("Full text ✓ (PDF)")        # the platform's own PDF address
             expect(items.nth(3)).to_contain_text("Full text ✓")              # a web page's readable text
             expect(items.nth(4)).to_contain_text("Web page: nothing to read")  # a tool, not "No access"
+            expect(items.nth(5)).to_contain_text("Full text ✓")  # the check passed by itself and reloaded: no stop
             # the report for what didn't work: how the page was built, no text
             expect(fp.locator("#report")).to_be_visible()
             ctx.grant_permissions(["clipboard-read", "clipboard-write"])

@@ -1,7 +1,7 @@
 // The extension's fetch page: visits the papers Citrello asked for in background tabs, with the person's own access,
 // takes their text and hands it to the Citrello tab, which keeps only the text. Up to three at once, but never two
 // from the same publisher, and each publisher gets a pause between its papers (publishers block fast downloading).
-/* global grabPaper, pdfFrom, clickAndFollow */
+/* global grabPaper, pdfFrom, clickAndFollow, isChallenge */
 const $ = (id) => document.getElementById(id);
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -62,6 +62,21 @@ async function settle(tabId) {
   }
 }
 
+// Security checks (Cloudflare's "Just a moment…") usually pass by themselves after some seconds and then reload the
+// page; in a background tab the browser slows pages down, so give them up to a minute, following the reload. Only
+// a check still there after that is a real "are you human?" for the person.
+async function passCheck(tabId, limit = job && job.testFast ? 20000 : 60000) {
+  const check = async () => {
+    try { return (await chrome.scripting.executeScript({ target: { tabId }, func: isChallenge }))[0].result; }
+    catch (e) { return true; }  // the page is reloading (the check passed): look again
+  };
+  if (!(await check())) return;
+  for (const end = Date.now() + limit; Date.now() < end;) {
+    await sleep(1500);
+    if (!(await check())) { await settle(tabId); if (!(await check())) return; }
+  }
+}
+
 // One paper: its page in a background tab (or the tab already open for an "are you human?" check), then the text:
 // the article on the page, or a PDF it links to or its platform keeps (fetched here, with the extension's own access,
 // when the page can't), or the PDF its button opens. A check page is left open for the person.
@@ -97,6 +112,7 @@ async function fetchOne(p, existingTab = null) {
         await settle(tabId);
       }
     }
+    await passCheck(tabId);
     const [{ result }] = await chrome.scripting.executeScript({ target: { tabId }, func: grabPaper, args: [p.doi, p.type || ""] });
     const g = result || { status: "error" };
     if (g.status === "captcha") { keep = true; return Object.assign(g, { tabId }); }
