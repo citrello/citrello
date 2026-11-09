@@ -142,6 +142,7 @@ def test_extension_fetches_full_texts_and_adds_from_the_toolbar(tmp_path):
             assert app_tabs() == 1
 
             # with no Citrello tab open: the extension opens Citrello in a background tab and uses it
+            blank = ctx.new_page()  # with a screen, closing the last tab closes the window and new tabs fail
             page.close()
             paper, pop = panel_for("/pdfonly.html")
             expect(pop.locator("#title")).to_contain_text("Sailing through end-of-life", timeout=LOAD)
