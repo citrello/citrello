@@ -1658,7 +1658,7 @@ window.addEventListener("message", async (e) => {
     let ok = false, error = "";
     try {
       const body = m.pdf ? b64Bytes(m.pdf) : JSON.stringify({text: m.text});
-      const r = await fetch("/api/clip/fulltext", {method: "POST", body, headers: {"X-Key": encodeURIComponent(m.key)}});
+      const r = await fetch("/api/clip/fulltext", {method: "POST", body, headers: {"X-Key": encodeURIComponent(m.key), "X-Check-Title": "1"}});
       ok = r.ok; if (!ok) error = (await r.json().catch(() => ({}))).error || r.statusText;
     } catch (err) { error = err.message; }
     window.postMessage({citrelloExt: "saved", id: m.id, ok, error}, location.origin);

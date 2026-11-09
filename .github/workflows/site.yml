@@ -39,7 +39,7 @@ jobs:
           mkdir -p web-shots
           (cd site/public && python -m http.server 8099 > /dev/null 2>&1 &)
           sleep 2
-          python -m pytest -v tests/test_web_check.py tests/test_web_app.py tests/test_web_extension.py
+          xvfb-run -a python -m pytest -v tests/test_web_check.py tests/test_web_app.py tests/test_web_extension.py  # a screen: PDFs open as for people
       - uses: actions/upload-artifact@v4
         if: always()
         with:

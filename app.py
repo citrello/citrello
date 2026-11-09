@@ -1049,7 +1049,8 @@ class Handler(BaseHTTPRequestHandler):
                 key = urllib.parse.unquote(self.headers.get("X-Key", "")).strip()
                 data = self.body()
                 if data.startswith(b"%PDF"):
-                    return self.send(200, dict(fulltext.attach_pdf(data, key), how="pdf"))
+                    check = self.headers.get("X-Check-Title") == "1"  # the bulk fetch: make sure it's this paper
+                    return self.send(200, dict(fulltext.attach_pdf(data, key, check_title=check), how="pdf"))
                 b = json.loads(data or b"{}")
                 return self.send(200, dict(fulltext.attach(key, fulltext.clean_page(str(b.get("text", ""))), "page"), how="page"))
             if path == "/api/library/delete":

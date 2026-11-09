@@ -252,3 +252,14 @@ def test_the_extension_on_a_pdf_itself(lib, tmp_path, monkeypatch):
     other = [["An unrelated paper about bees and flowers in spring meadows."] * 40]
     st, _, _, out = webapp.handle("POST", "/api/clip/pdf", {}, pdf_bytes(tmp_path, other, "bees.pdf"))
     assert st == 200 and json.loads(out)["unmatched"]
+
+
+def test_a_pdf_for_another_paper_is_refused_when_checked(lib, tmp_path):
+    """The bulk fetch checks that a PDF is the paper it's for (most of the title's words near the start)."""
+    key = lib[BURTON["title"]]["key"]  # "Wind Energy Handbook": the Topham PDF is a different paper
+    topham = library.get(library.load(), lib[TOPHAM["title"]]["key"])
+    text, _ = fulltext.pdf_text(pdf_bytes(tmp_path))
+    assert fulltext.same_paper(topham, text)
+    with pytest.raises(ValueError, match="different paper"):
+        fulltext.attach_pdf(pdf_bytes(tmp_path), key, check_title=True)
+    assert fulltext.attach_pdf(pdf_bytes(tmp_path), key)["how"] == "chosen"  # chosen by hand: no check

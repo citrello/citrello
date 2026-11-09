@@ -113,6 +113,16 @@ def match(text, items, title_hint=""):
     return (best, "title") if best_score >= 0.85 else (None, None)
 
 
+def same_paper(it, text):
+    """Does this text look like the paper of this reference? Most of its title's words near the start (a PDF
+    fetched by the extension could be a different paper: a wrong DOI, another paper's link)."""
+    title = [w for w in _words(it["csl"].get("title", "")) if w not in STOP]
+    if len(title) < 3:
+        return True  # too short a title to tell
+    head = set(_words(text[:12000]))
+    return sum(1 for w in title if w in head) / len(title) >= 0.75
+
+
 def first_doi(text):
     m = core.DOI_RE.search(text[:6000])
     return core.clean_doi(m.group(1)) if m else None
@@ -162,11 +172,15 @@ def read(it):
         return None
 
 
-def attach_pdf(data, key=None, items=None):
+def attach_pdf(data, key=None, items=None, check_title=False):
     """A PDF for one reference (key), or matched to the library. Returns {"key", "words", "how"} or
     {"unmatched": True, "doi": ...} when it fits no reference (the caller may add it by its DOI)."""
     text, title = pdf_text(data)
     if key:
+        if check_title:
+            it = library.get(library.load(), key)
+            if it and not same_paper(it, text):
+                raise ValueError("This PDF seems to be a different paper (its title isn't in it), so it wasn't kept.")
         return dict(attach(key, text), how="chosen")
     it, how = match(text, items if items is not None else library.load()["items"], title)
     if not it:

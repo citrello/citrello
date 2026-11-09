@@ -98,6 +98,14 @@ People must re-drag the bookmarklet to get the version that takes the text.
 - Security checks that pass by themselves (Cloudflare "Just a moment…", e.g. science.org): the extension watches
   from outside the page (`isChallenge`, `passCheck` in fetch.js) for up to a minute, following the reload when it
   passes; only a check still there after that pauses for the person.
+- From Armin's first "Copy a report" (9 Nov): only this paper's own PDF links are used (never "Recommended"/
+  "Cited by" ones), citation_pdf_url and platform rules first; a refused PDF is opened in the tab like a click and
+  the address it lands on (ScienceDirect's signed link) is fetched; the bulk fetch's PDFs must contain most of the
+  reference's title words (`fulltext.same_paper`, header X-Check-Title) or they aren't kept; DOIs with # < > ; are
+  encoded for doi.org; doi.org "not found" → "DOI not found: check it"; a different DOI on the page is accepted when
+  the title matches (Zenodo versions); books → "Book: add the chapters you cite"; nothing with a DOI is called a web
+  page; pages that start blank (SPIE) get time; PDFs from the DOI alone (DTIC, arXiv) when the page won't load.
+  Extension tests run with a screen in CI (xvfb-run) so PDFs open in Chrome's viewer as for people.
 
 ## The web app
 **Progress:** steps 1 and 2 are live at citrello.app/app and tested in Chromium and WebKit: library in the browser,

@@ -11,7 +11,8 @@ const checkTabs = {};               // paper index -> the tab showing its "are y
 const slowHosts = new Set();        // sites that asked for a check: go slower there
 const nextAt = {}, busy = new Set();  // per publisher: when its next paper may start, and whether one is running
 const STATUS = { ok: "Full text ✓", page: "Full text ✓", pdf: "Full text ✓ (PDF)", "no-access": "No access", captcha: "Needs you",
-                 "not-paper": "Web page: nothing to read", "other-page": "Didn't reach the paper", failed: "Couldn't save",
+                 "not-paper": "Web page: nothing to read", "bad-doi": "DOI not found: check it",
+                 book: "Book: add the chapters you cite as PDFs", "other-page": "Didn't reach the paper", failed: "Couldn't save",
                  error: "Didn't load", work: "Reading…", wait: "" };
 // a publisher: the DOI's prefix (10.1016 = Elsevier, 10.1109 = IEEE…), or the site for a link
 const pubOf = (p) => { if (p.doi) return p.doi.split("/")[0]; try { return new URL(p.url).hostname; } catch (e) { return "?"; } };
@@ -95,10 +96,57 @@ function doiCandidates(doi) {
 }
 self.doiCandidates = doiCandidates;
 
+// a DOI as a doi.org address: characters like # < > ; in old DOIs must be encoded, or the browser cuts the DOI short
+const doiUrl = (d) => "https://doi.org/" + d.split("/").map((x, i) => (i ? encodeURIComponent(x) : x)).join("/");
+self.doiUrl = doiUrl;
+
+// PDFs known from the DOI alone, for when the publisher's page won't load (public report servers, arXiv)
+function doiPdfUrls(doi) {
+  const out = [];
+  let m = /^10\.21236\/(\S+)$/i.exec(doi || "");          // DTIC technical reports
+  if (m) out.push(`https://apps.dtic.mil/sti/pdfs/${m[1].toUpperCase()}.pdf`);
+  m = /^10\.48550\/arxiv\.(\S+)$/i.exec(doi || "");       // arXiv
+  if (m) out.push(`https://arxiv.org/pdf/${m[1]}`);
+  return out;
+}
+self.doiPdfUrls = doiPdfUrls;
+
+// Open a PDF link in the paper's tab, as a person clicking it would (some sites refuse PDF requests that don't come
+// from a page visit), and read it there. A viewer page with the PDF inside is followed once.
+async function openPdfInTab(tabId, url, depth = 0) {
+  try {
+    await chrome.tabs.update(tabId, { url });
+    await settle(tabId);
+    await passCheck(tabId);
+    // where the visit ended up (ScienceDirect: a signed PDF address anyone holding it may fetch): fetch that
+    const landed = (await chrome.tabs.get(tabId).catch(() => ({}))).url || "";
+    if (landed && landed !== url) {
+      const pdf = await pdfFrom(landed);
+      if (pdf) return pdf;
+    }
+    let type = "";
+    try {  // Chrome's PDF viewer may not let extensions look inside: then the address above is the way
+      [{ result: type }] = await chrome.scripting.executeScript({ target: { tabId }, func: () => document.contentType });
+    } catch (e) { return landed ? pdfFrom(landed) : null; }
+    if (type === "application/pdf") {
+      const [{ result }] = await chrome.scripting.executeScript({ target: { tabId }, func: grabPaper, args: ["", "", ""] });
+      return result && result.pdf ? result.pdf : null;
+    }
+    if (depth) return null;
+    const [{ result: inner }] = await chrome.scripting.executeScript({ target: { tabId }, func: () => {
+      const el = document.querySelector('iframe[src*="pdf" i], embed[src*="pdf" i], object[data*="pdf" i], iframe#pdf, embed[type="application/pdf"]');
+      return el ? new URL(el.getAttribute("src") || el.getAttribute("data"), location.href).href : "";
+    } });
+    return inner ? (await pdfFrom(inner)) || openPdfInTab(tabId, inner, 1) : null;
+  } catch (e) {
+    return null;
+  }
+}
+
 async function fetchOne(p, existingTab = null) {
   let tabId = existingTab;
   if (!tabId) {
-    const url = p.doi ? "https://doi.org/" + p.doi : p.url;
+    const url = p.doi ? doiUrl(p.doi) : p.url;
     tabId = (await chrome.tabs.create({ url, active: false })).id;
   }
   let keep = false;
@@ -108,14 +156,25 @@ async function fetchOne(p, existingTab = null) {
       for (const d of doiCandidates(p.doi).slice(1)) {
         const t = await chrome.tabs.get(tabId).catch(() => null);
         if (!t || !/(^|\.)doi\.org$/.test(new URL(t.url || "https://x/").hostname)) break;
-        await chrome.tabs.update(tabId, { url: "https://doi.org/" + d });
+        await chrome.tabs.update(tabId, { url: doiUrl(d) });
         await settle(tabId);
       }
     }
     await passCheck(tabId);
-    const [{ result }] = await chrome.scripting.executeScript({ target: { tabId }, func: grabPaper, args: [p.doi, p.type || ""] });
-    const g = result || { status: "error" };
+    let g;
+    try {
+      g = (await chrome.scripting.executeScript({ target: { tabId }, func: grabPaper, args: [p.doi, p.type || "", p.title || ""] }))[0].result || { status: "error" };
+    } catch (e) {
+      g = { status: "error", error: String(e && e.message || e) };  // e.g. the site showed an error page
+    }
     if (g.status === "captcha") { keep = true; return Object.assign(g, { tabId }); }
+    if (g.status === "error" || g.status === "bad-doi") {  // the page didn't load: PDFs known from the DOI alone
+      for (const u of doiPdfUrls(p.doi)) {
+        const pdf = (await pdfFrom(u)) || (await openPdfInTab(tabId, u));
+        if (pdf) return { status: "ok", how: "pdf", pdf, host: new URL(u).hostname };
+      }
+      return g;
+    }
     if (g.status !== "no-access") return g;
     for (const u of g.pdfLinks || []) {  // the page's PDF links and the platform's PDF address, with the extension's access
       const pdf = await pdfFrom(u);
@@ -123,7 +182,11 @@ async function fetchOne(p, existingTab = null) {
     }
     if (g.pdfButton) {                     // a PDF button that works with scripts: click it and follow it
       const u = await clickAndFollow(tabId);
-      const pdf = u && await pdfFrom(u);
+      const pdf = u && ((await pdfFrom(u)) || (await openPdfInTab(tabId, u)));
+      if (pdf) return { status: "ok", how: "pdf", pdf, host: g.host };
+    }
+    for (const u of (g.pdfLinks || []).slice(0, 3)) {  // refused when fetched: open it in the tab, as a person would
+      const pdf = await openPdfInTab(tabId, u);
       if (pdf) return { status: "ok", how: "pdf", pdf, host: g.host };
     }
     return g;

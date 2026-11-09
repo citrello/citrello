@@ -22,6 +22,9 @@ BASE = os.environ.get("CITRELLO_WEB_CHECK", "").rstrip("/")
 pytestmark = pytest.mark.skipif(not BASE, reason="needs the site served locally and internet (set CITRELLO_WEB_CHECK)")
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 LOAD = 180000
+# With a screen (e.g. xvfb-run), a real browser window: PDFs then open in Chrome's viewer as they do for people
+# (headless Chromium downloads them instead). CI runs these under xvfb-run.
+HEADLESS = not os.environ.get("DISPLAY")
 
 
 def test_extension_fetches_full_texts_and_adds_from_the_toolbar(tmp_path):
@@ -45,7 +48,7 @@ def test_extension_fetches_full_texts_and_adds_from_the_toolbar(tmp_path):
     shots = os.environ.get("CITRELLO_E2E_SHOTS") or str(tmp_path)
     try:
         with sync_playwright() as pw:
-            ctx = pw.chromium.launch_persistent_context(str(tmp_path / "profile"), channel="chromium", headless=True,
+            ctx = pw.chromium.launch_persistent_context(str(tmp_path / "profile"), channel="chromium", headless=HEADLESS,
                                                         viewport={"width": 1280, "height": 800},  # the stores' screenshot size
                                                         args=[f"--disable-extensions-except={ext}", f"--load-extension={ext}"])
             sw = ctx.service_workers[0] if ctx.service_workers else ctx.wait_for_event("serviceworker", timeout=15000)
@@ -201,7 +204,7 @@ def test_extension_finds_the_pdf_and_waits_for_you_at_a_check(tmp_path):
     sys.path.insert(0, os.path.dirname(__file__))
     import test_doccheck as T
     pdf = str(tmp_path / "paper.pdf")
-    T.make_pdf(pdf, [["A paper only available as a PDF"] +
+    T.make_pdf(pdf, [["Paper behind a link, button, viewer and check: only available as a PDF"] +
                      [f"Section {i}: decommissioning offshore wind farms costs more than planned." for i in range(40)]])
     site, srv, state = hard_publisher(pdf)
     ext = str(tmp_path / "ext")
@@ -212,7 +215,7 @@ def test_extension_finds_the_pdf_and_waits_for_you_at_a_check(tmp_path):
     shots = os.environ.get("CITRELLO_E2E_SHOTS") or str(tmp_path)
     try:
         with sync_playwright() as pw:
-            ctx = pw.chromium.launch_persistent_context(str(tmp_path / "profile"), channel="chromium", headless=True,
+            ctx = pw.chromium.launch_persistent_context(str(tmp_path / "profile"), channel="chromium", headless=HEADLESS,
                                                         viewport={"width": 1280, "height": 800},
                                                         args=[f"--disable-extensions-except={ext}", f"--load-extension={ext}"])
             page = ctx.pages[0] if ctx.pages else ctx.new_page()
@@ -254,7 +257,7 @@ def test_extension_finds_the_pdf_and_waits_for_you_at_a_check(tmp_path):
         srv.shutdown()
 
 
-def platform_site(pdf_path):
+def platform_site(pdf_path, other_pdf=None):
     """Pages like the real platforms: a redirect page (like linkinghub.elsevier.com) to an article built by scripts
     after loading, a security check that clears by itself, a "/doi/" platform page whose PDF is only at the
     platform's usual address (/doi/pdf/<doi>), a web page with readable text, and a web tool with nothing to read."""
@@ -270,6 +273,10 @@ def platform_site(pdf_path):
         "/autocheck.html": ("<title>Just a moment...</title><p id='c'>Checking your browser before accessing the site.</p>"
                             f"<script>setTimeout(() => {{ document.title = 'Paper'; document.body.innerHTML = {article!r}; }}, 3000)</script>"),
         "/doi/10.5555/platform": "<title>A platform paper</title><p>Abstract only. Sign in to read more.</p>",
+        "/sd/pii/S123": ("<title>Rotating prism array - ScienceDirect</title><h1>Rotating prism array for solar tracking</h1>"
+                         "<h2>Abstract</h2><p>Abstract only.</p><a href='/sd/pii/S123/pdfft?md5=abc&pid=1'>View PDF</a>"
+                         "<div class='RelatedContent'><h2>Recommended articles</h2><a href='/sd/pii/S999/pdfft'>View PDF</a></div>"),
+        "/book.html": "<title>Nonimaging Optics</title><h1>Nonimaging Optics</h1><p>Book description.</p><a href='/ch1.pdf'>Chapter 1 PDF</a>",
         "/tool.html": "<title>Solar path calculator</title><div id='app'>Latitude <input> Longitude <input> <button>Go</button></div>",
         "/webpage.html": "<title>About solar maps</title><main>" + "".join(
             f"<p>Line {i} of an explanatory web page about solar radiation maps and how to read them.</p>" for i in range(40)) + "</main>",
@@ -280,6 +287,25 @@ def platform_site(pdf_path):
             pass
 
         def do_GET(self):
+            if self.path.split("?")[0] in ("/sd/pii/S123/pdfft", "/sd/pii/S999/pdfft"):
+                # like ScienceDirect: the PDF link works only as a page visit (not for a script fetching it), and
+                # sends the visit on to a signed address that anyone holding it may fetch
+                if self.headers.get("Sec-Fetch-Mode") != "navigate":
+                    self.send_response(403)
+                    self.end_headers()
+                    return
+                which = "S123" if "S123" in self.path else "S999"
+                self.send_response(302)
+                self.send_header("Location", f"/sd/signed/{which}.pdf?X-Amz-Signature=abc")
+                self.end_headers()
+                return
+            if self.path.startswith("/sd/signed/"):
+                body = open(pdf_path if "S123" in self.path else other_pdf, "rb").read()
+                self.send_response(200)
+                self.send_header("Content-Type", "application/pdf")
+                self.end_headers()
+                self.wfile.write(body)
+                return
             if self.path == "/cfcheck.html":  # like Cloudflare: a check that passes by itself, sets a cookie, reloads
                 passed = "cf_clearance=1" in (self.headers.get("Cookie") or "")
                 page = (article if passed else "<title>Just a moment...</title><p>Performing security verification</p>"
@@ -314,22 +340,26 @@ def test_extension_waits_for_pages_knows_platforms_and_runs_in_parallel(tmp_path
     sys.path.insert(0, os.path.dirname(__file__))
     import test_doccheck as T
     pdf = str(tmp_path / "paper.pdf")
-    T.make_pdf(pdf, [["A platform paper"] + [f"Section {i}: tracking the sun with rotating prisms." for i in range(40)]])
-    port, srv = platform_site(pdf)
+    T.make_pdf(pdf, [["A platform paper: rotating prism array for solar tracking"] + [f"Section {i}: tracking the sun with rotating prisms." for i in range(40)]])
+    other = str(tmp_path / "other.pdf")  # another paper's PDF, linked from a "Recommended" box
+    T.make_pdf(other, [["Thin-film micro-concentrator solar cells"] + [f"Other paper, section {i}." for i in range(40)]])
+    port, srv = platform_site(pdf, other)
     a, b = f"http://127.0.0.1:{port}", f"http://localhost:{port}"  # two "publishers", so two run at once
     refs = [{"id": "redirect", "type": "article-journal", "title": "Behind a redirect", "URL": f"{a}/redirect.html"},
             {"id": "autocheck", "type": "article-journal", "title": "Behind a check that clears", "URL": f"{b}/autocheck.html"},
             {"id": "platform", "type": "article-journal", "title": "On a doi platform", "URL": f"{a}/doi/10.5555/platform"},
             {"id": "webpage", "type": "webpage", "title": "A web page", "URL": f"{b}/webpage.html"},
             {"id": "tool", "type": "webpage", "title": "A web tool", "URL": f"{a}/tool.html"},
-            {"id": "cfcheck", "type": "article-journal", "title": "Behind a check that reloads", "URL": f"{b}/cfcheck.html"}]
+            {"id": "cfcheck", "type": "article-journal", "title": "Behind a check that reloads", "URL": f"{b}/cfcheck.html"},
+            {"id": "sd", "type": "article-journal", "title": "Rotating prism array for solar tracking", "URL": f"{a}/sd/pii/S123"},
+            {"id": "book", "type": "book", "title": "Nonimaging Optics", "URL": f"{b}/book.html"}]
     lib = tmp_path / "refs.json"
     lib.write_text(json.dumps(refs), encoding="utf-8")
     ext = str(tmp_path / "ext")
     subprocess.run([sys.executable, os.path.join(ROOT, "packaging", "build_extension.py"), "--test", ext], check=True)
     try:
         with sync_playwright() as pw:
-            ctx = pw.chromium.launch_persistent_context(str(tmp_path / "profile"), channel="chromium", headless=True,
+            ctx = pw.chromium.launch_persistent_context(str(tmp_path / "profile"), channel="chromium", headless=HEADLESS,
                                                         viewport={"width": 1280, "height": 800},
                                                         args=[f"--disable-extensions-except={ext}", f"--load-extension={ext}"])
             page = ctx.pages[0] if ctx.pages else ctx.new_page()
@@ -343,7 +373,7 @@ def test_extension_waits_for_pages_knows_platforms_and_runs_in_parallel(tmp_path
             page.click("#openImport")
             page.click('[data-guide="imp-file"]')
             page.set_input_files("#importFile", str(lib))
-            expect(page.locator("#libRows .ref")).to_have_count(6, timeout=60000)
+            expect(page.locator("#libRows .ref")).to_have_count(8, timeout=60000)
             page.click("#gNext")
             page.click('.side button.navb[data-tab="papers"]')
             page.uncheck("#ftVerify")  # these references point at pretend pages on purpose: no online check
@@ -352,7 +382,7 @@ def test_extension_waits_for_pages_knows_platforms_and_runs_in_parallel(tmp_path
             fp = fetch_page.value
             fp.click("#start")
             fp.wait_for_function("document.querySelectorAll('#list li.work').length >= 2", timeout=60000)  # two at once
-            expect(fp.locator("#msg")).to_contain_text("Finished: 5 of 6 full texts added", timeout=240000)
+            expect(fp.locator("#msg")).to_contain_text("Finished: 6 of 8 full texts added", timeout=300000)
             items = fp.locator("#list li")
             expect(items.nth(0)).to_contain_text("Full text ✓")              # waited for the redirect and the script
             expect(items.nth(1)).to_contain_text("Full text ✓")              # the check cleared by itself: no stop
@@ -360,6 +390,9 @@ def test_extension_waits_for_pages_knows_platforms_and_runs_in_parallel(tmp_path
             expect(items.nth(3)).to_contain_text("Full text ✓")              # a web page's readable text
             expect(items.nth(4)).to_contain_text("Web page: nothing to read")  # a tool, not "No access"
             expect(items.nth(5)).to_contain_text("Full text ✓")  # the check passed by itself and reloaded: no stop
+            # its own PDF (opened in the tab, as the site refuses fetching it), not the "Recommended" paper's
+            expect(items.nth(6)).to_contain_text("Full text ✓ (PDF)")
+            expect(items.nth(7)).to_contain_text("Book: add the chapters you cite")
             # the report for what didn't work: how the page was built, no text
             expect(fp.locator("#report")).to_be_visible()
             ctx.grant_permissions(["clipboard-read", "clipboard-write"])
@@ -367,6 +400,9 @@ def test_extension_waits_for_pages_knows_platforms_and_runs_in_parallel(tmp_path
             report = fp.evaluate("navigator.clipboard.readText()")
             assert "A web tool" in report and "Web page: nothing to read" in report and "Solar path calculator" in report
             fp.close()
+            page.bring_to_front()
+            text = page.evaluate("fetch('/api/fulltext/text?key=' + encodeURIComponent(papersLib.items.find((i) => i.title.startsWith('Rotating')).key)).then((r) => r.text())")
+            assert "rotating prism" in text.lower() and "Thin-film" not in text
             assert not errors, errors
             ctx.close()
     finally:
@@ -419,3 +455,20 @@ console.log(JSON.stringify(JSON.parse(process.argv[2]).map(doiCandidates)));"""
     assert out[0] == ["10.1063/1.4812391/138579", "10.1063/1.4812391"]
     assert out[1] == ["10.1016/j.renene.2016.10.066"]  # a right DOI stays as it is
     assert out[2][-1] == "10.1002/pip.2843" and out[3][-1] == "10.1234/abc"
+
+
+def test_doi_addresses_and_dois_with_odd_characters():
+    """Old Wiley DOIs contain # < > ; which must be encoded for doi.org; some PDFs are known from the DOI alone."""
+    import json
+    import shutil
+    if not shutil.which("node"):
+        pytest.skip("needs node")
+    js = r"""
+const src = require('fs').readFileSync(process.argv[1], 'utf8');
+eval(src.match(/const doiUrl = [^\n]*\n/)[0].replace('const ', 'var ')); eval(src.match(/function doiPdfUrls[\s\S]*?\n}\n/)[0]);
+console.log(JSON.stringify([doiUrl(process.argv[2]), doiPdfUrls('10.21236/ada213404'), doiPdfUrls('10.48550/arXiv.1706.03762')]));"""
+    out = json.loads(subprocess.run(["node", "-e", js, os.path.join(ROOT, "extension", "fetch.js"),
+                                     "10.1002/(sici)1099-159x(199603/04)4:2<155::aid-pip128>3.0.co;2-#"],
+                                    capture_output=True, text=True, check=True).stdout)
+    assert out[0] == "https://doi.org/10.1002/(sici)1099-159x(199603/04)4%3A2%3C155%3A%3Aaid-pip128%3E3.0.co%3B2-%23"
+    assert out[1] == ["https://apps.dtic.mil/sti/pdfs/ADA213404.pdf"] and out[2] == ["https://arxiv.org/pdf/1706.03762"]

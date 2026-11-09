@@ -9,7 +9,7 @@
 
 /* exported grabPaper, pageInfo, clickPdfButton, isChallenge */
 
-async function grabPaper(expectDoi, kind) {
+async function grabPaper(expectDoi, kind, refTitle) {
   // Where the big publishing platforms keep a paper's PDF, from the page's address and the DOI. This covers most
   // fields without knowing every journal: Elsevier, IEEE, Wiley, Springer, Nature, the "/doi/pdf/" platform that
   // Taylor & Francis, SAGE, ACS, Science, PNAS, ACM, Annual Reviews and many societies use, IOP, MDPI, arXiv...
@@ -78,10 +78,28 @@ async function grabPaper(expectDoi, kind) {
   // a security check (the extension waits for those to clear first; see isChallenge in fetch.js): still there
   for (let i = 0; i < 3 && challenge(); i++) await sleep(1000);
   if (challenge()) return { status: "captcha", host, page: describe() };
+  // doi.org itself: it didn't know the DOI
+  if (/(^|\.)doi\.org$/.test(host) && /not found/i.test(document.title)) return { status: "bad-doi", host, page: describe() };
+  // a page that starts blank while its scripts (or a bot check) load: give it time
+  for (let i = 0; i < 12 && (!document.body || document.body.innerText.trim().length < 300); i++) await sleep(1250);
 
+  // the paper's title, in words (to tell this paper's page and PDF links from other papers' on the same page)
+  const words = (t) => (t || "").toLowerCase().normalize("NFKD").replace(/[^a-z0-9 ]+/g, " ").split(/\s+/).filter((w) => w.length > 3);
+  const titleWords = words(refTitle);
+  const sameTitle = (t) => {
+    if (!titleWords.length) return false;
+    const w = new Set(words(t));
+    return titleWords.filter((x) => w.has(x)).length / titleWords.length >= 0.7;
+  };
   const doi = cleanDoi(meta("citation_doi") || meta("dc.identifier") || meta("prism.doi") ||
                        ((location.pathname.match(/\/doi\/(?:\w+\/)?(10\.\d{4,9}\/[^?#]+)/) || [])[1] || ""));
-  if (expectDoi && doi && doi.startsWith("10.") && doi !== cleanDoi(expectDoi)) return { status: "other-page", doi, host, page: describe() };
+  // another DOI on the page is fine when it's the same paper (Zenodo's "version" DOI, a book chapter's DOI…)
+  if (expectDoi && doi && doi.startsWith("10.") && doi !== cleanDoi(expectDoi) &&
+      !sameTitle(meta("citation_title") || meta("dc.title") || document.title)) {
+    return { status: "other-page", doi, host, page: describe() };
+  }
+  // a whole book can't be fetched (its page links one chapter's PDF at most): say so
+  if (kind === "book") return { status: "book", doi, host, page: describe() };
 
   // the article as the page shows it (publishers show the full text when you have access); pages built by scripts
   // may still be filling in, so look a few times
@@ -106,9 +124,12 @@ async function grabPaper(expectDoi, kind) {
     if (tries < 3) await sleep(1500);
   }
   // a web page (not a paper): its readable text is what there is to keep
-  if (kind === "webpage" && best.length > 1500) return { status: "ok", how: "page", text: best.slice(0, 600000), host };
+  const notPaperKind = ["webpage", "post", "post-weblog", "software", "dataset"].includes(kind) && !expectDoi;
+  if (notPaperKind && best.length > 1500) return { status: "ok", how: "page", text: best.slice(0, 600000), host };
 
-  // PDFs: the page's citation_pdf_url, its links or buttons that say PDF, and where the platform keeps it
+  // PDFs, most trustworthy first: the page's citation_pdf_url, where the platform keeps this paper's PDF, then the
+  // page's own PDF links and buttons. Never the PDF links of OTHER papers on the page ("Recommended", "Cited by",
+  // reference lists…): those would put the wrong paper's text under this reference.
   const links = [];
   const add = (u) => {
     try {
@@ -117,6 +138,12 @@ async function grabPaper(expectDoi, kind) {
     } catch (e) { /* not a link */ }
   };
   if (meta("citation_pdf_url")) add(meta("citation_pdf_url"));
+  for (const u of publisherPdfUrls(location.href, doi || cleanDoi(expectDoi))) add(u);
+  // this paper's own identifiers, as they appear in its links (ScienceDirect's PII, the page's last path part, the DOI)
+  const ids = [location.pathname.split("/").filter(Boolean).pop() || "", ...((doi || cleanDoi(expectDoi)).split("/").slice(1))]
+    .map((x) => decodeURIComponent(x).toLowerCase()).filter((x) => x.length >= 6);
+  const OTHER = /related|recommend|cited|citing|reference|similar|sidebar|more-?like|popular|also-?read|trending|teaser|toc/i;
+  const elsewhere = (el) => { for (let e = el; e && e !== document.body; e = e.parentElement) if (OTHER.test((e.id || "") + " " + (e.className && e.className.baseVal === undefined ? e.className : ""))) return true; return false; };
   const PDF_HREF = /\.pdf(\?|#|$)|\/pdf(ft|direct|plus)?(\/|\?|$)|\/epdf\/|\/doi\/(pdf|epdf|pdfdirect)\/|\/content\/pdf\/|\/articlepdf\/|stamp\.jsp|getpdf|download.{0,20}pdf|pdf.{0,20}download/i;
   const PDF_LABEL = /^(download|view|get|open|full[- ]text|article|read)?\s*(the )?(article )?pdf\b|\bpdf\s*(download|\(\d|$)/i;
   let button = false;
@@ -124,15 +151,22 @@ async function grabPaper(expectDoi, kind) {
     const label = (el.innerText || el.getAttribute("aria-label") || el.title || "").replace(/\s+/g, " ").trim();
     const href = el.getAttribute("href") || "";
     if (!(PDF_HREF.test(href) || (label.length < 60 && PDF_LABEL.test(label)))) continue;
-    if (href && !/^(javascript:|#)/i.test(href)) add(href);
-    else if (!button) { el.setAttribute("data-citrello-pdf", "1"); button = true; }
+    if (elsewhere(el)) continue;  // in a list of other papers
+    if (href && !/^(javascript:|#)/i.test(href)) {
+      const abs = (() => { try { return new URL(href, location.href); } catch (e) { return null; } })();
+      if (!abs) continue;
+      const mine = ids.some((x) => decodeURIComponent(abs.href).toLowerCase().includes(x));
+      // a link to some other paper's PDF on the same site: skip; a link elsewhere (a repository) only if it says PDF
+      if (!mine && (abs.origin === location.origin ? ids.length > 0 : !PDF_LABEL.test(label))) continue;
+      add(abs.href);
+    } else if (!button) { el.setAttribute("data-citrello-pdf", "1"); button = true; }
   }
-  for (const u of publisherPdfUrls(location.href, doi)) add(u);
   for (const u of links.slice(0, 8)) {
     const pdf = await tryPdf(u);
     if (pdf) return { status: "ok", how: "pdf", pdf, doi, host };
   }
-  const notPaper = kind === "webpage" || (!doi && !meta("citation_title") && links.length === 0 && !button);
+  // not a paper: a web page, data set or tool (and nothing with a DOI is called that)
+  const notPaper = !expectDoi && !doi && (notPaperKind || (!meta("citation_title") && links.length === 0 && !button));
   return { status: notPaper ? "not-paper" : "no-access", doi, host, pdfLinks: links.slice(0, 8), pdfButton: button,
            page: describe({ pdfLinks: links.slice(0, 8).map((x) => x.replace(/[?#].*$/, "")), pdfButton: button, articleChars: best.length }) };
 }
