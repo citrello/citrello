@@ -389,3 +389,21 @@ console.log(JSON.stringify(JSON.parse(process.argv[2]).map(([u, d]) => publisher
     assert out[5][0] == "https://www.tandfonline.com/doi/pdf/10.1080/1234.5678"
     assert out[6][0] == "https://pubs.acs.org/doi/pdf/10.1021/nl302516v"
     assert out[7][0] == "https://arxiv.org/pdf/1706.03762"
+
+
+def test_doi_candidates_without_glued_on_endings():
+    """The extension tries a DOI again without a site's own number or ending when doi.org doesn't know it."""
+    import json
+    import shutil
+    if not shutil.which("node"):
+        pytest.skip("needs node")
+    js = """
+const src = require('fs').readFileSync(process.argv[1], 'utf8');
+eval(src.match(/function doiCandidates[\\s\\S]*?\\n}\\n/)[0]);
+console.log(JSON.stringify(JSON.parse(process.argv[2]).map(doiCandidates)));"""
+    cases = ["10.1063/1.4812391/138579", "10.1016/j.renene.2016.10.066", "10.1002/pip.2843/full", "10.1234/abc.pdf"]
+    out = json.loads(subprocess.run(["node", "-e", js, os.path.join(ROOT, "extension", "fetch.js"), json.dumps(cases)],
+                                    capture_output=True, text=True, check=True).stdout)
+    assert out[0] == ["10.1063/1.4812391/138579", "10.1063/1.4812391"]
+    assert out[1] == ["10.1016/j.renene.2016.10.066"]  # a right DOI stays as it is
+    assert out[2][-1] == "10.1002/pip.2843" and out[3][-1] == "10.1234/abc"

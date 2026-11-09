@@ -65,6 +65,21 @@ async function settle(tabId) {
 // One paper: its page in a background tab (or the tab already open for an "are you human?" check), then the text:
 // the article on the page, or a PDF it links to or its platform keeps (fetched here, with the extension's own access,
 // when the page can't), or the PDF its button opens. A check page is left open for the person.
+// DOIs to try: the DOI, then without a site's own number glued on (AIP's "10.1063/1.4812391/138579") or a
+// trailing ".pdf" or "/full" (doi.org says "DOI not found" for those)
+function doiCandidates(doi) {
+  const out = [doi];
+  let d = doi;
+  for (let i = 0; i < 2; i++) {
+    const t = d.replace(/\/(\d+|full|abstract|pdf|epdf)$/i, "").replace(/\.pdf$/i, "");
+    if (t === d || !/^10\.\d{4,9}\/\S+$/.test(t)) break;
+    out.push(t);
+    d = t;
+  }
+  return out;
+}
+self.doiCandidates = doiCandidates;
+
 async function fetchOne(p, existingTab = null) {
   let tabId = existingTab;
   if (!tabId) {
@@ -74,6 +89,14 @@ async function fetchOne(p, existingTab = null) {
   let keep = false;
   try {
     await settle(tabId);
+    if (p.doi && !existingTab) {  // doi.org didn't know this DOI: try it without a glued-on ending
+      for (const d of doiCandidates(p.doi).slice(1)) {
+        const t = await chrome.tabs.get(tabId).catch(() => null);
+        if (!t || !/(^|\.)doi\.org$/.test(new URL(t.url || "https://x/").hostname)) break;
+        await chrome.tabs.update(tabId, { url: "https://doi.org/" + d });
+        await settle(tabId);
+      }
+    }
     const [{ result }] = await chrome.scripting.executeScript({ target: { tabId }, func: grabPaper, args: [p.doi, p.type || ""] });
     const g = result || { status: "error" };
     if (g.status === "captcha") { keep = true; return Object.assign(g, { tabId }); }
