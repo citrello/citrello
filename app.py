@@ -900,6 +900,9 @@ class Handler(BaseHTTPRequestHandler):
             name = re.sub(r"[^\w\-. ]", "_", name)
             return self.send(200, body, "application/octet-stream",
                              {"Content-Disposition": "attachment; filename*=UTF-8''" + urllib.parse.quote(name)})
+        if path == "/api/sample-paper":  # a short paper with typical mistakes planted in it (Home's tours)
+            return self.send(200, doccheck.sample_paper(), "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                             {"Content-Disposition": "attachment; filename*=UTF-8''" + urllib.parse.quote(doccheck.SAMPLE_NAME)})
         if path == "/api/styles/search":
             return self.send(200, {"styles": citeformat.search_styles(qs.get("q", [""])[0])})
         if path == "/api/styles":

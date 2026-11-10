@@ -58,6 +58,7 @@ def test_extension_fetches_full_texts_and_adds_from_the_toolbar(tmp_path):
             page.goto(BASE + "/app/")
             page.wait_for_selector("#webCover", state="detached", timeout=LOAD)
             page.click("#wWebStart")
+            page.click('.side button.navb[data-tab="library"]')  # a new library opens on Home
             page.wait_for_function("typeof extVersion !== 'undefined' && extVersion", timeout=15000)  # the extension said hello
             page.evaluate("window.CITRELLO_TEST_FAST = true")  # no 10-20 s pause between papers (local copies only)
             page.click("#openImport")
@@ -225,6 +226,7 @@ def test_extension_finds_the_pdf_and_waits_for_you_at_a_check(tmp_path):
             page.goto(BASE + "/app/")
             page.wait_for_selector("#webCover", state="detached", timeout=LOAD)
             page.click("#wWebStart")
+            page.click('.side button.navb[data-tab="library"]')  # a new library opens on Home
             page.wait_for_function("typeof extVersion !== 'undefined' && extVersion", timeout=15000)
             page.evaluate("window.CITRELLO_TEST_FAST = true")
             page.click("#openImport")
@@ -369,6 +371,7 @@ def test_extension_waits_for_pages_knows_platforms_and_runs_in_parallel(tmp_path
             page.goto(BASE + "/app/")
             page.wait_for_selector("#webCover", state="detached", timeout=LOAD)
             page.click("#wWebStart")
+            page.click('.side button.navb[data-tab="library"]')  # a new library opens on Home
             page.wait_for_function("typeof extVersion !== 'undefined' && extVersion", timeout=15000)
             page.evaluate("window.CITRELLO_TEST_FAST = true")
             page.click("#openImport")

@@ -150,7 +150,49 @@ def test_00_welcome_on_first_launch(page):
     expect(page.locator("#welcome")).to_be_hidden()     # only once
 
 
+def test_00b_home_and_a_guided_check_of_the_sample_paper(page):
+    """A new library opens on Home: what Citrello can do, each with a guided tour on the real screen."""
+    expect(page.locator("#tab-home")).to_be_visible()
+    expect(page.locator(".home-tile")).to_have_count(9)
+    shot(page, "home")
+    page.click('.home-tile[data-tour="check"]')
+    tip = page.locator("#tourTip")
+    expect(tip.locator("h3")).to_have_text("Choose your paper")
+    expect(page.locator("#tab-documents")).to_be_visible()  # the tour went to the right screen
+    expect(page.locator("#tourSpot")).to_be_visible()
+    shot(page, "tour-choose")
+    tip.locator("button", has_text="Use the sample paper").click()
+    expect(tip.locator("h3")).to_have_text("The summary", timeout=60000)  # moved on by itself when the check finished
+    expect(page.locator("#chkCites")).to_contain_text("Citation [7] points to a reference that isn't in the list")
+    expect(page.locator("#chkCites")).to_contain_text("[1] = [5]")
+    expect(page.locator("#chkCites")).to_contain_text("never cited: [6]")
+    page.click("#ttAll")
+    expect(tip.locator("ol.tt-steps li")).to_have_count(5)
+    expect(tip.locator("ol.tt-steps li.done")).to_have_count(2)
+    shot(page, "tour-summary")
+    page.click("#ttNext")
+    expect(tip.locator("h3")).to_have_text("What's wrong, reference by reference")
+    page.click("#ttNext")
+    expect(tip.locator("h3")).to_have_text("Fix it in one click")
+    page.click("#ttNext")  # Done
+    expect(tip).to_have_count(0)
+    # a tour left halfway is offered again on Home
+    tab(page, "home")
+    page.click('.home-tile[data-tour="library"]')
+    expect(tip.locator("h3")).to_have_text("Bring your library")
+    page.reload()
+    expect(page.locator("#tourResume")).to_contain_text("Tidy up my library", timeout=15000)
+    page.click("#tourResumeGo")
+    expect(tip.locator("h3")).to_have_text("Bring your library")
+    page.click("#ttClose")
+    expect(tip).to_have_count(0)
+    tab(page, "home")
+    expect(page.locator("#tourResume")).to_be_hidden()
+    assert not page.errors, page.errors
+
+
 def test_01_starts_with_an_empty_library(page):
+    tab(page, "library")
     expect(page.locator("#libEmpty")).to_be_visible()
     expect(page.locator("#ver")).to_contain_text("v")
     shot(page, "empty-library")

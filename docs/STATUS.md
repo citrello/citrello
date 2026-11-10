@@ -107,6 +107,25 @@ People must re-drag the bookmarklet to get the version that takes the text.
   page; pages that start blank (SPIE) get time; PDFs from the DOI alone (DTIC, arXiv) when the page won't load.
   Extension tests run with a screen in CI (xvfb-run) so PDFs open in Chrome's viewer as for people.
 
+## Current focus: Home and guided tours (decided 10 Nov 2026)
+Armin: the app looked like an ordinary reference manager, so people never saw what it solves. Now a **Home** screen
+(first in the sidebar; where a new, empty library opens) shows nine tasks in three groups, worded as the person's
+goal: Check a paper (catch mistakes in my references; every citation matches the list; my sources say what I wrote),
+Write (typed references → live citations; cite while I write; write with Claude/ChatGPT from my library; find
+references), My library (tidy up; LaTeX paper ready). Each starts a **tour on the real screen** (`TOURS` in ui.html):
+a spotlight on what to click and a bubble with Back/Next, "See all steps" (ticks itself), moving on by itself when
+the step is done (file chosen, check finished, button clicked); a tour left halfway is offered again on Home. The
+check tours offer a **sample paper** (`doccheck.sample_paper()`, `/api/sample-paper`) with six planted mistakes:
+retracted paper, DOI that doesn't exist, duplicate, wrong year, citation with no reference, reference never cited.
+Found on the way: in "Check and fix", typed reference lists were looked up online but the result's source wasn't
+recorded, so every typed reference said "Not found online" and DOIs/years were never compared; fixed (10 Nov).
+AI decision (10 Nov): Claude/ChatGPT subscriptions can't be used by other apps, so the "sources" and "find
+references" tours send people to their Claude/ChatGPT (prompt to copy, links that open a new chat with it; the
+`?q=` links are not verified to fill in the prompt). Next: "Check my sources" inside Citrello without AI (each cited
+sentence next to the best-matching passages of the paper's full text); then an optional AI verdict with a cheap
+model paid by Citrello within a free monthly allowance for signed-in users (about 1–2 cents per paper); "find
+references" (OpenAlex + stronger model, ~5–10 cents per paragraph) later, possibly paid credits.
+
 ## The web app
 **Progress:** steps 1 and 2 are live at citrello.app/app and tested in Chromium and WebKit: library in the browser,
 import/export, backup/restore, check and fix Word/PDF/LaTeX, arXiv .zip, style search, progress bars. Step 3 too:

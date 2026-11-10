@@ -62,6 +62,7 @@ def test_browser_tab_is_the_device(browser_name, tmp_path):
         page.wait_for_selector("#webCover", state="detached", timeout=LOAD)
         expect(page.locator("#welcome")).to_contain_text("ChatGPT and Claude")
         page.click("#wWebStart")
+        page.click('.side button.navb[data-tab="library"]')  # a new library opens on Home
         expect(page.locator("#connText")).to_have_text("Web connectors: not signed in")
         page.click("#openImport")
         page.click('[data-guide="imp-file"]')
@@ -153,6 +154,7 @@ def test_find_free_full_texts_in_the_browser(browser_name, tmp_path):
         page.goto(f"{BASE}/app/?bridge={urllib.parse.quote(B.bc.BRIDGE)}")
         page.wait_for_selector("#webCover", state="detached", timeout=LOAD)
         page.click("#wWebStart")
+        page.click('.side button.navb[data-tab="library"]')  # a new library opens on Home
         page.click("#openImport")
         page.click('[data-guide="imp-file"]')
         page.set_input_files("#importFile", str(bib))

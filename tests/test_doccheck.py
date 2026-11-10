@@ -319,3 +319,37 @@ def test_failed_lookups_dont_stop_the_check(tmp_path, monkeypatch):
     rep = doccheck.check(path, offline=False)
     assert len(calls) == 2 and rep["references"] == 2
     assert any("[4]" in i["text"] for i in rep["citation_issues"])
+
+
+def test_sample_paper_shows_the_planted_mistakes(tmp_path):
+    p = tmp_path / doccheck.SAMPLE_NAME
+    p.write_bytes(doccheck.sample_paper())
+    r = doccheck.check(str(p), offline=True)
+    assert r["references"] == 6 and r["source"] == "typed"
+    texts = " ".join(x["text"] for x in r["citation_issues"])
+    assert "Citation [7] points to a reference that isn't in the list" in texts  # plain words, not a code
+    assert "never cited: [6]" in texts and "[1] = [5]" in texts
+
+
+def test_online_lookups_count_for_typed_lists(tmp_path, monkeypatch):
+    """A typed reference found online is checked against the record (it used to say "Not found online"), and a DOI
+    that doesn't exist is reported even when the paper isn't found by its title either."""
+    p = tmp_path / "s.docx"
+    p.write_bytes(doccheck.sample_paper())
+
+    def lookup(raw, parsed, email):
+        if "renene.2099" in raw:
+            return None, None, {"doi_not_found": "10.1016/j.renene.2099.01.001"}
+        if "Wakefield" in raw:
+            return dict(parsed, DOI="10.1016/S0140-6736(97)11096-0"), "crossref-doi", {"retracted": True}
+        if "Vetters" in raw:
+            return dict(VETTERS), "crossref-doi", {}
+        if "Topham" in raw:
+            return dict(TOPHAM), "crossref-doi", {}
+        return None, None, {}
+    monkeypatch.setattr(doccheck.core, "crossref_lookup", lookup)
+    refs = {x["number"]: x for x in doccheck.check(str(p))["refs"]}
+    assert refs[1]["reliability"] == "verified"
+    assert any("Year differs: you wrote 2023" in c["text"] for c in refs[2]["checks"])
+    assert any("RETRACTED" in c["text"] for c in refs[3]["checks"])
+    assert any("does not exist" in c["text"] for c in refs[4]["checks"]) and refs[4]["reliability"] == "problem"

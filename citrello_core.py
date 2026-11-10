@@ -1144,8 +1144,8 @@ def numeric_finder(by_num, styles):
         for s, e, nums_txt in found:
             nums = expand(nums_txt)
             if not nums or any(n not in by_num for n in nums):
-                report.append(f"SKIPPED (number not in bibliography): {full[s:e]!r} "
-                              f"in: {full[max(0, s - 40):e + 10]!r}")
+                report.append(f"Citation {full[s:e]} points to a reference that isn't in the list: "
+                              f"“…{full[max(0, s - 50):e + 10].strip()}…”")
                 continue
             out.append((s, e, [{"ref": by_num[n]} for n in nums]))
         plain = "".join(t.text or "" for t in p.iter(qn("w:t")))

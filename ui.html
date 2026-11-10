@@ -109,6 +109,41 @@
   .spick-list li .t { min-width: 0; } .spick-list li .t b { font-weight: 600; }
   .spick-list li.off { color: var(--muted); }
   .spick-list li button { flex: none; padding: 4px 12px; }
+  /* Home: what you can do, each with a guided tour on the real screen */
+  .home { max-width: 1100px; }
+  .home h1 { font-size: 36px; }
+  .home-group { font: 600 13px Figtree, sans-serif; letter-spacing: .4px; text-transform: uppercase; color: var(--muted); margin: 22px 0 8px; }
+  .home-tiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(290px, 1fr)); gap: 12px; }
+  .home-tile { all: unset; box-sizing: border-box; cursor: pointer; display: flex; flex-direction: column; gap: 6px; padding: 18px 18px 14px;
+               background: var(--card); border: 1px solid var(--line); border-radius: 16px; transition: border-color .15s, transform .15s, box-shadow .15s; }
+  .home-tile:hover { border-color: var(--accent); transform: translateY(-2px); box-shadow: 6px 6px 0 var(--lemon); }
+  .home-tile:focus-visible { outline: 3px solid var(--leaf); outline-offset: 2px; }
+  .home-tile b { font: 400 19px/1.25 var(--serif); color: var(--cobalt); }
+  .home-tile .ht-text { color: var(--muted); font-size: 14px; flex: 1; }
+  .home-tile .ht-go { color: var(--accent); font-weight: 700; font-size: 13.5px; margin-top: 4px; }
+  .home-tile .ht-icon { width: 38px; height: 38px; border-radius: 11px; display: grid; place-items: center; background: var(--lemon); color: #14213d; margin-bottom: 4px; }
+  .home-tile.g2 .ht-icon { background: var(--ok-soft); color: var(--ok); } .home-tile.g3 .ht-icon { background: var(--sky); color: var(--cobalt); }
+  .home-tile .ht-icon svg { width: 20px; height: 20px; }
+  .ht-via { font-size: 12px; font-weight: 700; color: var(--muted); }
+  .tour-resume { display: flex; gap: 12px; align-items: center; justify-content: space-between; flex-wrap: wrap; background: var(--lemon-soft);
+                 border-radius: 14px; padding: 12px 16px; margin: 12px 0 0; max-width: 1100px; }
+  /* the tour: a spotlight on the button to click and a bubble that says what to do */
+  .tour-spot { position: fixed; z-index: 60; border-radius: 12px; pointer-events: none; box-shadow: 0 0 0 4px var(--lemon), 0 0 0 9999px rgba(10,20,50,.38);
+               transition: all .2s ease; }
+  .tour-spot.none { box-shadow: 0 0 0 9999px rgba(10,20,50,.38); width: 0 !important; height: 0 !important; }
+  .tour-tip { position: fixed; z-index: 61; width: min(380px, calc(100vw - 24px)); background: var(--card); color: var(--ink); border-radius: 16px;
+              border: 1px solid var(--line); box-shadow: 0 18px 50px rgba(10,20,50,.35); padding: 14px 16px 12px; transition: top .2s ease, left .2s ease; }
+  .tour-tip .tt-count { font-size: 12px; font-weight: 700; color: var(--muted); display: flex; justify-content: space-between; align-items: center; }
+  .tour-tip h3 { margin: 4px 0 4px; font: 400 19px/1.25 var(--serif); color: var(--cobalt); }
+  .tour-tip .tt-text { font-size: 14px; } .tour-tip .tt-text p { margin: 4px 0; }
+  .tour-tip .tt-actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 8px; }
+  .tour-tip .tt-foot { display: flex; gap: 8px; align-items: center; margin-top: 10px; }
+  .tour-tip .tt-foot .grow { flex: 1; min-width: 0; }
+  .tour-tip ol.tt-steps { margin: 8px 0 0; padding-left: 22px; font-size: 13.5px; max-height: 220px; overflow-y: auto; }
+  .tour-tip ol.tt-steps li { padding: 2px 0; cursor: pointer; } .tour-tip ol.tt-steps li.done { color: var(--ok); }
+  .tour-tip ol.tt-steps li.done::marker { content: "✓  "; } .tour-tip ol.tt-steps li.now { font-weight: 700; }
+  .tour-tip .tt-wait { font-size: 12.5px; color: var(--muted); }
+  @media (max-width: 760px) { .tour-tip { left: 12px !important; right: 12px; top: auto !important; bottom: 12px; width: auto; } }
   /* Settings: guides that open in a window, one picture per step */
   .guide-tiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 10px; margin-top: 14px; }
   .guide-tile { display: flex; gap: 12px; align-items: center; text-align: left; padding: 14px; border-radius: 14px; font-weight: 400; }
@@ -248,7 +283,7 @@
     .app { grid-template-columns: 1fr; }
     .side { position: static; height: auto; flex-direction: row; flex-wrap: wrap; align-items: center; gap: 6px; padding: 12px; }
     .side .tagline, .side h4, #projNav, .side-foot { display: none; }
-    .side nav { flex-direction: row; } .side button.navb { gap: 6px; } .main { padding: 16px; }
+    .side nav { flex-direction: row; flex-wrap: wrap; } .side button.navb { gap: 6px; width: auto; } .main { padding: 16px; }
     .grid2 { grid-template-columns: 1fr; } .hide-sm { display: none; }
   }
 </style>
@@ -260,6 +295,7 @@
   <div class="logo">citr<span>ello</span></div>
   <div class="tagline">References, the sweet part.</div>
   <nav aria-label="Sections">
+    <button class="navb" data-tab="home">Home</button>
     <button class="navb active" data-tab="library">Library <small id="navCount"></small></button>
     <button class="navb" data-tab="papers">Full texts <small id="navFt"></small></button>
     <button class="navb" data-tab="documents">Documents</button>
@@ -280,6 +316,33 @@
     <button class="link" id="updLater">Later</button>
     <div class="bar hidden" id="updBarWrap"><div id="updBar"></div></div>
   </div>
+  <!-- ================= HOME ================= -->
+  <section id="tab-home" class="home hidden">
+    <div class="page-head"><h1>What would you like to do?</h1>
+      <p>Pick one: Citrello shows you each click, on the real screen.</p></div>
+    <div class="tour-resume hidden" id="tourResume"><span id="tourResumeText"></span>
+      <span><button class="primary" id="tourResumeGo">Carry on</button> <button class="link" id="tourResumeDrop">Forget it</button></span></div>
+    <h2 class="home-group">Check a paper</h2>
+    <div class="home-tiles">
+      <button class="home-tile" data-tour="check"><span class="ht-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 12l2 2 4-4"/><circle cx="12" cy="12" r="9"/></svg></span><b>Catch mistakes in my references</b><span class="ht-text">Retracted papers, DOIs that don't exist (often made up by AI), wrong authors or years, the same paper listed twice.</span><span class="ht-go">Show me how →</span></button>
+      <button class="home-tile" data-tour="cites"><span class="ht-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 6h10M4 12h7M4 18h10"/><path d="M17 9l3 3-3 3"/></svg></span><b>Make sure every citation matches the list</b><span class="ht-text">Citations with no reference behind them, references never cited, gaps in the numbering.</span><span class="ht-go">Show me how →</span></button>
+      <button class="home-tile" data-tour="sources"><span class="ht-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="6"/><path d="M20 20l-4.2-4.2"/><path d="M9 11h4"/></svg></span><b>Check my sources say what I wrote</b><span class="ht-text">Each cited sentence compared with what the paper really says.</span><span class="ht-via">With Claude or ChatGPT</span><span class="ht-go">Show me how →</span></button>
+    </div>
+    <h2 class="home-group">Write</h2>
+    <div class="home-tiles">
+      <button class="home-tile g2" data-tour="fix"><span class="ht-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 4h8l4 4v12H7z"/><path d="M15 4v4h4"/><path d="M10 14l2 2 3-4"/></svg></span><b>Turn typed references into live citations</b><span class="ht-text">Any Word file becomes live citations and a correct reference list, in any of 10,000 styles.</span><span class="ht-go">Show me how →</span></button>
+      <button class="home-tile g2" data-tour="cite"><span class="ht-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 20h8"/><path d="M16.5 3.5a2.1 2.1 0 013 3L7 19l-4 1 1-4z"/></svg></span><b>Cite while I write</b><span class="ht-text">Find a paper, put its marker in your text, and Citrello builds the reference list.</span><span class="ht-go">Show me how →</span></button>
+      <button class="home-tile g2" data-tour="ai"><span class="ht-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a8 8 0 01-11.6 7.1L4 20l1-4.4A8 8 0 1121 12z"/><path d="M9 12h.01M12 12h.01M15 12h.01"/></svg></span><b>Write with Claude or ChatGPT from my library</b><span class="ht-text">They cite only papers you really have, so no reference is made up.</span><span class="ht-go">Show me how →</span></button>
+      <button class="home-tile g2" data-tour="find"><span class="ht-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="6"/><path d="M20 20l-4.2-4.2"/><path d="M11 8v6M8 11h6"/></svg></span><b>Find references for what I'm writing</b><span class="ht-text">Claude or ChatGPT searches, reads and adds the right papers to your library.</span><span class="ht-via">With Claude or ChatGPT</span><span class="ht-go">Show me how →</span></button>
+    </div>
+    <h2 class="home-group">My library</h2>
+    <div class="home-tiles">
+      <button class="home-tile g3" data-tour="library"><span class="ht-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 4h3v16H5zM10 4h3v16h-3z"/><path d="M15.5 5l3-.8 3.4 15.6-3 .8z"/></svg></span><b>Tidy up my library</b><span class="ht-text">Bring it from Zotero, Mendeley or EndNote, check every reference online, and add the papers' text.</span><span class="ht-go">Show me how →</span></button>
+      <button class="home-tile g3" data-tour="latex"><span class="ht-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 8l-4 4 4 4M16 8l4 4-4 4M13.5 6l-3 12"/></svg></span><b>Get my LaTeX paper ready</b><span class="ht-text">Check the citations against the .bib, keep a .bib for Overleaf, and make an arXiv-ready .zip.</span><span class="ht-go">Show me how →</span></button>
+    </div>
+    <p class="small muted" style="margin-top:22px">Know your way around? Go straight to your <button class="link" data-go="library">library</button>.</p>
+  </section>
+
   <!-- ================= LIBRARY ================= -->
   <section id="tab-library" class="lib">
     <div>
@@ -516,7 +579,7 @@
       </div>
       <p class="small muted" style="margin:8px 0 0">Or use the <a href="https://citrello.app/extension" target="_blank" rel="noopener">Citrello browser extension</a>: a button in your toolbar, and it can fetch the full text of all your papers with your university access.</p>
     </div>
-    <div class="card desktop-only">
+    <div class="card desktop-only" id="wordCard">
       <h2>Word</h2>
       <p class="muted">Adds a <strong>Citrello</strong> tab to Word:</p>
       <ul class="small">
@@ -662,10 +725,13 @@ function toast(msg) { const t = $("toast"); t.textContent = msg; t.classList.add
 function notice(el, kind, html) { $(el).innerHTML = `<div class="notice ${kind}">${html}</div>`; }
 
 // ---------- tabs ----------
+let tabChosen = false;  // someone already went somewhere: don't jump to Home after the library loads
 document.querySelectorAll(".side button.navb").forEach((b) => b.onclick = () => {
+  tabChosen = true;
   document.querySelectorAll(".side button.navb").forEach((x) => x.classList.toggle("active", x === b));
   window.scrollTo(0, 0);
-  ["library", "papers", "documents", "settings"].forEach((t) => show("tab-" + t, t === b.dataset.tab));
+  ["home", "library", "papers", "documents", "settings"].forEach((t) => show("tab-" + t, t === b.dataset.tab));
+  if (b.dataset.tab === "home") renderResume();
   if (b.dataset.tab === "papers") { $("papersMsg").innerHTML = ""; loadPapers(); }
   if (b.dataset.tab === "library") loadLibrary();
   if (b.dataset.tab === "documents") loadBibExports();
@@ -1773,8 +1839,17 @@ function dropZone(zone, input, onFile) {
 }
 // ---------- documents: check references ----------
 let chk = null, chkTimer = null;
-dropZone($("chkDrop"), $("chkFile"), async (file) => {
-  $("chkResult").innerHTML = ""; $("texResult").innerHTML = "";
+dropZone($("chkDrop"), $("chkFile"), (file) => checkFile(file));
+async function useSample() {  // the sample paper: six typical mistakes planted in it
+  goTab("documents");
+  try {
+    const r = await fetch("/api/sample-paper");
+    if (!r.ok) throw new Error("The sample paper couldn't be made.");
+    await checkFile(new File([await r.blob()], "Citrello sample paper.docx"));
+  } catch (e) { notice("chkResult", "err", esc(e.message)); }
+}
+async function checkFile(file) {
+  $("chkResult").innerHTML = ""; $("texResult").innerHTML = ""; texJob = null;
   if (/\.(tex|ltx|zip|bib)$/i.test(file.name)) return texUpload(file);
   if (!/\.(docx|pdf)$/i.test(file.name)) return notice("chkResult", "err", "Please choose a Word document (.docx), a PDF, or a LaTeX .tex or .zip file.");
   $("chkDropText").innerHTML = `<strong>${esc(file.name)}</strong> · choose another file to check it`;
@@ -1783,7 +1858,7 @@ dropZone($("chkDrop"), $("chkFile"), async (file) => {
     const {id} = await api("/api/doccheck", {method: "POST", body: await file.arrayBuffer(), headers: {"X-Filename": encodeURIComponent(file.name)}});
     chk = {id}; pollCheck();
   } catch (e) { notice("chkResult", "err", esc(e.message)); }
-});
+}
 function pollCheck() {
   clearTimeout(chkTimer);
   chkTimer = setTimeout(async () => {
@@ -1804,18 +1879,18 @@ function renderCheck() {
   const r = c.report, problems = r.counts.problem + r.citation_issues.filter((x) => x.level === "problem").length;
   const name = c.name.replace(/\.(docx|pdf)$/i, "");
   const newOnes = r.refs.filter((x) => !x.in_library).length;
-  let h = `<div class="chips" style="margin-top:14px">
+  let h = `<div class="chips" id="chkChips" style="margin-top:14px">
       <span class="chip">${r.references} references · ${esc(r.manager)}</span>
       ${r.counts.verified ? `<span class="chip ok">${r.counts.verified} verified</span>` : ""}
       ${r.counts.check ? `<span class="chip warn">${r.counts.check} to check</span>` : ""}
       ${r.counts.problem ? `<span class="chip bad">${r.counts.problem} with problems</span>` : ""}
       ${r.duplicates ? `<span class="chip bad">${r.duplicates} duplicate${r.duplicates > 1 ? "s" : ""}</span>` : ""}</div>`;
   if (!r.online) h += `<div class="notice warn">Citrello couldn't go online, so the references weren't checked against the publishers' records. The other checks below still apply.</div>`;
-  h += r.citation_issues.length ? `<h3>Citations and the reference list</h3><ul class="issues">${r.citation_issues.map((x) => `<li class="${x.level}">${esc(x.text)}</li>`).join("")}</ul>`
-       : `<div class="notice ok">Every citation matches the reference list, and there are no duplicates.</div>`;
+  h += r.citation_issues.length ? `<div id="chkCites" style="padding-top:1px"><h3>Citations and the reference list</h3><ul class="issues">${r.citation_issues.map((x) => `<li class="${x.level}">${esc(x.text)}</li>`).join("")}</ul></div>`
+       : `<div class="notice ok" id="chkCites">Every citation matches the reference list, and there are no duplicates.</div>`;
   const flagged = r.refs.filter((x) => ["problem", "check"].includes(x.reliability) && x.checks.length);
-  if (flagged.length) h += `<h3>References to look at</h3><ul class="issues">${flagged.sort((a, b) => (a.reliability === "problem" ? 0 : 1) - (b.reliability === "problem" ? 0 : 1))
-      .map((x) => `<li class="${x.reliability}"><b>[${x.number}]</b> ${esc(x.authors)} (${esc(x.year || "n.d.")}) ${esc(x.title)}: ${x.checks.map((k) => esc(k.text)).join("; ")}</li>`).join("")}</ul>`;
+  if (flagged.length) h += `<div id="chkRefs" style="padding-top:1px"><h3>References to look at</h3><ul class="issues">${flagged.sort((a, b) => (a.reliability === "problem" ? 0 : 1) - (b.reliability === "problem" ? 0 : 1))
+      .map((x) => `<li class="${x.reliability}"><b>[${x.number}]</b> ${esc(x.authors)} (${esc(x.year || "n.d.")}) ${esc(x.title)}: ${x.checks.map((k) => esc(k.text)).join("; ")}</li>`).join("")}</ul></div>`;
   h += `<details><summary>All ${r.references} references</summary><div class="table-wrap"><table>
       <thead><tr><th>#</th><th>Reference</th><th>Reliability</th><th class="hide-sm">Library</th></tr></thead><tbody>
       ${r.refs.map((x) => `<tr class="${x.reliability || ""}"><td class="n">${x.number}</td>
@@ -1829,11 +1904,11 @@ function renderCheck() {
       <a class="btn" href="/api/doccheck/${id}/report.csv">Download the report (.csv)</a></div>`;
   if (r.source !== "pdf") {
     const f = c.fixed;
-    h += `<div class="panel" style="margin-top:16px"><strong>Fix and format</strong>
+    h += `<div class="panel" id="chkFixPanel" style="margin-top:16px"><strong>Fix and format</strong>
       <p class="small muted" style="margin:4px 0 0">Citrello writes a corrected Word copy: every citation (typed, [@Key] markers or from any reference manager) becomes a live citation, details are corrected from the publisher's record, duplicates are merged, and the reference list is rebuilt in the style you choose, with correct numbering. Your original file isn't changed. The references are also added to your library (they're what the live citations use).</p>`;
     if (f) {
       h += `<div class="notice ok">Fixed: ${f.citations} citations and ${f.entries} references in ${esc(f.style)}.</div>
-        <div class="row"><a class="btn primary" href="/api/doccheck/${id}/fixed.docx">Download the fixed document</a></div>`;
+        <div class="row"><a class="btn primary" id="chkFixed" href="/api/doccheck/${id}/fixed.docx">Download the fixed document</a></div>`;
       const li = (arr) => `<ul class="issues">${arr.join("")}</ul>`;
       if (f.corrected.length) h += `<h3>Corrected from the publisher's record</h3>` + li(f.corrected.map((x) => `<li class="ok">[${x.number}] ${esc(x.title)}: ${x.changes.map(esc).join(", ")}</li>`));
       if (f.merged.length) h += `<h3>Duplicates merged</h3>` + li(f.merged.map((x) => `<li class="ok">${esc(x)}</li>`));
@@ -2070,12 +2145,216 @@ $("usageStats").onchange = async () => {
   toast($("usageStats").checked ? "Thanks: the anonymous count is on" : "The anonymous count is off");
 };
 
+// ---------- Home and the guided tours ----------
+// Each tour is a list of steps on the real screen: a spotlight on what to click, and a bubble that says what to do.
+// A step moves on by itself when its `done` test becomes true (the file was chosen, the check finished...) or when
+// the highlighted button is clicked (`click: true`). Steps without an element show the bubble in the middle.
+const goTab = (t) => document.querySelector(`.side button.navb[data-tab="${t}"]`).click();
+const AI_LINKS = (prompt) => [
+  {label: "Open Claude", run: () => window.open("https://claude.ai/new?q=" + encodeURIComponent(prompt), "_blank", "noopener")},
+  {label: "Open ChatGPT", run: () => window.open("https://chatgpt.com/?q=" + encodeURIComponent(prompt), "_blank", "noopener")}];
+const tourCopy = (text) => `<div class="g-copy"><code>${esc(text)}</code><button data-copy="${esc(text)}">Copy</button></div>`;
+const checkDone = () => chk && chk.state && chk.state !== "checking";
+const STEP_DOC = (what) => ({tab: "documents", el: "#chkDrop", title: "Choose your paper",
+  text: `<p>Click here and pick ${what}. It can come from any reference manager, or be typed by hand. Your file stays on your computer.</p>
+         <p>No paper at hand? Try the sample: six typical mistakes are hidden in it.</p>`,
+  actions: [{label: "Use the sample paper", run: () => useSample(), primary: true}],
+  start: () => { tour.base = chk && chk.id; }, done: () => !!(chk && chk.id && chk.id !== tour.base)});  // a new file, not an earlier one
+const STEP_WAIT = {el: "#chkResult", title: "Citrello checks every reference",
+  text: "<p>Each reference is looked up at the publisher (Crossref and doi.org). It takes a few seconds per reference.</p>",
+  done: checkDone, waitText: "Checking…"};
+const STEP_FIX = {el: "#chkFixPanel", title: "Fix it in one click",
+  text: "<p>Choose a style and click <b>Fix and format</b>: you get a corrected copy with live citations, the duplicates merged and the list rebuilt. Your own file isn't changed.</p>"};
+const STEP_CONNECT = (why) => ({tab: "settings", el: "#connCard", title: "Connect Claude or ChatGPT",
+  text: `<p>${why} Click Claude or ChatGPT and follow the picture guide: it takes about two minutes, once.</p><p>Already connected? Click Next.</p>`});
+const SOURCES_PROMPT = "I've attached my paper. For every sentence with a citation, use Citrello's find_in_papers tool to read what the cited paper says, and list the sentences the paper doesn't support, quoting the passage as proof.";
+const FIND_PROMPT = "Find 5 peer-reviewed papers that support the paragraph below. Read their abstracts (and the full text where Citrello can get it), keep only those that really support it, check them with Citrello and add them to my Citrello library in the project \"New references\".\n\nParagraph: ";
+const WRITE_PROMPT = "Write the introduction of my paper using only references from my Citrello library, and give me a Word file with live citations in APA style.";
+const TOURS = {
+  check: {title: "Catch mistakes in my references", steps: [STEP_DOC("a Word document or a PDF"), STEP_WAIT,
+    {el: "#chkChips", title: "The summary", text: "<p>How many references are verified, need a look, or have problems, and how many are listed twice.</p>"},
+    {el: "#chkRefs", title: "What's wrong, reference by reference",
+     text: "<p>Retracted papers, DOIs that don't exist or lead to another paper, authors or years that don't match the publisher's record, preprints and web pages.</p>"},
+    STEP_FIX]},
+  cites: {title: "Make sure every citation matches the list", steps: [STEP_DOC("a Word document or a PDF"), STEP_WAIT,
+    {el: "#chkCites", title: "Citations and the reference list",
+     text: "<p>Every citation in the text is matched with the list: citations with no reference behind them, references never cited, gaps in the numbering and duplicates are listed here.</p>"},
+    STEP_FIX]},
+  sources: {title: "Check my sources say what I wrote", steps: [
+    {tab: "papers", el: "#ftWays", title: "Give Citrello the papers' text",
+     text: "<p>To check what a paper says, Citrello needs its text. Pick a way: free open-access copies, your university access (with the browser extension), or PDFs you have. Only the text is kept, never the PDF.</p>"},
+    STEP_CONNECT("Claude or ChatGPT reads the papers' text through Citrello."),
+    {title: "Ask it to check your paper", text: `<p>Start a new chat, attach your paper, and send this:</p>${tourCopy(SOURCES_PROMPT)}
+       <p class="small muted">It answers sentence by sentence, with the passage from each paper.</p>`, actions: AI_LINKS(SOURCES_PROMPT)}]},
+  fix: {title: "Turn typed references into live citations", steps: [STEP_DOC("the Word document"), STEP_WAIT,
+    {el: "#chkFixPanel", title: "Choose the style", text: "<p>Pick a style from the list, or type a journal's name underneath to find its own style (there are over 10,000).</p>"},
+    {el: "#chkFix", title: "Click Fix and format", text: "<p>Citrello writes a corrected copy: every citation becomes live, details are corrected from the publisher's record and the reference list is rebuilt.</p>",
+     click: true, done: () => !!(chk && chk.fixed)},
+    {el: "#chkFixed", title: "Download your document", waitFor: () => !!(chk && chk.fixed),
+     text: "<p>Open it in Word: the citations and the list are live. To switch style later, run it through here again with another style.</p>"}]},
+  cite: {title: "Cite while I write", steps: [
+    {tab: "library", el: "#q", title: "Find the paper", text: "<p>Type a few words to find it in your library, or paste its DOI or a link to add it.</p>"},
+    {el: () => document.querySelector("#libRows .ref"), title: "Click the reference", click: true,
+     text: "<p>Its details open on the right.</p>", missing: "<p>Your library is empty: add a paper with the box at the top first.</p>"},
+    {el: () => document.querySelector("#detail .copyline"), title: "Copy its marker",
+     text: "<p>Paste <code class=\"key\">[@Key]</code> into your Word text where the citation goes (<code class=\"key\">\\cite{Key}</code> in LaTeX). Write the whole paper like this; Claude and ChatGPT use the same markers.</p>"},
+    ...(IS_WEB ? [] : [{tab: "settings", el: "#wordCard", title: "Or cite from inside Word",
+      text: "<p>On Windows, the Citrello tab in Word puts citations in directly and keeps the list up to date.</p>"}]),
+    {tab: "documents", el: "#chkDrop", title: "Turn the markers into citations",
+     text: "<p>When you're ready, drop the Word file here and click <b>Fix and format</b>: every marker becomes a live citation and the reference list is built in your style.</p>"}]},
+  ai: {title: "Write with Claude or ChatGPT from my library", steps: [
+    STEP_CONNECT("Citrello lets Claude and ChatGPT search your library, cite from it and write Word files with live citations."),
+    {title: "Then just ask", text: `<p>In a new chat, for example:</p>${tourCopy(WRITE_PROMPT)}
+       <p class="small muted">They cite with <code class="key">[@Key]</code> markers from your library, so no reference is made up. ${esc(keepOpen)}</p>`, actions: AI_LINKS(WRITE_PROMPT)}]},
+  find: {title: "Find references for what I'm writing", steps: [
+    STEP_CONNECT("Claude or ChatGPT searches for papers and adds them to your library through Citrello."),
+    {title: "Ask for references", text: `<p>Send this with your paragraph at the end:</p>${tourCopy(FIND_PROMPT + "…")}
+       <p class="small muted">Each paper is checked online before it's added.</p>`, actions: AI_LINKS(FIND_PROMPT)},
+    {tab: "library", el: "#projNav", title: "They appear in your library",
+     text: "<p>In the project <b>New references</b>. Open a reference to see its check and copy its marker.</p>"}]},
+  library: {title: "Tidy up my library", steps: [
+    {tab: "library", el: "#openImport", title: "Bring your library", click: true,
+     text: "<p>Click <b>Import</b> and pick where it comes from: Zotero, Mendeley, EndNote or a file. Duplicates are skipped.</p><p>Your references are already here? Click Next.</p>"},
+    {el: "#verifyBtn", title: "Check every reference online", click: true,
+     text: "<p>Citrello compares each one with the publisher's record: it corrects details, adds missing DOIs, and flags retracted papers and preprints.</p>"},
+    {el: "#libChips", title: "See what needs you", text: "<p>Show only the references with a problem, those to check, or those without full text. Click one to see what's wrong.</p>"},
+    {el: '.side button.navb[data-tab="papers"]', title: "Add the papers' text", click: true,
+     text: "<p>So Claude and ChatGPT can read your papers and check what you cite. Only the text is kept, never the PDF.</p>"}]},
+  latex: {title: "Get my LaTeX paper ready", steps: [
+    {tab: "documents", el: "#chkDrop", title: "Choose your LaTeX paper", start: () => { tour.base = texJob && texJob.id; },
+     done: () => !!(texJob && texJob.report && texJob.id !== tour.base),
+     text: "<p>Pick the .tex file, or your Overleaf project as a .zip (in Overleaf: <b>Menu → Download → Source</b>).</p>"},
+    {el: "#texResult", title: "What Citrello found",
+     text: "<p>Citations with no .bib entry, entries never cited, duplicates and problems with each reference. Further down: the arXiv-ready .zip, with the .bbl made and comments removed.</p>"},
+    IS_WEB ? {tab: "library", el: "#openExport", title: "A .bib for Overleaf",
+      text: "<p><b>Export → BibTeX</b> gives you a .bib with the same keys every time. Upload it to Overleaf.</p>"}
+      : {el: "#latexCard", title: "Keep a .bib up to date",
+         text: "<p>Choose a folder and Citrello rewrites the .bib whenever your references change, with the same keys as always. Works with Overleaf through Dropbox or Git.</p>"}]},
+};
+
+let tour = null;  // {key, i, seen: Set of step numbers done}
+const tourSave = () => { try { tour ? localStorage.setItem("citrelloTour", JSON.stringify({key: tour.key, i: tour.i})) : localStorage.removeItem("citrelloTour"); } catch {} };
+const tourSaved = () => { try { const t = JSON.parse(localStorage.getItem("citrelloTour") || "null"); return t && TOURS[t.key] ? t : null; } catch { return null; } };
+function renderResume() {
+  const t = tourSaved();
+  show("tourResume", !!t && !tour);
+  if (t) $("tourResumeText").innerHTML = `You were doing <b>${esc(TOURS[t.key].title)}</b> (step ${t.i + 1} of ${TOURS[t.key].steps.length}).`;
+}
+$("tourResumeGo").onclick = () => { const t = tourSaved(); if (t) startTour(t.key, t.i); };
+$("tourResumeDrop").onclick = () => { try { localStorage.removeItem("citrelloTour"); } catch {} renderResume(); };
+document.querySelectorAll(".home-tile[data-tour]").forEach((b) => b.onclick = () => startTour(b.dataset.tour));
+document.querySelectorAll("[data-go]").forEach((b) => b.onclick = () => goTab(b.dataset.go));
+
+function tourEls() {
+  let spot = $("tourSpot"), tip = $("tourTip");
+  if (!spot) {
+    spot = Object.assign(document.createElement("div"), {id: "tourSpot", className: "tour-spot"});
+    tip = Object.assign(document.createElement("div"), {id: "tourTip", className: "tour-tip"});
+    tip.setAttribute("role", "dialog"); tip.setAttribute("aria-live", "polite"); tip.setAttribute("aria-label", "Guide");
+    document.body.append(spot, tip);
+  }
+  return {spot, tip};
+}
+function startTour(key, at = 0) {
+  tour = {key, i: -1, seen: new Set(), showAll: false};
+  for (let n = 0; n < at; n++) tour.seen.add(n);
+  show("tourResume", false);
+  tourGo(at);
+}
+function endTour(finished) {
+  clearInterval(tourTimer); tourTimer = null;
+  if (tour && tour.el && tour.onClick) tour.el.removeEventListener("click", tour.onClick, true);
+  const k = tour && tour.key; tour = null; tourSave();
+  ["tourSpot", "tourTip"].forEach((id) => $(id) && $(id).remove());
+  if (finished && k) toast("Done: you know how to " + TOURS[k].title.charAt(0).toLowerCase() + TOURS[k].title.slice(1));
+}
+const stepEl = (st) => { if (!st.el) return null; const e = typeof st.el === "function" ? st.el() : document.querySelector(st.el);
+  return e && e.offsetParent !== null && !e.closest(".hidden") ? e : null; };
+let tourTimer = null;
+function tourGo(i) {
+  const steps = TOURS[tour.key].steps;
+  if (i >= steps.length) return endTour(true);
+  if (i < 0) i = 0;
+  if (tour.i >= 0 && i > tour.i) tour.seen.add(tour.i);
+  tour.i = i; tourSave();
+  const st = steps[i];
+  if (st.tab && !document.querySelector(`.side button.navb[data-tab="${st.tab}"]`).classList.contains("active")) goTab(st.tab);
+  if (tour.el && tour.onClick) tour.el.removeEventListener("click", tour.onClick, true);
+  tour.el = null; tour.onClick = null; tour.clicked = false;
+  if (st.start) st.start();
+  tourRender(true);
+  clearInterval(tourTimer);
+  tourTimer = setInterval(() => tour && tourRender(false), 300);
+}
+function tourRender(fresh) {
+  const steps = TOURS[tour.key].steps, st = steps[tour.i], {spot, tip} = tourEls();
+  const ready = !st.waitFor || st.waitFor();
+  const el = ready ? stepEl(st) : null;
+  if (el !== tour.el) {  // a new element (or it appeared): point at it
+    if (tour.el && tour.onClick) tour.el.removeEventListener("click", tour.onClick, true);
+    tour.el = el;
+    if (el) {
+      // scroll so the element and the bubble both fit on the screen (the bubble under it); else the element at the top
+      const r = el.getBoundingClientRect(), th = tip.offsetHeight || 260, vh = innerHeight;
+      if (!el.closest(".side")) {
+        const room = r.height + th + 30 <= vh ? Math.max(16, (vh - r.height - th - 14) / 2) : 16;
+        window.scrollTo({top: Math.max(0, scrollY + r.top - room), behavior: "smooth"});
+      }
+      if (st.click) { tour.onClick = () => { if (tour) tour.clicked = true; }; el.addEventListener("click", tour.onClick, true); }
+    }
+    fresh = true;
+  }
+  if (st.done && st.done()) return tourGo(tour.i + 1);
+  if (st.click && tour.clicked && !st.done) return setTimeout(() => tour && tourGo(tour.i + 1), 250), void (tour.clicked = false);
+  if (fresh) {
+    const waiting = st.done && st.waitText && !st.done();
+    tip.innerHTML = `<div class="tt-count"><span>${esc(TOURS[tour.key].title)} · step ${tour.i + 1} of ${steps.length}</span>
+        <button class="link" id="ttClose" aria-label="Close the guide">✕</button></div>
+      <h3>${esc(st.title)}</h3><div class="tt-text">${!el && st.el && st.missing ? st.missing : st.text}</div>
+      ${st.actions ? `<div class="tt-actions">${st.actions.map((a, n) => `<button class="${a.primary ? "primary" : ""}" data-tt-act="${n}">${esc(a.label)}</button>`).join("")}</div>` : ""}
+      ${tour.showAll ? `<ol class="tt-steps">${steps.map((s, n) => `<li class="${tour.seen.has(n) ? "done" : ""} ${n === tour.i ? "now" : ""}" data-tt-go="${n}">${esc(s.title)}</li>`).join("")}</ol>` : ""}
+      <div class="tt-foot"><button class="link" id="ttAll">${tour.showAll ? "Hide the steps" : "See all steps"}</button><span class="grow"></span>
+        ${waiting ? `<span class="tt-wait">${esc(st.waitText)}</span>` : ""}
+        <button id="ttBack" ${tour.i ? "" : "disabled"}>Back</button>
+        <button class="primary" id="ttNext">${tour.i === steps.length - 1 ? "Done" : "Next"}</button></div>`;
+    $("ttClose").onclick = () => endTour(false);
+    $("ttBack").onclick = () => tourGo(tour.i - 1);
+    $("ttNext").onclick = () => tourGo(tour.i + 1);
+    $("ttAll").onclick = () => { tour.showAll = !tour.showAll; tourRender(true); };
+    tip.querySelectorAll("[data-tt-act]").forEach((b) => b.onclick = () => st.actions[+b.dataset.ttAct].run());
+    tip.querySelectorAll("[data-tt-go]").forEach((li) => li.onclick = () => tourGo(+li.dataset.ttGo));
+    tour.waiting = waiting;
+  } else if (tour.waiting && !(st.done && !st.done())) { tour.waiting = false; tourRender(true); return; }
+  // place the spotlight and the bubble
+  if (el) {
+    const r = el.getBoundingClientRect(), pad = 6;
+    spot.classList.remove("none");
+    Object.assign(spot.style, {top: r.top - pad + "px", left: r.left - pad + "px", width: r.width + 2 * pad + "px", height: r.height + 2 * pad + "px"});
+    const th = tip.offsetHeight, tw = tip.offsetWidth, vh = innerHeight, vw = innerWidth;
+    let top, left = Math.min(Math.max(12, r.left), vw - tw - 12);
+    if (r.bottom + 14 + th <= vh - 8) top = r.bottom + 14;                       // under it
+    else if (r.top - 14 - th >= 8) top = r.top - th - 14;                        // above it
+    else if (vw - r.right >= tw + 28) { left = r.right + 16; top = Math.min(Math.max(8, r.top), vh - th - 8); }  // beside it
+    else if (r.left >= tw + 28) { left = r.left - tw - 16; top = Math.min(Math.max(8, r.top), vh - th - 8); }
+    else { top = vh - th - 12; left = vw - tw - 16; }                            // a big element: in the corner
+    Object.assign(tip.style, {top: top + "px", left: left + "px"});
+  } else {
+    spot.classList.add("none");
+    Object.assign(spot.style, {top: innerHeight / 2 + "px", left: innerWidth / 2 + "px"});
+    Object.assign(tip.style, {top: Math.max(12, (innerHeight - tip.offsetHeight) / 2) + "px", left: Math.max(12, (innerWidth - tip.offsetWidth) / 2) + "px"});
+  }
+}
+document.addEventListener("keydown", (e) => { if (e.key === "Escape" && tour && !$("guide").open) endTour(false); });
+
 // ---------- start ----------
 const params = new URLSearchParams(location.search);
 if (params.get("login_error")) { $("loginErr").textContent = "Mendeley login failed: " + params.get("login_error"); show("loginErr"); }
 if (params.get("connected") || params.get("login_error")) document.querySelector('.side button.navb[data-tab="settings"]').click();
 if (params.toString()) history.replaceState(null, "", location.pathname);
-loadStatus().then(maybeWelcome); loadStyles(); loadLibrary();
+loadStatus().then(maybeWelcome); loadStyles();
+loadLibrary().then(() => {  // a new library starts on Home: what Citrello can do, with a guide for each
+  if (!lib.items.length && !tabChosen) goTab("home");
+});
 api("/api/account").then(renderSideConn).catch(() => {});
 setTimeout(() => status.web || checkUpdate(false), 3000);
 </script>

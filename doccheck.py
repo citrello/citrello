@@ -486,13 +486,15 @@ def check(path, offline=False, email=None, progress=None):
                 offline = True
             continue
         if csl:
-            r.update(csl=csl, meta=meta, typed=typed, lookup=src)
+            r.update(csl=csl, meta=meta, typed=typed, source=src, lookup=src)
+        elif meta and "error" not in meta:  # not found, but we learnt something (e.g. the DOI doesn't exist)
+            r["meta"] = meta
     core.assess_references(refs)
 
     dups = _duplicates(refs)
     never = [r["number"] for r in refs if r.get("cited") is False]
     if never:
-        citation_issues.append({"level": "check", "text": f"{len(never)} reference(s) in the list are never cited: "
+        citation_issues.append({"level": "check", "text": "In the list but never cited: "
                                 + ", ".join(f"[{n}]" for n in never[:15]) + ("…" if len(never) > 15 else "")})
     for d in dups:
         citation_issues.append({"level": "problem", "text": "The same paper is listed more than once: " +
@@ -707,3 +709,54 @@ def fix(path, report, out, style_id=None, project=None):
     return {"style": res["style"]["title"], "citations": res["citations"], "entries": res["entries"],
             "corrected": corrected, "merged": merged, "dropped_uncited": dropped, "still_problems": still,
             "unfixable": unfixable + [m for m in res["report"] if "not found" in m.lower()]}
+
+
+# ---------------------------------------------------------------------------
+# The sample paper: a short Word document with typical mistakes planted in it, so people can see what the check
+# finds before they upload their own work.
+
+SAMPLE_NAME = "Citrello sample paper.docx"
+SAMPLE_BODY = [
+    ("Decommissioning offshore wind farms", "Title"),
+    ("An example paper with mistakes planted in its references, to show what Citrello finds.", None),
+    ("Introduction", "Heading 1"),
+    ("The first generation of offshore wind farms is reaching the end of its design life, and decommissioning them "
+     "sustainably is now an urgent question [1]. Reviews of end-of-life options compare repowering, life extension "
+     "and full removal [2].", None),
+    ("Cable recovery is often the most expensive part of removal [4], although the costs reported vary widely "
+     "between projects [5]. Public trust in the evidence also matters: one widely cited study was later retracted "
+     "[3], and claims built on it no longer hold [7].", None),
+    ("References", "Heading 1"),
+    ("1. Topham, E. and McMillan, D. (2017) Sustainable decommissioning of an offshore wind farm. Renewable Energy, "
+     "102, pp. 470-480. doi:10.1016/j.renene.2016.10.066", None),
+    ("2. Vetters, J., Thomassen, G. and Van Passel, S. (2023) Sailing through end-of-life challenges: A comprehensive "
+     "review for offshore wind. Renewable and Sustainable Energy Reviews, 199, 114486. doi:10.1016/j.rser.2024.114486",
+     None),
+    ("3. Wakefield, A.J. et al. (1998) Ileal-lymphoid-nodular hyperplasia, non-specific colitis, and pervasive "
+     "developmental disorder in children. The Lancet, 351(9103), pp. 637-641. doi:10.1016/S0140-6736(97)11096-0", None),
+    ("4. Jensen, P. and Ortiz, L. (2021) Recovery costs of subsea export cables. Renewable Energy, 170, pp. 1-12. "
+     "doi:10.1016/j.renene.2099.01.001", None),
+    ("5. Topham, E. and McMillan, D. (2017) Sustainable decommissioning of an offshore wind farm. Renewable Energy, "
+     "102, pp. 470-480. doi:10.1016/j.renene.2016.10.066", None),
+    ("6. Burton, T., Jenkins, N., Sharpe, D. and Bossanyi, E. (2011) Wind Energy Handbook. 2nd edn. Chichester: Wiley.",
+     None),
+]
+SAMPLE_MISTAKES = [  # what was planted, for the tours and the tests
+    "[3] is a retracted paper",
+    "[4] has a DOI that doesn't exist",
+    "[5] is the same paper as [1]",
+    "[2] has the wrong year (2023; the publisher says 2024)",
+    "[7] is cited but there is no reference 7",
+    "[6] is in the list but never cited",
+]
+
+
+def sample_paper():
+    """The sample paper as .docx bytes."""
+    import io
+    d = docx.Document()
+    for text, style in SAMPLE_BODY:
+        d.add_paragraph(text, style=style) if style else d.add_paragraph(text)
+    buf = io.BytesIO()
+    d.save(buf)
+    return buf.getvalue()

@@ -62,6 +62,7 @@ def test_web_app(browser_name, tmp_path):
         expect(page.locator("#welcome")).to_contain_text("stays in this browser")
         shot(page, "welcome")
         page.click("#wWebStart")
+        page.click('.side button.navb[data-tab="library"]')  # a new library opens on Home
         expect(page.locator("#quit")).to_be_hidden()
         tab(page, "settings")
         for h in ("Claude", "Codex", "Word", "Updates", "Mendeley"):
@@ -201,6 +202,7 @@ def test_web_app_documents_and_styles(browser_name, tmp_path):
         page.on("dialog", lambda d: d.accept())
         open_app(page)
         page.click("#wWebStart")
+        page.click('.side button.navb[data-tab="library"]')  # a new library opens on Home
 
         # a PDF: read with pypdf in the browser
         pdf = str(tmp_path / "paper.pdf")
@@ -316,6 +318,7 @@ def test_web_app_browser_button_and_zotero(browser_name, tmp_path):
         page.on("pageerror", lambda e: errors.append(str(e)))
         open_app(page)
         page.click("#wWebStart")
+        page.click('.side button.navb[data-tab="library"]')  # a new library opens on Home
         tab(page, "settings")
         expect(page.locator("#bookmarklet")).to_be_visible()
         href = page.get_attribute("#bookmarklet", "href")
@@ -406,6 +409,7 @@ def test_web_app_mendeley_import(browser_name, tmp_path):
                 {"mendeley_auth": "https://mendeley.test/oauth/authorize", "mendeley_api": api}))
             page.wait_for_selector("#webCover", state="detached", timeout=LOAD)
             page.click("#wWebStart")
+            page.click('.side button.navb[data-tab="library"]')  # a new library opens on Home
             page.click("#openImport")
             page.fill("#importProject", "From Mendeley")
             page.click('[data-guide="imp-mendeley"]')
@@ -435,6 +439,7 @@ def test_web_app_connection_guides(browser_name, tmp_path):
         page.on("pageerror", lambda e: errors.append(str(e)))
         open_app(page)
         page.click("#wWebStart")
+        page.click('.side button.navb[data-tab="library"]')  # a new library opens on Home
         tab(page, "settings")
         expect(page.locator("#webDocsBox")).to_be_hidden()  # nothing to download yet: not shown
         for name, title, steps in (("claude", "Connect Claude", 5), ("chatgpt", "Connect ChatGPT", 5),
@@ -478,6 +483,7 @@ def test_web_app_import_endnote_xml(browser_name, tmp_path):
         page.on("pageerror", lambda e: errors.append(str(e)))
         open_app(page)
         page.click("#wWebStart")
+        page.click('.side button.navb[data-tab="library"]')  # a new library opens on Home
         page.click("#openImport")
         page.click('[data-guide="imp-endnote"]')
         expect(page.locator("#guide")).to_contain_text("Save as type")
@@ -487,6 +493,45 @@ def test_web_app_import_endnote_xml(browser_name, tmp_path):
         expect(page.locator("#libRows")).to_contain_text("Wind Energy Handbook")
         tab(page, "settings")
         expect(page.locator("#tab-settings h2", has_text=re.compile("^Zotero$"))).to_have_count(0)  # no Zotero card now
+        assert not errors, errors
+        b.close()
+
+
+@pytest.mark.parametrize("browser_name", BROWSERS)
+def test_web_app_home_and_tours(browser_name, tmp_path):
+    """Home: a new library opens on what Citrello can do; a tour checks the sample paper (made by Python in the
+    browser) on the real screen, and the connector tours give a prompt to copy and links to Claude and ChatGPT."""
+    from playwright.sync_api import expect, sync_playwright
+    shots = os.environ.get("CITRELLO_E2E_SHOTS") or str(tmp_path)
+    shot = lambda page, name: page.screenshot(path=os.path.join(shots, f"web-app-{browser_name}-{name}.png"))  # noqa: E731
+    with sync_playwright() as pw:
+        b = getattr(pw, browser_name).launch()
+        page = b.new_context(viewport={"width": 1280, "height": 860}).new_page()
+        errors = []
+        page.on("pageerror", lambda e: errors.append(str(e)))
+        open_app(page)
+        page.click("#wWebStart")
+        expect(page.locator("#tab-home")).to_be_visible(timeout=30000)
+        expect(page.locator(".home-tile")).to_have_count(9)
+        page.click('.home-tile[data-tour="cites"]')
+        tip = page.locator("#tourTip")
+        expect(tip.locator("h3")).to_have_text("Choose your paper")
+        tip.locator("button", has_text="Use the sample paper").click()
+        expect(tip.locator("h3")).to_have_text("Citations and the reference list", timeout=120000)
+        expect(page.locator("#chkCites")).to_contain_text("Citation [7] points to a reference that isn't in the list")
+        shot(page, "tour-cites")
+        page.click("#ttNext")
+        page.click("#ttNext")
+        expect(tip).to_have_count(0)
+        tab(page, "home")
+        page.click('.home-tile[data-tour="ai"]')
+        expect(page.locator("#tab-settings")).to_be_visible()
+        page.click("#ttNext")
+        expect(tip).to_contain_text("Write the introduction of my paper")
+        expect(tip.locator("button", has_text="Open Claude")).to_be_visible()
+        expect(tip.locator("button", has_text="Open ChatGPT")).to_be_visible()
+        page.keyboard.press("Escape")
+        expect(tip).to_have_count(0)
         assert not errors, errors
         b.close()
 
@@ -523,6 +568,7 @@ def test_web_app_full_texts(browser_name, tmp_path):
         page.on("dialog", lambda d: d.accept())
         open_app(page)
         page.click("#wWebStart")
+        page.click('.side button.navb[data-tab="library"]')  # a new library opens on Home
         page.click("#openImport")
         page.click('[data-guide="imp-file"]')
         page.set_input_files("#importFile", str(bib))
@@ -634,6 +680,7 @@ def test_web_app_browser_button_takes_the_full_text(browser_name, tmp_path):
             page.on("pageerror", lambda e: errors.append(str(e)))
             open_app(page)
             page.click("#wWebStart")
+            page.click('.side button.navb[data-tab="library"]')  # a new library opens on Home
             tab(page, "settings")
             code = urllib.parse.unquote(page.get_attribute("#bookmarklet", "href")[len("javascript:"):])
             tab(page, "library")
@@ -692,6 +739,7 @@ def test_full_texts_correct_wrong_dois_first(browser_name, tmp_path):
         page.on("pageerror", lambda e: errors.append(str(e)))
         open_app(page)
         page.click("#wWebStart")
+        page.click('.side button.navb[data-tab="library"]')  # a new library opens on Home
         page.click("#openImport")
         page.click('[data-guide="imp-file"]')
         page.set_input_files("#importFile", str(lib))
