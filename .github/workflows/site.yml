@@ -9,7 +9,7 @@ on:
             "packaging/build_web_check.py", "tests/test_web_check.py",
             # the web app (citrello.app/app) is the desktop interface and app code, run in the browser
             "ui.html", "app.py", "webapp.py", "arxiv.py", "zotero_local.py", "mcp_server.py", "bridge_client.py",
-            "usage.py", "updater.py", "word_addin.py", "codex_config.py", "fulltext.py", "tests/test_web_app.py",
+            "usage.py", "updater.py", "word_addin.py", "codex_config.py", "fulltext.py", "sources.py", "tests/test_web_app.py",
             # the browser extension is tested with the web app
             "extension/**", "packaging/build_extension.py", "tests/test_web_extension.py"]
   workflow_dispatch:

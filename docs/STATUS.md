@@ -121,8 +121,11 @@ Found on the way: in "Check and fix", typed reference lists were looked up onlin
 recorded, so every typed reference said "Not found online" and DOIs/years were never compared; fixed (10 Nov).
 AI decision (10 Nov): Claude/ChatGPT subscriptions can't be used by other apps, so the "sources" and "find
 references" tours send people to their Claude/ChatGPT (prompt to copy, links that open a new chat with it; the
-`?q=` links are not verified to fill in the prompt). Next: "Check my sources" inside Citrello without AI (each cited
-sentence next to the best-matching passages of the paper's full text); then an optional AI verdict with a cheap
+`?q=` links are not verified to fill in the prompt). **"What your sources say"** (10 Nov, `sources.py`, in the
+"Check and fix" results, tour 3): every sentence that cites a paper next to the passages of that paper's full text
+that match it best (BM25 + the best sentences, shared words highlighted), no AI, on the computer; reads [@Key]
+markers, Zotero/Mendeley/EndNote/Word fields, Mendeley Cite controls and typed [1] / (Author, year) citations; Word
+documents only for now (not PDFs). Next: an optional AI verdict with a cheap
 model paid by Citrello within a free monthly allowance for signed-in users (about 1–2 cents per paper); "find
 references" (OpenAlex + stronger model, ~5–10 cents per paragraph) later, possibly paid credits.
 

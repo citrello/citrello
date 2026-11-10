@@ -41,6 +41,7 @@ import bridge_client
 import citrello_core as core
 import codex_config
 import doccheck
+import sources
 import fulltext
 import arxiv
 import latex
@@ -149,7 +150,7 @@ def start_find_free(keys):
 
 def check_public(cid):
     c = CHECKS[cid]
-    out = {k: c.get(k) for k in ("state", "i", "n", "step", "error", "name", "added", "fixed")}
+    out = {k: c.get(k) for k in ("state", "i", "n", "step", "error", "name", "added", "fixed", "sources")}
     rep = c.get("report")
     if rep:
         index = library._index(library.load()["items"])
@@ -1251,6 +1252,14 @@ class Handler(BaseHTTPRequestHandler):
                 c["fixed"] = doccheck.fix(c["path"], c["report"], out, b.get("style") or load_config().get("style"),
                                           (b.get("project") or "").strip() or None)
                 c["fixed_path"] = out
+            except ValueError as e:
+                return self.send(400, {"error": str(e)})
+            return self.send(200, check_public(m.group(1)))
+        m = re.fullmatch(r"/api/doccheck/(\w+)/sources", path)
+        if m and m.group(1) in CHECKS and CHECKS[m.group(1)].get("report"):  # each cited sentence and its paper's text
+            c = CHECKS[m.group(1)]
+            try:
+                c["sources"] = sources.check(c["path"])
             except ValueError as e:
                 return self.send(400, {"error": str(e)})
             return self.send(200, check_public(m.group(1)))

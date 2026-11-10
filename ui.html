@@ -109,6 +109,14 @@
   .spick-list li .t { min-width: 0; } .spick-list li .t b { font-weight: 600; }
   .spick-list li.off { color: var(--muted); }
   .spick-list li button { flex: none; padding: 4px 12px; }
+  /* Check my sources: each cited sentence next to the passages of the paper */
+  .src { border-top: 1px solid var(--line); padding: 12px 0 4px; }
+  .src-s { font-weight: 600; margin: 0 0 4px; }
+  .src-p { margin: 6px 0 0 14px; font-size: 13.5px; }
+  .src-p .src-who { font-weight: 700; color: var(--cobalt); }
+  blockquote.src-q { margin: 6px 0; padding: 8px 12px; background: var(--bg); border-left: 3px solid var(--leaf); border-radius: 8px; }
+  blockquote.src-q .small { display: block; margin-top: 2px; }
+  mark { background: var(--lemon-soft); color: inherit; padding: 0 1px; border-radius: 3px; }
   /* Home: what you can do, each with a guided tour on the real screen */
   .home { max-width: 1100px; }
   .home h1 { font-size: 36px; }
@@ -326,7 +334,7 @@
     <div class="home-tiles">
       <button class="home-tile" data-tour="check"><span class="ht-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 12l2 2 4-4"/><circle cx="12" cy="12" r="9"/></svg></span><b>Catch mistakes in my references</b><span class="ht-text">Retracted papers, DOIs that don't exist (often made up by AI), wrong authors or years, the same paper listed twice.</span><span class="ht-go">Show me how →</span></button>
       <button class="home-tile" data-tour="cites"><span class="ht-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 6h10M4 12h7M4 18h10"/><path d="M17 9l3 3-3 3"/></svg></span><b>Make sure every citation matches the list</b><span class="ht-text">Citations with no reference behind them, references never cited, gaps in the numbering.</span><span class="ht-go">Show me how →</span></button>
-      <button class="home-tile" data-tour="sources"><span class="ht-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="6"/><path d="M20 20l-4.2-4.2"/><path d="M9 11h4"/></svg></span><b>Check my sources say what I wrote</b><span class="ht-text">Each cited sentence compared with what the paper really says.</span><span class="ht-via">With Claude or ChatGPT</span><span class="ht-go">Show me how →</span></button>
+      <button class="home-tile" data-tour="sources"><span class="ht-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="6"/><path d="M20 20l-4.2-4.2"/><path d="M9 11h4"/></svg></span><b>Check my sources say what I wrote</b><span class="ht-text">Each cited sentence next to what the paper really says, from the papers' full text.</span><span class="ht-go">Show me how →</span></button>
     </div>
     <h2 class="home-group">Write</h2>
     <div class="home-tiles">
@@ -1926,7 +1934,15 @@ function renderCheck() {
   } else {
     h += `<p class="small muted">A PDF can't be changed. To get a fixed document, check the Word version.</p>`;
   }
+  h += sourcesPanel(c, r, newOnes);
   $("chkResult").innerHTML = h;
+  if ($("chkSources")) $("chkSources").onclick = async () => {
+    $("chkSources").disabled = true; $("chkSources").textContent = "Reading…";
+    try { chk = await post(`/api/doccheck/${id}/sources`, {}); chk.id = id; renderCheck(); }
+    catch (e) { toast(e.message); $("chkSources").disabled = false; $("chkSources").textContent = "Show what my sources say"; }
+  };
+  document.querySelectorAll("[data-go-papers]").forEach((b) => b.onclick = () => goTab("papers"));
+  document.querySelectorAll("[data-src-ai]").forEach((b) => b.onclick = () => AI_LINKS(SOURCES_PROMPT)[+b.dataset.srcAi].run());
   if ($("chkStyle")) { const def = $("defStyle").value; if (def) $("chkStyle").value = def;
     stylePicker($("chkFind"), $("chkFindList"), $("chkFindMsg"), async (sid) => {
       const info = await post("/api/styles/add", {id: sid, default: false}); const keep = $("defStyle").value;
@@ -1944,6 +1960,44 @@ function renderCheck() {
     try { chk = await post(`/api/doccheck/${id}/add`, {project: $("chkProject").value}); chk.id = id; renderCheck(); toast("Added to your library"); loadLibrary(); }
     catch (e) { toast(e.message); $("chkAdd").disabled = false; }
   };
+}
+
+// ---------- documents: what the sources say ----------
+const SRC_STOP = new Set("the and for with that this from are was were has have had been their which into than also these those such can may our its not but all any more most other some per via using used use based between there they them then when where while what about".split(" "));
+function markWords(passage, sentence) {  // highlight the sentence's words in the passage
+  const words = [...new Set((sentence.toLowerCase().match(/[a-z\u00c0-\u024f][a-z\u00c0-\u024f\-]{3,}/g) || []).filter((w) => !SRC_STOP.has(w)))]
+    .map((w) => w.slice(0, Math.max(4, w.length - 2)).replace(/[-]/g, "\\-"));
+  const safe = esc(passage);
+  return words.length ? safe.replace(new RegExp(`\\b(${words.join("|")})[\\w\\-]*`, "gi"), "<mark>$&</mark>") : safe;
+}
+function sourcesPanel(c, r, newOnes) {
+  if (r.source === "pdf") return "";
+  const head = `<div class="panel" id="chkSrcPanel" style="margin-top:16px"><strong>What your sources say</strong>
+    <p class="small muted" style="margin:4px 0 8px">Each sentence that cites a paper, next to the passages of that paper that match it best, so you can see whether it supports what you wrote. Citrello uses the papers' text it has (Full texts); nothing leaves your computer.</p>`;
+  const s = c.sources;
+  if (!s) return head + (newOnes ? `<p class="small">Add the references to your library first (button above): Citrello looks for their text there.</p>` : "") +
+    `<button class="primary" id="chkSources">Show what my sources say</button></div>`;
+  const n = s.counts;
+  let h = head + `<div class="chips" id="chkSrcChips"><span class="chip">${n.sentences} cited sentence${n.sentences === 1 ? "" : "s"}</span>
+      ${n.with_text ? `<span class="chip ok">${n.with_text} with the paper's text</span>` : ""}
+      ${n.no_text ? `<span class="chip warn">${n.no_text} without text yet</span>` : ""}
+      ${n.not_in_library ? `<span class="chip bad">${n.not_in_library} not in your library</span>` : ""}</div>`;
+  if (!n.sentences) h += `<div class="notice warn">No sentence with a citation was found.</div>`;
+  if (n.no_text) h += `<div class="notice warn" style="display:flex;gap:12px;align-items:center;justify-content:space-between;flex-wrap:wrap">
+      <span>Citrello doesn't have the text of every paper yet. Add it, then click Show again.</span><button data-go-papers>Get the papers' text</button></div>`;
+  h += `<div id="chkSrc">` + s.sentences.map((x) => `<div class="src"><p class="src-s">${esc(x.sentence)}</p>${x.papers.map((p) => {
+      const who = `<span class="src-who">${esc(p.label)}</span> <span class="muted">${esc(p.title.slice(0, 90))}</span>`;
+      if (p.status === "found") return `<div class="src-p">${who}${p.passages.map((q) =>
+        `<blockquote class="src-q">${markWords(q.text, x.sentence)}<span class="small muted">${q.at < 5 ? "Near the start of the paper" : q.at > 90 ? "Near the end of the paper" : `About ${q.at}% into the paper`}</span></blockquote>`).join("")}</div>`;
+      if (p.status === "no_match") return `<div class="src-p">${who}<div class="small" style="color:var(--warn)">No passage of this paper clearly matches the sentence: worth a look.
+        <a href="/api/fulltext/text?key=${encodeURIComponent(p.key)}">Open its text</a></div></div>`;
+      if (p.status === "no_text") return `<div class="src-p">${who}<div class="small muted">No text for this paper yet.</div></div>`;
+      return `<div class="src-p">${who}<div class="small" style="color:var(--err)">Not in your library.</div></div>`;
+    }).join("")}</div>`).join("") + `</div>`;
+  if (s.limited) h += `<p class="small muted">Showing the first ${s.sentences.length} sentences.</p>`;
+  h += `<div class="row" style="margin-top:10px"><button id="chkSources">Show again</button>
+      <span class="small muted">Want a verdict on each sentence? Ask</span><button data-src-ai="0">Claude</button><button data-src-ai="1">ChatGPT</button></div></div>`;
+  return h;
 }
 
 // ---------- documents: LaTeX ----------
@@ -2155,10 +2209,10 @@ const AI_LINKS = (prompt) => [
   {label: "Open ChatGPT", run: () => window.open("https://chatgpt.com/?q=" + encodeURIComponent(prompt), "_blank", "noopener")}];
 const tourCopy = (text) => `<div class="g-copy"><code>${esc(text)}</code><button data-copy="${esc(text)}">Copy</button></div>`;
 const checkDone = () => chk && chk.state && chk.state !== "checking";
-const STEP_DOC = (what) => ({tab: "documents", el: "#chkDrop", title: "Choose your paper",
+const STEP_DOC = (what, sample = true) => ({tab: "documents", el: "#chkDrop", title: "Choose your paper",
   text: `<p>Click here and pick ${what}. It can come from any reference manager, or be typed by hand. Your file stays on your computer.</p>
-         <p>No paper at hand? Try the sample: six typical mistakes are hidden in it.</p>`,
-  actions: [{label: "Use the sample paper", run: () => useSample(), primary: true}],
+         ${sample ? "<p>No paper at hand? Try the sample: six typical mistakes are hidden in it.</p>" : ""}`,
+  actions: sample ? [{label: "Use the sample paper", run: () => useSample(), primary: true}] : null,
   start: () => { tour.base = chk && chk.id; }, done: () => !!(chk && chk.id && chk.id !== tour.base)});  // a new file, not an earlier one
 const STEP_WAIT = {el: "#chkResult", title: "Citrello checks every reference",
   text: "<p>Each reference is looked up at the publisher (Crossref and doi.org). It takes a few seconds per reference.</p>",
@@ -2182,10 +2236,15 @@ const TOURS = {
     STEP_FIX]},
   sources: {title: "Check my sources say what I wrote", steps: [
     {tab: "papers", el: "#ftWays", title: "Give Citrello the papers' text",
-     text: "<p>To check what a paper says, Citrello needs its text. Pick a way: free open-access copies, your university access (with the browser extension), or PDFs you have. Only the text is kept, never the PDF.</p>"},
-    STEP_CONNECT("Claude or ChatGPT reads the papers' text through Citrello."),
-    {title: "Ask it to check your paper", text: `<p>Start a new chat, attach your paper, and send this:</p>${tourCopy(SOURCES_PROMPT)}
-       <p class="small muted">It answers sentence by sentence, with the passage from each paper.</p>`, actions: AI_LINKS(SOURCES_PROMPT)}]},
+     text: "<p>To show what a paper says, Citrello needs its text. Pick a way: free open-access copies, your university access (with the browser extension), or PDFs you have. Only the text is kept, never the PDF.</p><p>Already done? Click Next.</p>"},
+    STEP_DOC("your Word document", false), STEP_WAIT,
+    {el: "#chkSrcPanel", title: "Show what your sources say", done: () => !!(chk && chk.sources),
+     text: "<p>Click <b>Show what my sources say</b>. If the references aren't in your library yet, add them first with the button above.</p>"},
+    {el: "#chkSrc", title: "Read them side by side",
+     text: "<p>Under each sentence: the passages of the cited paper that match it best, with the shared words highlighted. If the paper doesn't say what you wrote, change the sentence or the citation.</p>",
+     missing: "<p>No passages to show yet: add the papers' text (Full texts), then click <b>Show again</b>.</p>"},
+    {title: "Want a verdict on each sentence?", text: `<p>Claude or ChatGPT can judge every sentence using these texts through Citrello (connect it once under Settings). In a new chat, attach your paper and send:</p>${tourCopy(SOURCES_PROMPT)}`,
+     actions: AI_LINKS(SOURCES_PROMPT)}]},
   fix: {title: "Turn typed references into live citations", steps: [STEP_DOC("the Word document"), STEP_WAIT,
     {el: "#chkFixPanel", title: "Choose the style", text: "<p>Pick a style from the list, or type a journal's name underneath to find its own style (there are over 10,000).</p>"},
     {el: "#chkFix", title: "Click Fix and format", text: "<p>Citrello writes a corrected copy: every citation becomes live, details are corrected from the publisher's record and the reference list is rebuilt.</p>",

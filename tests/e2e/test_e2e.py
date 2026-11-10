@@ -355,6 +355,30 @@ def test_07b_check_a_document(page, env):
     assert "ZOTERO_ITEM" not in xml and "ADDIN CSL_CITATION" in xml and "CSL_BIBLIOGRAPHY" in xml
 
 
+def test_07b2_what_my_sources_say(page, env):
+    """Each cited sentence next to the passages of the paper's full text that match it (no AI, on the computer)."""
+    import docx
+    sys.path.insert(0, os.path.join(ROOT, "tests"))
+    from test_sources import PAPER
+    r = page.evaluate("""async (text) => (await fetch('/api/clip/fulltext', {method: 'POST',
+        headers: {'Content-Type': 'application/json', 'X-Key': 'topham2017'}, body: JSON.stringify({text})})).status""", PAPER)
+    assert r == 200
+    d = docx.Document()
+    d.add_paragraph("Removing the export cables is the largest part of the decommissioning cost [@topham2017]. "
+                    "Reviews compare the end-of-life options [@vetters2024].")
+    path = os.path.join(env["_TMP"], "claims.docx")
+    d.save(path)
+    tab(page, "documents")
+    page.set_input_files("#chkFile", path)
+    page.click("#chkSources", timeout=60000)
+    expect(page.locator("#chkSrc")).to_contain_text("42% of the total decommissioning cost", timeout=30000)
+    expect(page.locator("#chkSrc mark").first).to_be_visible()  # the shared words are highlighted
+    expect(page.locator("#chkSrc")).to_contain_text("No text for this paper yet")  # Vetters has no text
+    expect(page.locator("#chkSrcChips")).to_contain_text("2 cited sentences")
+    page.locator("#chkSrcPanel").scroll_into_view_if_needed()
+    shot(page, "sources")
+
+
 def test_07c_check_a_pdf(page, env):
     import importlib.util
     spec = importlib.util.spec_from_file_location("dfix", os.path.join(ROOT, "tests", "test_doccheck.py"))

@@ -532,6 +532,35 @@ def test_web_app_home_and_tours(browser_name, tmp_path):
         expect(tip.locator("button", has_text="Open ChatGPT")).to_be_visible()
         page.keyboard.press("Escape")
         expect(tip).to_have_count(0)
+
+        # what my sources say: a paper with its text, a document that cites it
+        bib = tmp_path / "two.bib"
+        bib.write_text("@article{topham2017, title={Sustainable decommissioning of an offshore wind farm}, "
+                       "author={Topham, Eva and McMillan, David}, journal={Renewable Energy}, year={2017}, "
+                       "doi={10.1016/j.renene.2016.10.066}}\n@article{vetters2024, title={Sailing through end-of-life "
+                       "challenges}, author={Vetters, Jan}, year={2024}, doi={10.1016/j.rser.2024.114486}}\n", encoding="utf-8")
+        tab(page, "library")
+        page.click("#openImport")
+        page.click('[data-guide="imp-file"]')
+        page.set_input_files("#importFile", str(bib))
+        expect(page.locator("#gResult")).to_contain_text("2 added", timeout=60000)
+        page.keyboard.press("Escape")
+        sys.path.insert(0, os.path.dirname(__file__))
+        from test_sources import PAPER
+        import docx
+        assert page.evaluate("""async (text) => (await fetch('/api/clip/fulltext', {method: 'POST',
+            headers: {'Content-Type': 'application/json', 'X-Key': 'topham2017'}, body: JSON.stringify({text})})).status""", PAPER) == 200
+        d = docx.Document()
+        d.add_paragraph("Removing the export cables is the largest part of the decommissioning cost [@topham2017]. "
+                        "Reviews compare the end-of-life options [@vetters2024].")
+        doc = tmp_path / "claims.docx"
+        d.save(str(doc))
+        tab(page, "documents")
+        page.set_input_files("#chkFile", str(doc))
+        page.click("#chkSources", timeout=120000)
+        expect(page.locator("#chkSrc")).to_contain_text("42% of the total decommissioning cost", timeout=60000)
+        expect(page.locator("#chkSrc")).to_contain_text("No text for this paper yet")
+        shot(page, "sources")
         assert not errors, errors
         b.close()
 
