@@ -1259,6 +1259,8 @@ class Handler(BaseHTTPRequestHandler):
             except ValueError as e:
                 return self.send(400, {"error": str(e)})
             return self.send(200, check_public(m.group(1)))
+        if path == "/api/sources/windows":  # the cited papers as passages, for matching by meaning in the page
+            return self.send(200, {"papers": sources.paper_windows([str(k) for k in self.json_body().get("keys", [])][:500])})
         m = re.fullmatch(r"/api/doccheck/(\w+)/sources", path)
         if m and m.group(1) in CHECKS and CHECKS[m.group(1)].get("report"):  # each cited sentence and its paper's text
             c = CHECKS[m.group(1)]

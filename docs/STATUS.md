@@ -138,6 +138,19 @@ sentences refresh by themselves as texts arrive; long papers get filters (passag
 text / not in library) and 20 sentences at a time; PDFs say it works on Word for now. Also: an unreadable document
 offers the sample and "tell us"; "See them" after adding references; imports end with "Next: check them online ·
 get the papers' full texts"; Verify's problems have "Show only these"; "Still needs you" says what to do.
+**Matching by meaning** (11 Nov, Armin: word matching "doesn't work well"): in the page (desktop and web), a
+module worker loads transformers.js 3.0.2 from jsDelivr and two models from Hugging Face, cached by the browser
+(~220 MB once): all-MiniLM-L6-v2 (q8) fingerprints each sentence of the cited paper (`sources.paper_sentences`,
+`/api/sources/windows`, paper's own reference list left out, max 800 sentences) and the claim; the 4 closest + the
+best word match are judged by nli-deberta-v3-small (q8): supports (entailment >= 0.5) / seems to contradict
+(contradiction >= 0.6, same topic: similarity >= 0.45, and still contradicting when read with its neighbours) /
+doesn't clearly say (closest passage shown). Fingerprints and verdicts cached in IndexedDB. Tried and rejected:
+MiniLM/bge/e5/gte/arctic/mxbai embeddings alone (2/4 on hard cases), ms-marco and bge rerankers, nli xsmall and
+judging 3-sentence passages (missed paraphrases); a stray space before the full stop changed verdicts (fixed in
+claimOf). Speed on 4 cores, single-threaded (no cross-origin isolation): ~47 sentences/s fingerprinting, ~11
+verdicts/s, so a 103-paper document takes ~10–15 min the first time, instant after. Possible speed-ups: WebGPU,
+threads (needs COOP/COEP, which would break the Mendeley/clip pop-ups), fingerprinting papers when their text
+arrives. Falls back to word matches if the models can't load (offline). Privacy page updated.
 Next: an optional AI verdict with a cheap
 model paid by Citrello within a free monthly allowance for signed-in users (about 1–2 cents per paper); "find
 references" (OpenAlex + stronger model, ~5–10 cents per paragraph) later, possibly paid credits.

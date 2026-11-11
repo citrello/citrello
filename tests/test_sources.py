@@ -73,3 +73,20 @@ def test_only_word_documents(tmp_path):
     import pytest
     with pytest.raises(ValueError):
         sources.check(str(tmp_path / "a.pdf"))
+
+
+def test_windows_for_matching_by_meaning(tmp_path, monkeypatch):
+    _library(tmp_path, monkeypatch)
+    w = sources.windows(PAPER)
+    assert all(len(x) <= 900 for x in w) and len(w) > 3
+    assert any("42% of the total decommissioning cost" in x for x in w)
+    got = sources.paper_windows(["Topham2017", "Vetters2024", "Nobody"])
+    assert list(got) == ["Topham2017"] and got["Topham2017"]["version"]
+    sents = got["Topham2017"]["sentences"]
+    assert "Removing the subsea export cables accounted for 42% of the total decommissioning cost, more than the turbines themselves." in sents
+    assert "Results" not in sents  # headings aren't sentences
+
+
+def test_windows_leave_out_the_papers_own_references():
+    text = "Intro.\n\n" + "Body sentence about cables. " * 60 + "\n\nReferences\n\n1. Someone (2001) A cited paper about cables."
+    assert not any("A cited paper" in w for w in sources.windows(text))

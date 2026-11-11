@@ -116,6 +116,7 @@
   .src-p .src-who { font-weight: 700; color: var(--cobalt); }
   blockquote.src-q { margin: 6px 0; padding: 8px 12px; background: var(--bg); border-left: 3px solid var(--leaf); border-radius: 8px; }
   blockquote.src-q .small { display: block; margin-top: 2px; }
+  blockquote.src-q.contradicts { border-left-color: var(--err); } blockquote.src-q.unclear { border-left-color: var(--lemon); }
   .src-get { background: var(--sky); border-radius: 12px; padding: 12px 14px; margin: 0 0 12px; font-size: 14px; }
   .src-act { display: flex; gap: 12px; align-items: center; justify-content: space-between; flex-wrap: wrap; }
   .src-filter .chip { cursor: pointer; } .src-filter .chip.on { background: var(--cobalt); color: #fff; }
@@ -2020,10 +2021,12 @@ function markWords(passage, sentence) {  // highlight the sentence's words in th
 // text (get them here: with the extension, as free copies, or from PDFs dropped in), texts that arrive later (the
 // sentences update by themselves), long papers (filters, 20 sentences at a time), PDFs (not yet: says so).
 let srcFilter = "all", srcShown = 20, srcNote = null, srcTimer = null;
-const SRC_FILTERS = [["all", "All"], ["found", "Passages found"], ["no_match", "No clear match"], ["no_text", "Without text"], ["not_in_library", "Not in your library"]];
+const SRC_FILTERS = [["all", "All"], ["supports", "Supported"], ["unclear", "Not clearly said"], ["contradicts", "Seems to contradict"],
+  ["found", "Passages found"], ["no_match", "No clear match"], ["no_text", "Without text"], ["not_in_library", "Not in your library"]];
+const VERDICT = {supports: ["ok", "✓ Supports this"], contradicts: ["bad", "Seems to contradict this"], unclear: ["warn", "Doesn't clearly say this: the closest passage"]};
 function sourcesPanel(c, r, newOnes) {
   const head = `<div class="panel" id="chkSrcPanel" style="margin-top:16px"><strong>What your sources say</strong>
-    <p class="small muted" style="margin:4px 0 8px">Each sentence that cites a paper, next to the passages of that paper that match it best, so you can see whether it supports what you wrote. Citrello uses the papers' text it has (Full texts); nothing leaves your computer.</p>`;
+    <p class="small muted" style="margin:4px 0 8px">Each sentence that cites a paper, next to the passage of that paper that matches it best, even in other words, and whether it seems to support what you wrote, contradict it, or not say it. Citrello reads the papers' text it has (Full texts) with small language models that run on your computer: nothing leaves it.</p>`;
   if (r.source === "pdf") return head + `<p class="small">This works on Word documents for now: check the Word version of this paper to see what your sources say.</p></div>`;
   const s = c.sources;
   if (!s) return head + (newOnes && c.added === null
@@ -2033,8 +2036,11 @@ function sourcesPanel(c, r, newOnes) {
   const n = s.counts, missing = srcMissing(s);
   let h = head + `<div class="chips" id="chkSrcChips"><span class="chip">${n.sentences} cited sentence${n.sentences === 1 ? "" : "s"}</span>
       ${n.with_text ? `<span class="chip ok">${n.with_text} with the paper's text</span>` : ""}
+      ${["supports", "contradicts", "unclear"].map((k) => { const c = s.sentences.reduce((a, x) => a + x.papers.filter((p) => p.status === k).length, 0);
+        return c ? `<span class="chip ${VERDICT[k][0]}">${c} ${k === "supports" ? "supported" : k === "contradicts" ? "seem to contradict" : "not clearly said"}</span>` : ""; }).join("")}
       ${missing.length ? `<span class="chip warn">${missing.length} paper${missing.length === 1 ? "" : "s"} without text yet</span>` : ""}
       ${n.not_in_library ? `<span class="chip bad">${n.not_in_library} not in your library</span>` : ""}</div>`;
+  if (s.meaningState) h += `<p class="small muted" id="srcMeaning" style="margin:0 0 10px">${meaningLine(s)}</p>`;
   if (!n.sentences) h += `<div class="notice warn">No sentence with a citation was found in this document.</div>`;
   if (n.not_in_library && c.added === null) h += `<div class="notice warn src-act"><span>Some cited papers aren't in your library, so Citrello can't look for their text.</span>
       <button id="srcAddRefs">Add them to my library</button></div>`;
@@ -2055,6 +2061,8 @@ function sourcesPanel(c, r, newOnes) {
   const list = s.sentences.filter((x) => srcFilter === "all" || x.papers.some((p) => p.status === srcFilter));
   h += `<div id="chkSrc">` + list.slice(0, srcShown).map((x) => `<div class="src"><p class="src-s">${esc(x.sentence)}</p>${x.papers.map((p) => {
       const who = `<span class="src-who">${esc(p.label)}</span> <span class="muted">${esc(p.title.slice(0, 90))}</span>`;
+      if (VERDICT[p.status]) return `<div class="src-p">${who} <span class="tag ${VERDICT[p.status][0]}">${VERDICT[p.status][1]}</span>${p.passages.map((q) =>
+        `<blockquote class="src-q ${p.status}">${markWords(q.text, x.sentence)}<span class="small muted">${q.at < 5 ? "Near the start of the paper" : q.at > 90 ? "Near the end of the paper" : `About ${q.at}% into the paper`}</span></blockquote>`).join("")}</div>`;
       if (p.status === "found") return `<div class="src-p">${who}${p.passages.map((q) =>
         `<blockquote class="src-q">${markWords(q.text, x.sentence)}<span class="small muted">${q.at < 5 ? "Near the start of the paper" : q.at > 90 ? "Near the end of the paper" : `About ${q.at}% into the paper`}</span></blockquote>`).join("")}</div>`;
       if (p.status === "no_match") return `<div class="src-p">${who}<div class="small" style="color:var(--warn)">No passage of this paper clearly matches the sentence: worth a look.
@@ -2067,7 +2075,7 @@ function sourcesPanel(c, r, newOnes) {
   if (list.length > srcShown) h += `<div class="row"><button id="srcMore">Show ${Math.min(20, list.length - srcShown)} more</button><span class="small muted">${list.length - srcShown} more sentences</span></div>`;
   if (s.limited) h += `<p class="small muted">The first ${s.sentences.length} cited sentences are shown.</p>`;
   h += `<div class="row" style="margin-top:10px"><button id="chkSources">Show again</button>
-      <span class="small muted">Want a verdict on each sentence? Ask</span><button data-src-ai="0">Claude</button><button data-src-ai="1">ChatGPT</button></div></div>`;
+      <span class="small muted">Want a second opinion? Ask</span><button data-src-ai="0">Claude</button><button data-src-ai="1">ChatGPT</button></div></div>`;
   return h;
 }
 function srcMissing(s) {  // the cited papers in the library without text, once each
@@ -2078,7 +2086,7 @@ function srcMissing(s) {  // the cited papers in the library without text, once 
 async function runSources(add, quiet) {
   const id = chk.id;
   if (!quiet && $("chkSources")) { $("chkSources").disabled = true; $("chkSources").textContent = "Reading…"; }
-  try { chk = await post(`/api/doccheck/${id}/sources`, {add: !!add, project: chk.name.replace(/\.docx$/i, "")}); chk.id = id; renderCheck(); if (add) loadLibrary(); }
+  try { chk = await post(`/api/doccheck/${id}/sources`, {add: !!add, project: chk.name.replace(/\.docx$/i, "")}); chk.id = id; renderCheck(); startMeaning(); if (add) loadLibrary(); }
   catch (e) { if (!quiet) toast(e.message); if ($("chkSources")) { $("chkSources").disabled = false; $("chkSources").textContent = "Show what my sources say"; } }
 }
 function srcRefreshSoon() {  // a paper's text arrived: show it under its sentences (only while the results are on screen)
@@ -2140,6 +2148,193 @@ function bindSources() {
   document.querySelectorAll("[data-src-filter]").forEach((b) => b.onclick = () => { srcFilter = b.dataset.srcFilter; srcShown = 20; renderCheck(); });
   if ($("srcMore")) $("srcMore").onclick = () => { srcShown += 20; renderCheck(); };
   document.querySelectorAll("[data-src-ai]").forEach((b) => b.onclick = () => AI_LINKS(SOURCES_PROMPT)[+b.dataset.srcAi].run());
+}
+
+// ---------- documents: matching by meaning (two small language models running in this page) ----------
+// 1. a "fingerprint" model (all-MiniLM-L6-v2, 23 MB) finds the passages of the cited paper about the same thing as
+//    the sentence, even in other words; the two best word matches are added;
+// 2. an NLI model (nli-deberta-v3-small, 172 MB) reads the sentence with each of those passages and says whether the
+//    passage supports it, contradicts it, or doesn't say. Everything runs on this computer (nothing is sent); the
+//    models are downloaded once (about 220 MB with their runtime) and the browser keeps them. Results are cached.
+//    Tested: judging one sentence of the paper at a time (with the one before when it starts "It/This…") is far more
+//    accurate than judging a longer passage; the xsmall model and longer passages missed paraphrases.
+const MEANING_LIB = "https://cdn.jsdelivr.net/npm/@huggingface/transformers@3.0.2";
+const EMBED_MODEL = "Xenova/all-MiniLM-L6-v2", NLI_MODEL = "Xenova/nli-deberta-v3-small";
+const MEANING_WORKER = `
+import { pipeline, AutoTokenizer, AutoModelForSequenceClassification } from "${MEANING_LIB}";
+let embed, tok, nli;
+const progress = (p) => { if (p.status === "progress" && p.total) self.postMessage({progress: {file: p.file, loaded: p.loaded, total: p.total}}); };
+self.onmessage = async (e) => {
+  const {id, op, texts, premises, hypotheses} = e.data;
+  try {
+    if (op === "embed") {
+      if (!embed) embed = await pipeline("feature-extraction", "${EMBED_MODEL}", {dtype: "q8", progress_callback: progress});
+      const out = await embed(texts, {pooling: "mean", normalize: true});
+      return self.postMessage({id, ok: true, data: out.data, dim: out.dims[1]}, [out.data.buffer]);
+    }
+    if (!nli) { tok = await AutoTokenizer.from_pretrained("${NLI_MODEL}", {progress_callback: progress});
+                nli = await AutoModelForSequenceClassification.from_pretrained("${NLI_MODEL}", {dtype: "q8", progress_callback: progress}); }
+    const {logits} = await nli(tok(premises, {text_pair: hypotheses, padding: true, truncation: true, max_length: 256}));
+    self.postMessage({id, ok: true, data: logits.data});
+  } catch (err) { self.postMessage({id, ok: false, error: String((err && err.message) || err)}); }
+};`;
+const meaning = {worker: null, calls: new Map(), seq: 0, failed: null, files: {}, onProgress: null};
+function meaningCall(msg, transfer) {
+  if (meaning.failed) return Promise.reject(new Error(meaning.failed));
+  if (!meaning.worker) {
+    meaning.worker = new Worker(URL.createObjectURL(new Blob([MEANING_WORKER], {type: "text/javascript"})), {type: "module"});
+    meaning.worker.onmessage = (e) => {
+      const m = e.data;
+      if (m.progress) { meaning.files[m.progress.file] = m.progress; if (meaning.onProgress) meaning.onProgress(); return; }
+      const cb = meaning.calls.get(m.id); if (!cb) return;
+      meaning.calls.delete(m.id);
+      m.ok ? cb.res(m) : cb.rej(new Error(m.error));
+    };
+    meaning.worker.onerror = (e) => { meaning.failed = e.message || "The meaning model couldn't start."; meaning.calls.forEach((cb) => cb.rej(new Error(meaning.failed))); meaning.calls.clear(); };
+  }
+  return new Promise((res, rej) => { const id = ++meaning.seq; meaning.calls.set(id, {res, rej}); meaning.worker.postMessage({id, ...msg}, transfer || []); });
+}
+const meaningDownload = () => {  // "Downloading … 45%" while the models arrive the first time
+  const f = Object.values(meaning.files), total = f.reduce((a, x) => a + x.total, 0), got = f.reduce((a, x) => a + x.loaded, 0);
+  return total && got < total ? Math.round(100 * got / total) : null;
+};
+async function embedTexts(texts) {
+  const out = [];
+  for (let i = 0; i < texts.length; i += 16) {
+    const r = await meaningCall({op: "embed", texts: texts.slice(i, i + 16)});
+    for (let j = 0; j < r.data.length / r.dim; j++) out.push(r.data.subarray(j * r.dim, (j + 1) * r.dim));
+  }
+  return out;
+}
+async function nliScores(premises, hypotheses) {  // -> [{e: supports, c: contradicts}] for each pair
+  const out = [];
+  for (let i = 0; i < premises.length; i += 8) {
+    const r = await meaningCall({op: "nli", premises: premises.slice(i, i + 8), hypotheses: hypotheses.slice(i, i + 8)});
+    for (let j = 0; j < r.data.length / 3; j++) {
+      const [c, e, n] = r.data.slice(j * 3, j * 3 + 3), m = Math.max(c, e, n), s = Math.exp(c - m) + Math.exp(e - m) + Math.exp(n - m);
+      out.push({c: Math.exp(c - m) / s, e: Math.exp(e - m) / s});
+    }
+  }
+  return out;
+}
+// a small cache in the browser: papers' fingerprints and the verdicts already worked out
+const meaningDb = (() => { let db; return () => db || (db = new Promise((res) => {
+  try { const r = indexedDB.open("citrello-meaning", 1);
+    r.onupgradeneeded = () => { r.result.createObjectStore("vec"); r.result.createObjectStore("nli"); };
+    r.onsuccess = () => res(r.result); r.onerror = () => res(null);
+  } catch { res(null); } })); })();
+async function cacheGet(store, key) { const db = await meaningDb(); if (!db) return undefined;
+  return new Promise((res) => { try { const r = db.transaction(store).objectStore(store).get(key); r.onsuccess = () => res(r.result); r.onerror = () => res(undefined); } catch { res(undefined); } }); }
+async function cachePut(store, key, val) { const db = await meaningDb(); if (!db) return;
+  try { db.transaction(store, "readwrite").objectStore(store).put(val, key); } catch {} }
+const hash = (s) => { let h1 = 0xdeadbeef, h2 = 0x41c6ce57; for (let i = 0; i < s.length; i++) { const c = s.charCodeAt(i);
+  h1 = Math.imul(h1 ^ c, 2654435761); h2 = Math.imul(h2 ^ c, 1597334677); }
+  h1 = Math.imul(h1 ^ (h1 >>> 16), 2246822507) ^ Math.imul(h2 ^ (h2 >>> 13), 3266489909);
+  h2 = Math.imul(h2 ^ (h2 >>> 16), 2246822507) ^ Math.imul(h1 ^ (h1 >>> 13), 3266489909);
+  return (h2 >>> 0).toString(36) + (h1 >>> 0).toString(36); };
+const claimOf = (sentence) => sentence.replace(/\[@[^\]]*\]|\[\d+(?:[,–\-]\s*\d+)*\]|\([^()]*\d{4}[a-z]?[^()]*\)/g, " ").replace(/\s+/g, " ")
+  .replace(/\s+([.,;:!?])/g, "$1").trim();  // "…cost [@Key]." -> "…cost." (a stray space changes the verdict)
+const wordsOf = (t) => new Set((t.toLowerCase().match(/[a-zÀ-ɏ]{4,}/g) || []).filter((w) => !SRC_STOP.has(w)).map((w) => w.slice(0, 6)));
+
+const paperCache = new Map();  // key -> {sentences, vecs} for this visit
+async function paperVectors(key, info) {  // each sentence of the paper as a "meaning fingerprint" (cached in the browser)
+  const id = `${EMBED_MODEL}|s|${key}|${info.version}`;
+  if (paperCache.has(id)) return paperCache.get(id);
+  let vecs = await cacheGet("vec", id);
+  if (vecs && vecs.n === info.sentences.length) vecs = Array.from({length: vecs.n}, (_, i) => new Float32Array(vecs.buf, i * vecs.dim * 4, vecs.dim));
+  else {
+    vecs = await embedTexts(info.sentences);
+    const dim = vecs[0] ? vecs[0].length : 0, buf = new Float32Array(vecs.length * dim);
+    vecs.forEach((v, i) => buf.set(v, i * dim));
+    cachePut("vec", id, {n: vecs.length, dim, buf: buf.buffer});
+  }
+  const out = {sentences: info.sentences, vecs};
+  paperCache.set(id, out);
+  return out;
+}
+function spanAround(sents, i, max = 420) {  // the sentence with its neighbours, for context ("It accounted for…")
+  let lo = i, hi = i, text = sents[i];
+  if (i > 0 && text.length + sents[i - 1].length <= max) { lo = i - 1; text = sents[lo] + " " + text; }
+  if (i + 1 < sents.length && text.length + sents[i + 1].length <= max) { hi = i + 1; text = text + " " + sents[hi]; }
+  return text;
+}
+let meaningRun = 0;
+async function meaningPass(s, onStep) {  // turns word matches into verdicts, sentence by sentence (in place)
+  const run = ++meaningRun;
+  const keys = [...new Set(s.sentences.flatMap((x) => x.papers.filter((p) => p.key && (p.status === "found" || p.status === "no_match")).map((p) => p.key)))];
+  if (!keys.length) return;
+  const {papers} = await post("/api/sources/windows", {keys});
+  s.meaning = {done: 0, papers: Object.keys(papers).length, ready: new Set()};
+  const order = (arr) => arr.map((v, i) => [v, i]).sort((a, b) => b[0] - a[0]).map((a) => a[1]);
+  for (const [n, x] of s.sentences.entries()) {
+    if (run !== meaningRun) return;  // a newer check started
+    const claim = claimOf(x.sentence);
+    let q = null;
+    for (const p of x.papers) {
+      const info = papers[p.key];
+      if (!info || !info.sentences.length || !claim) continue;
+      const paper = await paperVectors(p.key, info);
+      s.meaning.ready.add(p.key);
+      if (!q) [q] = await embedTexts([claim]);
+      const sims = paper.vecs.map((v) => { let d = 0; for (let i = 0; i < v.length; i++) d += v[i] * q[i]; return d; });
+      const cw = wordsOf(claim), overlap = paper.sentences.map((t) => { let k = 0; for (const w of wordsOf(t)) if (cw.has(w)) k++; return k; });
+      const cands = [...new Set([...order(sims).slice(0, 4), ...order(overlap).slice(0, 1)])];
+      const spans = cands.map((i) => spanAround(paper.sentences, i));  // what's shown: with its neighbours
+      const premises = cands.map((i) => (i > 0 && /^(it|its|this|these|those|they|their|such|he|she|the latter|the former)\b/i.test(paper.sentences[i])
+        ? paper.sentences[i - 1] + " " : "") + paper.sentences[i]);  // what's judged: the sentence itself
+      const verdicts = new Array(cands.length), todo = [];
+      for (const [j, pr] of premises.entries()) {
+        const k = hash(NLI_MODEL + "|" + claim + "|" + pr);
+        verdicts[j] = await cacheGet("nli", k);
+        if (!verdicts[j]) todo.push([j, k]);
+      }
+      if (todo.length) {
+        const sc = await nliScores(todo.map(([j]) => premises[j]), todo.map(() => claim));
+        todo.forEach(([j, k], t) => { verdicts[j] = sc[t]; cachePut("nli", k, sc[t]); });
+      }
+      const passage = (j) => ({text: spans[j], at: Math.round(100 * cands[j] / Math.max(paper.sentences.length, 1)), e: verdicts[j].e, c: verdicts[j].c, sim: sims[cands[j]]});
+      const js = cands.map((_, j) => j);
+      const sup = js.filter((j) => verdicts[j].e >= 0.5).sort((a, b) => verdicts[b].e - verdicts[a].e);
+      // a contradiction must be about the same thing (unrelated text can look "contradictory" to the model)
+      let con = js.filter((j) => verdicts[j].c >= 0.6 && verdicts[j].e < 0.2 && sims[cands[j]] >= 0.45).sort((a, b) => verdicts[b].c - verdicts[a].c);
+      if (!sup.length && con.length) {  // read with its neighbours, does it still contradict? ("halved that cost" needs the sentence before)
+        const again = [];
+        for (const j of con) {
+          const k = hash(NLI_MODEL + "|" + claim + "|" + spans[j]);
+          let v = await cacheGet("nli", k);
+          if (!v) { [v] = await nliScores([spans[j]], [claim]); cachePut("nli", k, v); }
+          if (v.e >= 0.5) { sup.push(j); verdicts[j] = v; }
+          else if (v.c >= 0.6) again.push(j);
+        }
+        con = again;
+      }
+      if (sup.length) { p.status = "supports"; p.passages = [passage(sup[0])]; }
+      else if (con.length) { p.status = "contradicts"; p.passages = [passage(con[0])]; }
+      else { p.status = "unclear"; p.passages = [passage(0)]; }  // the closest passage by meaning
+    }
+    s.meaning.done = n + 1;
+    if (onStep) onStep();
+  }
+}
+let meaningPaint = 0;
+function startMeaning() {  // after the word matches are shown: work out the verdicts, showing them as they come
+  const s = chk && chk.sources;
+  if (!s || s.meaningState) return;
+  if (!s.sentences.some((x) => x.papers.some((p) => p.status === "found" || p.status === "no_match"))) return;
+  s.meaningState = "running";
+  const paint = () => { if (chk && chk.sources === s && Date.now() - meaningPaint > 1200) { meaningPaint = Date.now(); renderCheck(); } };
+  meaning.onProgress = () => { if ($("srcMeaning") && chk.sources === s) $("srcMeaning").innerHTML = meaningLine(s); };
+  meaningPass(s, paint).then(() => { s.meaningState = "done"; if (chk && chk.sources === s) renderCheck(); })
+    .catch((e) => { s.meaningState = "failed"; s.meaningError = e.message; if (chk && chk.sources === s) renderCheck(); });
+}
+function meaningLine(s) {
+  if (s.meaningState === "failed") return `Matched by words only: the meaning models couldn't load (${esc(s.meaningError || "offline?")}).`;
+  if (s.meaningState === "done") return "Verdicts by two small language models on your computer: a pointer, not proof. Read the passage.";
+  const dl = meaningDownload();
+  if (dl !== null) return `Downloading the meaning models (first time only, about 220 MB, kept by your browser): ${dl}%`;
+  const m = s.meaning || {done: 0, papers: 0, ready: new Set()};
+  return `Reading the papers for meaning, on your computer: sentence ${m.done} of ${s.sentences.length}, ${m.ready.size} of ${m.papers} paper${m.papers === 1 ? "" : "s"} read.
+    The first time takes a few seconds per paper; after that it's instant. Keep working meanwhile.`;
 }
 
 // ---------- documents: LaTeX ----------
@@ -2384,9 +2579,9 @@ const TOURS = {
      text: "<p>Papers without text can be fetched right here: with the browser extension (your university access), as free copies, or from PDFs you have. The sentences fill in as the texts arrive.</p>",
      missing: "<p>Every cited paper has its text: nothing to fetch.</p>"},
     {el: "#chkSrc", title: "Read them side by side",
-     text: "<p>Under each sentence: the passages of the cited paper that match it best, with the shared words highlighted. If the paper doesn't say what you wrote, change the sentence or the citation.</p>",
+     text: "<p>Under each sentence: the passage of the cited paper that matches it best, and whether it seems to <b>support</b> what you wrote, <b>contradict</b> it, or <b>not clearly say</b> it. Read the passage: the verdict is a pointer, not proof. Use the filters to see the doubtful ones first.</p>",
      missing: "<p>No passages to show yet: add the papers' text (Full texts), then click <b>Show again</b>.</p>"},
-    {title: "Want a verdict on each sentence?", text: `<p>Claude or ChatGPT can judge every sentence using these texts through Citrello. Attach your paper in the new chat; the question is filled in for you. The first time, Citrello shows you how to connect it (about two minutes).</p>${tourCopy(SOURCES_PROMPT)}`,
+    {title: "Want a second opinion?", text: `<p>Claude or ChatGPT can also judge every sentence, using these texts through Citrello. Attach your paper in the new chat; the question is filled in for you. The first time, Citrello shows you how to connect it (about two minutes).</p>${tourCopy(SOURCES_PROMPT)}`,
      actions: AI_LINKS(SOURCES_PROMPT)}]},
   fix: {title: "Turn typed references into live citations", steps: [STEP_DOC("the Word document"), STEP_WAIT,
     {el: "#chkFixPanel", title: "Choose the style", text: "<p>Pick a style from the list, or type a journal's name underneath to find its own style (there are over 10,000).</p>"},
@@ -2469,7 +2664,11 @@ renderTiles();
 document.addEventListener("click", (e) => {  // "next step" links anywhere: go to that screen (closing a guide window first)
   const b = e.target.closest("[data-go], [data-open-project]"); if (!b) return;
   if ($("guide").open) $("guide").close();
-  if (b.dataset.openProject !== undefined) { $("projectFilter").value = b.dataset.openProject; return goTab("library"); }
+  if (b.dataset.openProject !== undefined) {
+    const sel = $("projectFilter"), v = b.dataset.openProject;
+    if (![...sel.options].some((o) => o.value === v)) sel.add(new Option(v, v));  // a project made a moment ago
+    sel.value = v; return goTab("library");
+  }
   if (b.dataset.go === "verify") { goTab("library"); return $("verifyBtn").click(); }
   goTab(b.dataset.go);
 });

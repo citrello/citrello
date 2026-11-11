@@ -298,3 +298,63 @@ def check(path):
             break
     counts["papers"] = len({p["key"] or p["title"] for s in out for p in s["papers"]})
     return {"sentences": out, "counts": counts, "limited": len(out) >= MAX_SENTENCES}
+
+
+# ---------------------------------------------------------------------------
+# Passages for matching by meaning (done in the page: a small language model runs in the browser)
+# ---------------------------------------------------------------------------
+
+REFS_HEAD = re.compile(r"\n\s*(?:\d+\.?\s*)?(references|bibliography|literature cited|works cited|reference list)\s*\n", re.I)
+
+
+def body_text(text):
+    """The paper without its own reference list (its last "References" heading in the second half)."""
+    heads = [m for m in REFS_HEAD.finditer(text) if m.start() > len(text) * 0.5]
+    return text[:heads[-1].start()] if heads else text
+
+
+def windows(text, size=450):
+    """The paper as readable passages of about `size` characters (whole sentences), in order."""
+    text = body_text(text)
+    sents = [s.strip() for s in re.split(r"(?<=[.!?])\s+|\n{2,}", text) if len(s.strip()) > 2]
+    out, cur = [], ""
+    for s in sents:
+        if cur and len(cur) + len(s) > size:
+            out.append(cur)
+            cur = ""
+        cur = (cur + " " + s).strip()
+        while len(cur) > size * 2:  # a run-on "sentence" (tables, references): cut it
+            out.append(cur[:size])
+            cur = cur[size:]
+    if cur:
+        out.append(cur)
+    return out
+
+
+def paper_sentences(text, cap=800):
+    """The paper's body as sentences (for matching by meaning: each is compared with the cited sentence)."""
+    out = []
+    for s in re.split(r"(?<=[.!?])\s+(?=[A-Z0-9(\[\"“])|\n{2,}", body_text(text)):
+        s = re.sub(r"\s+", " ", s).strip()
+        if len(s) < 25 or not re.search(r"[a-z]{3}", s):  # headings, page furniture, numbers
+            continue
+        while len(s) > 600:
+            out.append(s[:400])
+            s = s[400:]
+        out.append(s)
+        if len(out) >= cap:
+            break
+    return out
+
+
+def paper_windows(keys):
+    """{key: {"version", "sentences"}} for library items with full text (version changes when the text does)."""
+    data = library.load()
+    out = {}
+    for key in keys:
+        it = library.get(data, key)
+        text = fulltext.read(it) if it else None
+        if text:
+            ft = it.get("fulltext") or {}
+            out[it["key"]] = {"version": f"{ft.get('words', 0)}-{ft.get('added', '')}", "sentences": paper_sentences(text)}
+    return out
