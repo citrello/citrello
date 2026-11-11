@@ -901,6 +901,10 @@ class Handler(BaseHTTPRequestHandler):
             name = re.sub(r"[^\w\-. ]", "_", name)
             return self.send(200, body, "application/octet-stream",
                              {"Content-Disposition": "attachment; filename*=UTF-8''" + urllib.parse.quote(name)})
+        if path == "/api/ai/session":  # the page calls Citrello's server for Claude checks with this account's token
+            a = bridge_client.load_account()
+            return self.send(200, {"signed_in": bool(a), "token": a and a.get("token"), "email": a and a.get("email"),
+                                   "bridge": bridge_client.BRIDGE})
         if path == "/api/sample-paper":  # a short paper with typical mistakes planted in it (Home's tours)
             return self.send(200, doccheck.sample_paper(), "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
                              {"Content-Disposition": "attachment; filename*=UTF-8''" + urllib.parse.quote(doccheck.SAMPLE_NAME)})
@@ -1259,8 +1263,12 @@ class Handler(BaseHTTPRequestHandler):
             except ValueError as e:
                 return self.send(400, {"error": str(e)})
             return self.send(200, check_public(m.group(1)))
-        if path == "/api/sources/windows":  # the cited papers as passages, for matching by meaning in the page
-            return self.send(200, {"papers": sources.paper_windows([str(k) for k in self.json_body().get("keys", [])][:500])})
+        if path == "/api/sources/library-candidates":  # papers in the library that may support a sentence
+            b = self.json_body()
+            return self.send(200, {"papers": sources.library_candidates(str(b.get("claim", ""))[:1200], [str(k) for k in b.get("exclude", [])])})
+        m = re.fullmatch(r"/api/doccheck/(\w+)/ai-items", path)
+        if m and m.group(1) in CHECKS and CHECKS[m.group(1)].get("sources"):  # what Claude reads for each cited sentence
+            return self.send(200, {"items": sources.ai_items(CHECKS[m.group(1)]["sources"])})
         m = re.fullmatch(r"/api/doccheck/(\w+)/sources", path)
         if m and m.group(1) in CHECKS and CHECKS[m.group(1)].get("report"):  # each cited sentence and its paper's text
             c = CHECKS[m.group(1)]

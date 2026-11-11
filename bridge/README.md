@@ -97,3 +97,15 @@ device token as a subprotocol: `new WebSocket("wss://mcp.citrello.app/device/con
 repositories don't let web pages download their files. The Worker looks the DOI up on Unpaywall, fetches the free
 PDF (up to four locations, 40 MB max, must start with `%PDF-`) and returns it; nothing is stored. Tested by
 `tests/test_web_bridge_e2e.py::test_find_free_full_texts_in_the_browser` against the real services.
+
+## Claude checks (`/api/ai/*`, a pro feature)
+"What your sources say" asks Claude, through here, whether each cited paper supports the sentence (`/api/ai/judge`:
+the sentence plus a few passages of the paper's text picked by the app; structured JSON answer), and can look for
+supporting papers on the web (`/api/ai/find-web`, Claude's web search tool). Signed-in accounts only; nothing is
+stored except a monthly count per account (`ai_usage`, one unit per sentence-and-paper, 5 per web search).
+- Secret: `ANTHROPIC_API_KEY` (GitHub secret of the same name; the deploy workflow passes it on). Without it the
+  endpoints answer "Claude checks aren't switched on yet" and the app keeps showing word matches.
+- Variables (optional, in `wrangler.toml` `[vars]`): `AI_MODEL` (default `claude-opus-5-5`), `AI_FREE_MONTHLY`
+  (default 30), `AI_PRO_MONTHLY` (default 3000). `ANTHROPIC_BASE_URL` points the tests at a pretend Claude.
+- Pro, until payments exist: `curl -X POST -H "Authorization: Bearer ADMIN_TOKEN" -H "Content-Type: application/json"
+  -d '{"email":"someone@example.com","pro":true}' https://mcp.citrello.app/admin/pro`

@@ -300,10 +300,6 @@ def check(path):
     return {"sentences": out, "counts": counts, "limited": len(out) >= MAX_SENTENCES}
 
 
-# ---------------------------------------------------------------------------
-# Passages for matching by meaning (done in the page: a small language model runs in the browser)
-# ---------------------------------------------------------------------------
-
 REFS_HEAD = re.compile(r"\n\s*(?:\d+\.?\s*)?(references|bibliography|literature cited|works cited|reference list)\s*\n", re.I)
 
 
@@ -313,48 +309,57 @@ def body_text(text):
     return text[:heads[-1].start()] if heads else text
 
 
-def windows(text, size=450):
-    """The paper as readable passages of about `size` characters (whole sentences), in order."""
-    text = body_text(text)
-    sents = [s.strip() for s in re.split(r"(?<=[.!?])\s+|\n{2,}", text) if len(s.strip()) > 2]
-    out, cur = [], ""
-    for s in sents:
-        if cur and len(cur) + len(s) > size:
-            out.append(cur)
-            cur = ""
-        cur = (cur + " " + s).strip()
-        while len(cur) > size * 2:  # a run-on "sentence" (tables, references): cut it
-            out.append(cur[:size])
-            cur = cur[size:]
-    if cur:
-        out.append(cur)
-    return out
+# ---------------------------------------------------------------------------
+# For Claude's verdicts (a pro feature; the page sends these to Citrello's server, which asks Claude)
+# ---------------------------------------------------------------------------
+
+def _passages_for(it, text, claim, n=6):
+    """The paper's passages most likely to matter for the claim: its opening (abstract) and the best matches."""
+    body = body_text(text)
+    found = [p["text"] for p in fulltext.passages(body, claim, n=n)]
+    opening = body[:1200].strip()
+    if opening and not any(opening[:200] in f for f in found):
+        found = [opening] + found[:n - 1]
+    return found
 
 
-def paper_sentences(text, cap=800):
-    """The paper's body as sentences (for matching by meaning: each is compared with the cited sentence)."""
-    out = []
-    for s in re.split(r"(?<=[.!?])\s+(?=[A-Z0-9(\[\"“])|\n{2,}", body_text(text)):
-        s = re.sub(r"\s+", " ", s).strip()
-        if len(s) < 25 or not re.search(r"[a-z]{3}", s):  # headings, page furniture, numbers
+def ai_items(report):
+    """One item per cited sentence: the claim and, for each cited paper with text, its best passages."""
+    lib, items = _Library(library.load()), []
+    for i, x in enumerate(report["sentences"]):
+        claim = re.sub(r"\s+([.,;:!?])", r"\1", re.sub(r"\s+", " ", re.sub(
+            r"\[@[^\]]*\]|\[\d+(?:[,\u2013\-]\s*\d+)*\]|\([^()]*\d{4}[a-z]?[^()]*\)", " ", x["sentence"]))).strip()
+        papers = []
+        for j, p in enumerate(x["papers"]):
+            it = lib.by_key.get(p.get("key") or "")
+            text = it and lib.text(it)
+            if text:
+                papers.append({"ref": f"{j}", "key": it["key"], "title": it["csl"].get("title", ""),
+                               "passages": _passages_for(it, text, claim)})
+        if papers and claim:
+            items.append({"id": str(i), "claim": claim, "papers": papers})
+    return items
+
+
+def library_candidates(claim, exclude=(), n=6):
+    """Papers in the library that may support the claim: their best passages (full text, else the abstract)."""
+    data, exclude = library.load(), set(exclude)
+    q = [w for w in fulltext._words(claim) if w not in fulltext.STOP]
+    if not q:
+        return []
+    scored = []
+    for it in data["items"]:
+        if it["key"] in exclude:
             continue
-        while len(s) > 600:
-            out.append(s[:400])
-            s = s[400:]
-        out.append(s)
-        if len(out) >= cap:
-            break
-    return out
-
-
-def paper_windows(keys):
-    """{key: {"version", "sentences"}} for library items with full text (version changes when the text does)."""
-    data = library.load()
-    out = {}
-    for key in keys:
-        it = library.get(data, key)
-        text = fulltext.read(it) if it else None
-        if text:
-            ft = it.get("fulltext") or {}
-            out[it["key"]] = {"version": f"{ft.get('words', 0)}-{ft.get('added', '')}", "sentences": paper_sentences(text)}
-    return out
+        text = fulltext.read(it) or it["csl"].get("abstract") or ""
+        if len(text) < 200:
+            continue
+        best = fulltext.passages(body_text(text), claim, n=3)
+        if not best:
+            continue
+        words = set(fulltext._words(" ".join(b["text"] for b in best)))
+        score = sum(1 for w in set(q) if w in words) / len(set(q))
+        scored.append((score, it, [b["text"] for b in best], bool(it.get("fulltext"))))
+    scored.sort(key=lambda t: -t[0])
+    return [{"ref": it["key"], "key": it["key"], "title": it["csl"].get("title", ""), "label": _label(it["csl"]),
+             "passages": passages, "full_text": ft} for score, it, passages, ft in scored[:n] if score >= 0.3]

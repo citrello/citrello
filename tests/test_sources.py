@@ -75,18 +75,28 @@ def test_only_word_documents(tmp_path):
         sources.check(str(tmp_path / "a.pdf"))
 
 
-def test_windows_for_matching_by_meaning(tmp_path, monkeypatch):
-    _library(tmp_path, monkeypatch)
-    w = sources.windows(PAPER)
-    assert all(len(x) <= 900 for x in w) and len(w) > 3
-    assert any("42% of the total decommissioning cost" in x for x in w)
-    got = sources.paper_windows(["Topham2017", "Vetters2024", "Nobody"])
-    assert list(got) == ["Topham2017"] and got["Topham2017"]["version"]
-    sents = got["Topham2017"]["sentences"]
-    assert "Removing the subsea export cables accounted for 42% of the total decommissioning cost, more than the turbines themselves." in sents
-    assert "Results" not in sents  # headings aren't sentences
-
-
-def test_windows_leave_out_the_papers_own_references():
+def test_the_papers_own_reference_list_is_left_out():
     text = "Intro.\n\n" + "Body sentence about cables. " * 60 + "\n\nReferences\n\n1. Someone (2001) A cited paper about cables."
-    assert not any("A cited paper" in w for w in sources.windows(text))
+    assert "A cited paper" not in sources.body_text(text) and "Body sentence" in sources.body_text(text)
+
+
+def test_what_claude_reads(tmp_path, monkeypatch):
+    _library(tmp_path, monkeypatch)
+    d = docx.Document()
+    d.add_paragraph("Taking the power lines out was the costliest operation [@Topham2017]. Reviews compare options [@Vetters2024].")
+    path = str(tmp_path / "c.docx")
+    d.save(path)
+    items = sources.ai_items(sources.check(path))
+    assert len(items) == 1  # Vetters has no text: nothing for Claude to read
+    it = items[0]
+    assert it["claim"] == "Taking the power lines out was the costliest operation."  # the citation taken out
+    assert it["papers"][0]["key"] == "Topham2017"
+    assert any("42% of the total decommissioning cost" in p for p in it["papers"][0]["passages"])
+    assert it["papers"][0]["passages"][0].startswith("Abstract")  # the opening first
+
+
+def test_library_candidates(tmp_path, monkeypatch):
+    _library(tmp_path, monkeypatch)
+    got = sources.library_candidates("Removing subsea cables is the largest decommissioning cost.")
+    assert [p["key"] for p in got] == ["Topham2017"] and got[0]["full_text"]
+    assert sources.library_candidates("Removing subsea cables is the largest decommissioning cost.", exclude=["Topham2017"]) == []

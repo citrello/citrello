@@ -170,3 +170,96 @@ def test_find_free_full_texts_in_the_browser(browser_name, tmp_path):
         expect(page.locator('#libRows .ref[data-sel="lecun2015"] .ftmark')).to_have_count(0)
         assert not errors, errors
         b.close()
+
+
+@pytest.mark.parametrize("browser_name", BROWSERS)
+def test_claude_checks_what_my_sources_say(browser_name, tmp_path):
+    """Pro: Claude's verdict for each citation (through the bridge, with a pretend Claude API), the exact words in
+    "More details", and finding support in the library and on the web (and adding the paper found)."""
+    from playwright.sync_api import expect, sync_playwright
+    import docx
+    import anthropic_mock
+    from test_sources import PAPER
+    srv = anthropic_mock.start()
+    email = f"ai-{browser_name}-{int(time.time())}@example.com"
+    bib = tmp_path / "two.bib"
+    bib.write_text("@article{topham2017, title={Sustainable decommissioning of an offshore wind farm}, author={Topham, Eva}, year={2017}}\n"
+                   "@article{lee2021, title={Export cable recovery costs}, author={Lee, Ann}, year={2021}}\n", encoding="utf-8")
+    d = docx.Document()
+    d.add_paragraph("Removing the export cables was the largest share of the decommissioning cost [@topham2017]. "
+                    "Leaving the cables buried doubled the cost [@topham2017].")
+    doc = tmp_path / "claims.docx"
+    d.save(str(doc))
+    lee = ("Export cable recovery costs.\n\n" + " ".join(
+        f"Part {i}. In every farm studied, leaving the export cables buried in place doubled the cost of later works." for i in range(15)))
+    try:
+        with sync_playwright() as pw:
+            b = getattr(pw, browser_name).launch()
+            page = b.new_context(viewport={"width": 1280, "height": 900}).new_page()
+            errors = []
+            page.on("pageerror", lambda e: errors.append(str(e)))
+            page.goto(f"{BASE}/app/?bridge={urllib.parse.quote(B.bc.BRIDGE)}")
+            page.wait_for_selector("#webCover", state="detached", timeout=LOAD)
+            page.click("#wWebStart")
+            page.click('.side button.navb[data-tab="library"]')
+            page.click("#openImport")
+            page.click('[data-guide="imp-file"]')
+            page.set_input_files("#importFile", str(bib))
+            expect(page.locator("#gResult")).to_contain_text("2 added", timeout=60000)
+            page.keyboard.press("Escape")
+            for key, text in (("topham2017", PAPER), ("lee2021", lee)):
+                assert page.evaluate("""async ([key, text]) => (await fetch('/api/clip/fulltext', {method: 'POST',
+                    headers: {'Content-Type': 'application/json', 'X-Key': key}, body: JSON.stringify({text})})).status""", [key, text]) == 200
+            tab = lambda name: page.click(f'.side button.navb[data-tab="{name}"]')  # noqa: E731
+            tab("documents")
+            page.set_input_files("#chkFile", str(doc))
+            page.click("#chkSources", timeout=120000)
+            # not signed in: word matches, and the way to Claude's verdicts
+            expect(page.locator("#srcAi")).to_contain_text("sign in to your Citrello account", timeout=30000)
+            tab("settings")
+            page.fill("#acctEmail", email)
+            page.click("#acctSend")
+            expect(page.locator("#acctCodeRow")).to_be_visible(timeout=30000)
+            page.fill("#acctCode", B.bc.start_sign_in(email)["dev_code"])
+            page.click("#acctVerify")
+            expect(page.locator("#acctIn")).to_be_visible(timeout=30000)
+            tab("documents")
+            page.click("#chkSources")
+            page.click("#srcAiGo", timeout=30000)  # agrees to send sentences and passages to Claude, once
+            src = page.locator("#chkSrc .src")
+            expect(src.nth(0)).to_contain_text("Supports this", timeout=60000)
+            expect(src.nth(1)).to_contain_text("Seems to contradict this")
+            expect(src.nth(0).locator(".cite")).to_have_text("[@topham2017]")  # the citation, in colour
+            expect(page.locator("#srcAi")).to_contain_text("Claude checks this month")
+            # More details: Claude's reason and the exact words, highlighted in their passage
+            src.nth(1).locator("[data-src-more]").click()
+            expect(src.nth(1).locator("mark")).to_contain_text("halved that cost")
+            expect(src.nth(1)).to_contain_text("The paper says it halved the cost.")
+            # find support in the library: another paper that says it
+            src.nth(1).locator('[data-src-find="library"]').click()
+            expect(src.nth(1).locator(".src-found")).to_contain_text("Found in your library", timeout=60000)
+            expect(src.nth(1).locator(".src-found")).to_contain_text("Export cable recovery costs")
+            expect(src.nth(1).locator('.src-found button[data-copy="[@lee2021]"]')).to_be_visible()
+            # and on the web: a search costs 5 checks, more than this free account has left: said plainly
+            src.nth(1).locator('[data-src-find="web"]').click()
+            found = src.nth(1).locator(".src-found")
+            expect(found).to_contain_text("Free accounts get 6 Claude checks a month", timeout=60000)
+            # with Citrello Pro (switched on by the admin for now): Claude's search, then the paper goes to the library
+            assert B.call("POST", "/admin/pro", {"email": email, "pro": True}, headers={"Authorization": "Bearer testadmin"})[0] == 200
+            src.nth(1).locator('[data-src-find="web"]').click()
+            expect(found).to_contain_text("Found on the web", timeout=60000)
+            expect(found).to_contain_text("Cable recovery dominates offshore wind decommissioning costs")
+            found.locator("[data-src-addweb]").click()
+            expect(found.locator("button[data-copy]")).to_be_visible(timeout=60000)
+            page.locator("#chkSrcPanel").scroll_into_view_if_needed()
+            page.screenshot(path=os.path.join(os.environ.get("CITRELLO_E2E_SHOTS") or str(tmp_path), f"web-bridge-{browser_name}-claude.png"))
+            # checking again doesn't ask (or pay) Claude twice: the verdicts come from this browser
+            n = len(anthropic_mock.SEEN)
+            page.click("#chkSources")
+            expect(src.nth(1)).to_contain_text("Seems to contradict this", timeout=30000)
+            expect(page.locator("#srcAi")).to_contain_text("Verdicts by Claude")
+            assert len(anthropic_mock.SEEN) == n
+            assert not errors, errors
+            b.close()
+    finally:
+        srv.stop()

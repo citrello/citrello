@@ -10,6 +10,7 @@
 //   /admin/stats|broadcast     user counts and feature emails (ADMIN_TOKEN)
 import { Relay } from "./relay.js";
 import * as pages from "./pages.js";
+import * as ai from "./ai.js";
 
 export { Relay };
 
@@ -609,6 +610,31 @@ function requireAdmin(request, env) {
   if (!env.ADMIN_TOKEN || !safeEqual(bearer(request), env.ADMIN_TOKEN)) throw new HttpError(401, "unauthorized");
 }
 
+// Claude checks (src/ai.js): signed-in accounts only; errors are explained in plain words
+async function aiCall(request, env, fn) {
+  const d = await deviceFromRequest(env, request);
+  try {
+    return json(await fn(d));
+  } catch (e) {
+    if (e instanceof ai.AiError) throw new HttpError(e.status, e.code, e.message);
+    if (ai.isApiError(e)) {  // the Claude API said no (busy, overloaded, bad key...)
+      console.error("Claude API", e.status, e.message);
+      throw new HttpError(e.status === 429 || e.status === 529 ? 503 : 502, "ai_unavailable",
+                          "Claude is busy or unavailable right now. Please try again in a minute.");
+    }
+    throw e;
+  }
+}
+
+// Turn Citrello Pro on or off for an account (until payments exist): {"email": ..., "pro": true}
+async function adminPro(request, env) {
+  requireAdmin(request, env);
+  const b = await readBody(request);
+  const r = await env.DB.prepare("UPDATE users SET pro = ? WHERE email = ?").bind(b.pro ? 1 : 0, String(b.email || "").trim().toLowerCase()).run();
+  if (!r.meta.changes) throw new HttpError(404, "not_found", "No account with that email.");
+  return json({ ok: true, email: b.email, pro: !!b.pro });
+}
+
 async function adminStats(request, env) {
   requireAdmin(request, env);
   const t = now(), d7 = t - 7 * 86400, d30 = t - 30 * 86400;
@@ -707,6 +733,10 @@ async function route(request, env, ctx) {
   if (path === "/api/signout" && m === "POST") return apiSignOut(request, env);
   if (path === "/api/account/delete" && m === "POST") return apiDeleteAccount(request, env);
   if (path === "/device/connect") return deviceConnect(request, env);
+  if (path === "/api/ai/quota" && m === "GET") return aiCall(request, env, (d) => ai.quota(env, d.user_id));
+  if (path === "/api/ai/judge" && m === "POST") return aiCall(request, env, async (d) => ai.judge(env, d.user_id, await readBody(request)));
+  if (path === "/api/ai/find-web" && m === "POST") return aiCall(request, env, async (d) => ai.findOnWeb(env, d.user_id, await readBody(request)));
+  if (path === "/admin/pro" && m === "POST") return adminPro(request, env);
 
   if (path === "/admin/stats") return adminStats(request, env);
   if (path === "/admin/broadcast" && m === "POST") return adminBroadcast(request, env);

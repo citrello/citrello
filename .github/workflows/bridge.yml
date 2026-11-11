@@ -8,7 +8,9 @@ name: Deploy bridge (mcp.citrello.app)
 on:
   push:
     branches: [main]
-    paths: ["bridge/**", ".github/workflows/bridge.yml", "tests/test_bridge_e2e.py", "tests/test_web_bridge_e2e.py"]
+    paths: ["bridge/**", ".github/workflows/bridge.yml", "tests/test_bridge_e2e.py", "tests/test_web_bridge_e2e.py",
+            # Claude checks: the bridge's AI endpoints and the screen that uses them
+            "tests/test_bridge_ai_e2e.py", "tests/anthropic_mock.py", "ui.html", "sources.py"]
   workflow_dispatch:
 
 concurrency: bridge-deploy
@@ -37,12 +39,14 @@ jobs:
       - name: End-to-end tests against a local copy of the bridge (the desktop app, and the web app in Chromium and WebKit)
         run: |
           npx wrangler d1 migrations apply citrello --local
-          npx wrangler dev --port 8787 --var DEV_RETURN_CODES:1 --var ADMIN_TOKEN:testadmin --var PUBLIC_URL:http://localhost:8787 > wrangler.log 2>&1 &
+          # Claude checks go to a pretend Claude API (tests/anthropic_mock.py, started by the tests): nothing is paid for
+          npx wrangler dev --port 8787 --var DEV_RETURN_CODES:1 --var ADMIN_TOKEN:testadmin --var PUBLIC_URL:http://localhost:8787 \
+            --var ANTHROPIC_BASE_URL:http://127.0.0.1:8799 --var ANTHROPIC_API_KEY:test-key --var AI_FREE_MONTHLY:6 > wrangler.log 2>&1 &
           for i in $(seq 60); do curl -sf http://localhost:8787/ > /dev/null && break; sleep 1; done
           (cd ../site/public && python -m http.server 8099 > /dev/null 2>&1 &)
           sleep 1
           cd .. && CITRELLO_BRIDGE_E2E=1 CITRELLO_BRIDGE=http://localhost:8787 CITRELLO_WEB_CHECK=http://localhost:8099 \
-            pytest -q tests/test_bridge_e2e.py tests/test_web_bridge_e2e.py || { cat bridge/wrangler.log; exit 1; }
+            pytest -q tests/test_bridge_e2e.py tests/test_bridge_ai_e2e.py tests/test_web_bridge_e2e.py || { cat bridge/wrangler.log; exit 1; }
 
   deploy:
     needs: check
@@ -55,6 +59,7 @@ jobs:
       CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
       RESEND_API_KEY: ${{ secrets.RESEND_API_KEY || secrets.RESEND_API_KEY_CITRELLO }}
       BRIDGE_ADMIN_TOKEN: ${{ secrets.BRIDGE_ADMIN_TOKEN }}
+      ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
     steps:
       - name: Skip when Cloudflare isn't set up yet
         id: ready
@@ -93,4 +98,5 @@ jobs:
         run: |
           [ -n "$RESEND_API_KEY" ] && printf '%s' "$RESEND_API_KEY" | npx wrangler secret put RESEND_API_KEY
           [ -n "$BRIDGE_ADMIN_TOKEN" ] && printf '%s' "$BRIDGE_ADMIN_TOKEN" | npx wrangler secret put ADMIN_TOKEN
+          [ -n "$ANTHROPIC_API_KEY" ] && printf '%s' "$ANTHROPIC_API_KEY" | npx wrangler secret put ANTHROPIC_API_KEY
           true

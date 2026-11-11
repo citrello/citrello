@@ -138,19 +138,22 @@ sentences refresh by themselves as texts arrive; long papers get filters (passag
 text / not in library) and 20 sentences at a time; PDFs say it works on Word for now. Also: an unreadable document
 offers the sample and "tell us"; "See them" after adding references; imports end with "Next: check them online ·
 get the papers' full texts"; Verify's problems have "Show only these"; "Still needs you" says what to do.
-**Matching by meaning** (11 Nov, Armin: word matching "doesn't work well"): in the page (desktop and web), a
-module worker loads transformers.js 3.0.2 from jsDelivr and two models from Hugging Face, cached by the browser
-(~220 MB once): all-MiniLM-L6-v2 (q8) fingerprints each sentence of the cited paper (`sources.paper_sentences`,
-`/api/sources/windows`, paper's own reference list left out, max 800 sentences) and the claim; the 4 closest + the
-best word match are judged by nli-deberta-v3-small (q8): supports (entailment >= 0.5) / seems to contradict
-(contradiction >= 0.6, same topic: similarity >= 0.45, and still contradicting when read with its neighbours) /
-doesn't clearly say (closest passage shown). Fingerprints and verdicts cached in IndexedDB. Tried and rejected:
-MiniLM/bge/e5/gte/arctic/mxbai embeddings alone (2/4 on hard cases), ms-marco and bge rerankers, nli xsmall and
-judging 3-sentence passages (missed paraphrases); a stray space before the full stop changed verdicts (fixed in
-claimOf). Speed on 4 cores, single-threaded (no cross-origin isolation): ~47 sentences/s fingerprinting, ~11
-verdicts/s, so a 103-paper document takes ~10–15 min the first time, instant after. Possible speed-ups: WebGPU,
-threads (needs COOP/COEP, which would break the Mendeley/clip pop-ups), fingerprinting papers when their text
-arrives. Falls back to word matches if the models can't load (offline). Privacy page updated.
+**Matching by meaning in the browser** (11 Nov) was tried and **removed the same day** (Armin: too slow, poor
+reasoning): MiniLM + nli-deberta-v3-small via transformers.js, ~220 MB download, 10–15 min first run for 103 papers.
+**Claude checks** (12 Nov, pro feature; Armin decides the business model later): the app picks passages of each cited
+paper's full text (`sources.ai_items`: the paper's opening + BM25 best matches) and the page sends them with the
+sentence to the bridge (`/api/ai/judge`, the account's token from `/api/ai/session`), which asks Claude
+(`bridge/src/ai.js`, official SDK 1.3.0, `AI_MODEL` default claude-opus-5-5 at effort low, structured JSON,
+server-side fallback "default") for supports / partly / contradicts / not found + exact quote + one-line reason.
+Verdicts cached in the browser (IndexedDB) so checking again never pays twice. Per citation: "More details" (the
+quote highlighted in its passage, the reason) and, when not supported, "Find support: in my library"
+(`sources.library_candidates` + Claude) or "on the web" (Claude web search, max 6 searches; "Add to my library").
+Monthly allowance per account (`ai_usage`; AI_FREE_MONTHLY 30, AI_PRO_MONTHLY 3000; web search = 5); Pro switched
+on by `/admin/pro` until payments exist. Consent asked once ("sends each cited sentence and a few passages").
+Tested with a pretend Claude API (tests/anthropic_mock.py) end to end in Chromium and WebKit; **not yet tested with
+the real Claude API** (waiting for Armin's ANTHROPIC_API_KEY GitHub secret). Cost note for Armin: Opus is $4/$20 per
+million tokens; one sentence-and-paper is about 2–3k tokens in, so roughly 1–2 cents each with Opus, about 40 times less
+with Haiku (AI_MODEL=claude-haiku-5-5).
 Next: an optional AI verdict with a cheap
 model paid by Citrello within a free monthly allowance for signed-in users (about 1–2 cents per paper); "find
 references" (OpenAlex + stronger model, ~5–10 cents per paragraph) later, possibly paid credits.

@@ -574,8 +574,10 @@ def test_web_app_home_and_tours(browser_name, tmp_path):
         tab(page, "documents")
         page.set_input_files("#chkFile", str(doc))
         page.click("#chkSources", timeout=120000)
-        expect(page.locator("#chkSrc")).to_contain_text("42% of the total decommissioning cost", timeout=60000)
-        expect(page.locator("#chkSrc")).to_contain_text("No text for this paper yet")
+        expect(page.locator('[data-row="0.0"]')).to_contain_text("Passages found", timeout=60000)
+        page.click('[data-row="0.0"] [data-src-more]')
+        expect(page.locator("#chkSrc")).to_contain_text("42% of the total decommissioning cost")
+        expect(page.locator('[data-row="1.0"]')).to_contain_text("No text yet")
         expect(page.locator("#srcFetch")).to_have_text("Get the free ones now")  # no extension yet
         shot(page, "sources")
         # with the extension: it's asked for exactly the papers without text, and their sentences fill in
@@ -589,58 +591,10 @@ def test_web_app_home_and_tours(browser_name, tmp_path):
         text = "Sailing through end-of-life challenges.\n\n" + " ".join(
             f"Part {i}. Reviews compare the end-of-life options for offshore wind: repowering, life extension and full removal." for i in range(20))
         page.evaluate("(text) => window.postMessage({citrelloExt: 'fulltext', key: 'vetters2024', text, id: 1}, location.origin)", text)
-        expect(page.locator("#chkSrc")).to_contain_text("repowering, life extension and full removal", timeout=60000)
+        expect(page.locator('[data-row="1.0"]')).to_contain_text("Passages found", timeout=60000)
+        page.click('[data-row="1.0"] [data-src-more]')
+        expect(page.locator("#chkSrc")).to_contain_text("repowering, life extension and full removal")
         expect(page.locator("#srcGet")).to_have_count(0)
-        assert not errors, errors
-        b.close()
-
-
-@pytest.mark.parametrize("browser_name", BROWSERS)
-def test_web_app_sources_by_meaning(browser_name, tmp_path):
-    """What your sources say, by meaning: two small language models in the page find the passage even in other words
-    and say whether it supports the sentence, contradicts it, or doesn't say (downloads the models: needs internet)."""
-    from playwright.sync_api import expect, sync_playwright
-    import docx
-    sys.path.insert(0, os.path.dirname(__file__))
-    from test_sources import PAPER
-    bib = tmp_path / "t.bib"
-    bib.write_text("@article{topham2017, title={Sustainable decommissioning of an offshore wind farm}, author={Topham, Eva}, "
-                   "year={2017}, doi={10.1016/j.renene.2016.10.066}}\n", encoding="utf-8")
-    d = docx.Document()
-    d.add_paragraph("Taking the power lines out of the seabed was the costliest operation [@topham2017]. "
-                    "Leaving the cables buried doubled the cost [@topham2017]. "
-                    "Most turbine blades end up in landfill [@topham2017].")
-    doc = tmp_path / "claims.docx"
-    d.save(str(doc))
-    with sync_playwright() as pw:
-        b = getattr(pw, browser_name).launch()
-        page = b.new_context(viewport={"width": 1280, "height": 860}).new_page()
-        errors = []
-        page.on("pageerror", lambda e: errors.append(str(e)))
-        open_app(page)
-        page.click("#wWebStart")
-        tab(page, "library")
-        page.click("#openImport")
-        page.click('[data-guide="imp-file"]')
-        page.set_input_files("#importFile", str(bib))
-        expect(page.locator("#gResult")).to_contain_text("1 added", timeout=60000)
-        page.keyboard.press("Escape")
-        assert page.evaluate("""async (text) => (await fetch('/api/clip/fulltext', {method: 'POST',
-            headers: {'Content-Type': 'application/json', 'X-Key': 'topham2017'}, body: JSON.stringify({text})})).status""", PAPER) == 200
-        tab(page, "documents")
-        page.set_input_files("#chkFile", str(doc))
-        page.click("#chkSources", timeout=120000)
-        expect(page.locator("#srcMeaning")).to_contain_text("Verdicts by two small language models", timeout=600000)
-        src = page.locator("#chkSrc .src")
-        expect(src.nth(0)).to_contain_text("Supports this")       # other words, same meaning
-        expect(src.nth(0)).to_contain_text("42% of the total decommissioning cost")
-        expect(src.nth(1)).to_contain_text("Seems to contradict this")  # the paper says it halved the cost
-        expect(src.nth(2)).to_contain_text("Doesn't clearly say this")   # the paper isn't about blades
-        expect(page.locator("#chkSrcChips")).to_contain_text("1 supported")
-        page.locator("#chkSrcPanel").scroll_into_view_if_needed()
-        page.screenshot(path=os.path.join(os.environ.get("CITRELLO_E2E_SHOTS") or str(tmp_path), f"web-app-{browser_name}-meaning.png"))
-        page.click("#chkSources")  # again: from the browser's cache, quickly
-        expect(page.locator("#srcMeaning")).to_contain_text("Verdicts by two small language models", timeout=60000)
         assert not errors, errors
         b.close()
 

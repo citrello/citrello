@@ -384,9 +384,14 @@ def test_07b2_what_my_sources_say(page, env):
     tab(page, "documents")
     page.set_input_files("#chkFile", path)
     page.click("#chkSources", timeout=60000)
-    expect(page.locator("#chkSrc")).to_contain_text("42% of the total decommissioning cost", timeout=30000)
+    # not signed in: the passages that match by words (Claude's verdicts need an account), behind "More details"
+    expect(page.locator("#srcAi")).to_contain_text("sign in to your Citrello account", timeout=30000)
+    expect(page.locator('[data-row="0.0"] .src-cite, [data-row="0.0"]')).to_contain_text("Passages found")
+    page.click('[data-row="0.0"] [data-src-more]')
+    expect(page.locator("#chkSrc")).to_contain_text("42% of the total decommissioning cost")
     expect(page.locator("#chkSrc mark").first).to_be_visible()  # the shared words are highlighted
-    expect(page.locator("#chkSrc")).to_contain_text("No text for this paper yet")  # Vetters has no text
+    expect(page.locator("#chkSrc .src").nth(0).locator(".cite")).to_have_text("[@topham2017]")  # the citation, in colour
+    expect(page.locator('[data-row="1.0"]')).to_contain_text("No text yet")  # Vetters has no text
     expect(page.locator("#chkSrcChips")).to_contain_text("2 cited sentences")
     # the paper without text can be fixed right here: its PDF, then the sentence fills in by itself
     expect(page.locator("#srcGet")).to_contain_text("1 cited paper has no text yet")
@@ -398,7 +403,9 @@ def test_07b2_what_my_sources_say(page, env):
                    [f"Part {i}. Reviews compare the end-of-life options for offshore wind farms: repowering, life "
                     f"extension and full removal, each with different costs." for i in range(14)]])
     page.set_input_files("#srcPdfs", pdf)
-    expect(page.locator("#chkSrc")).to_contain_text("repowering, life extension and full removal", timeout=30000)
+    expect(page.locator('[data-row="1.0"]')).to_contain_text("Passages found", timeout=30000)
+    page.click('[data-row="1.0"] [data-src-more]')
+    expect(page.locator("#chkSrc")).to_contain_text("repowering, life extension and full removal")
     expect(page.locator("#srcGet")).to_have_count(0)  # nothing missing any more
     expect(page.locator("#srcFetchMsg")).to_contain_text("Text added for 1 paper")
     # a long paper isn't one wall of text: filters, and 20 sentences at a time
