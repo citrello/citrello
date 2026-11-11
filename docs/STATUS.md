@@ -148,8 +148,13 @@ server-side fallback "default") for supports / partly / contradicts / not found 
 Verdicts cached in the browser (IndexedDB) so checking again never pays twice. Per citation: "More details" (the
 quote highlighted in its passage, the reason) and, when not supported, "Find support: in my library"
 (`sources.library_candidates` + Claude) or "on the web" (Claude web search, max 6 searches; "Add to my library").
-Monthly allowances per account (`ai_usage`), decided by Armin 12 Nov: free = 30 checks (a verdict or a library check
-counts 1) + 3 web checks; Pro = 3000 + 100 (placeholders). Pro switched on by `/admin/pro` until payments exist.
+Monthly allowances per account (`ai_usage`), decided by Armin 12 Nov (revised the same day): free = 10 citation
+checks a month, and only those are sent to Claude (the rest of the paper is blurred with "Get Pro"); finding support
+in the library or on the web is Pro only (server: `pro_only`); Pro = 3000 checks + 100 web checks (placeholders).
+UI (12 Nov): no word-match passages any more, only Claude's decisions; each row = the citation as in the paper ([12],
+[@Key] or author-year: `cite` from sources.py), the decision, "In my library", "From the web", "More details"
+(paper, reason, quote in its passage). Signing in and "Citrello Pro" open in windows (`openSignIn`, `openPro`); the
+Pro window's button emails hello@citrello.app until payments exist. Pro switched on by `/admin/pro` until payments exist.
 Estimated cost per action (Opus / Sonnet / Haiku): verdict ~1.2 / 0.6 / <0.1 cents; library check ~3 / 1.6 / 0.1
 cents; web check ~20–30 / 12–18 cents (Haiku can't use the newer web search). Model: Sonnet 5.5 for both (Armin, 12 Nov; `AI_MODEL`, `AI_WEB_MODEL` in bridge/wrangler.toml). A real test runs
 by hand: workflow "Real test of Claude checks" (tests/ai_real_check.py, real key, prints verdicts, time, cost). Consent asked once ("sends each cited sentence and a few passages").

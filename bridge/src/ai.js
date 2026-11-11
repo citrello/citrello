@@ -28,8 +28,8 @@ export async function quota(env, userId) {
   const row = await env.DB.prepare("SELECT units, web FROM ai_usage WHERE user_id = ? AND month = ?").bind(userId, month()).first();
   const pro = !!(u && u.pro);
   return { pro, month: month(), ready: !!env.ANTHROPIC_API_KEY,
-           used: row ? row.units : 0, limit: Number(pro ? env.AI_PRO_MONTHLY || 3000 : env.AI_FREE_MONTHLY || 30),
-           web_used: row ? row.web : 0, web_limit: Number(pro ? env.AI_PRO_WEB || 100 : env.AI_FREE_WEB || 3) };
+           used: row ? row.units : 0, limit: Number(pro ? env.AI_PRO_MONTHLY || 3000 : env.AI_FREE_MONTHLY || 10),
+           web_used: row ? row.web : 0, web_limit: Number(pro ? env.AI_PRO_WEB || 100 : env.AI_FREE_WEB || 0) };
 }
 
 async function spend(env, userId, units, kind = "units") {
@@ -39,7 +39,7 @@ async function spend(env, userId, units, kind = "units") {
   if (used + units > limit) {
     throw new AiError(402, "ai_limit", q.pro
       ? `You've used this month's ${limit} ${what}. They start again next month.`
-      : `Free accounts get ${limit} ${what} a month, and they're used up. Citrello Pro gives you many more.`);
+      : `Free accounts get ${limit} ${what} a month, and they're used up. Citrello Pro checks every citation.`);
   }
   const col = web ? "web" : "units";
   return async () => env.DB.prepare(`INSERT INTO ai_usage (user_id, month, ${col}) VALUES (?, ?, ?)
@@ -77,7 +77,13 @@ function textOf(msg) {
 }
 
 // {items: [{id, claim, papers: [{ref, title, passages: [text]}]}]} -> {results: [{id, paper, verdict, ...}], quota}
+// Finding support (in the library or on the web) is for Citrello Pro; free accounts get 10 verdicts a month.
+async function requirePro(env, userId) {
+  if (!(await quota(env, userId)).pro) throw new AiError(402, "pro_only", "Finding supporting papers is part of Citrello Pro.");
+}
+
 export async function judge(env, userId, body) {
+  if (body.kind === "library") await requirePro(env, userId);
   const items = (Array.isArray(body.items) ? body.items : []).slice(0, 12).map((it) => ({
     id: clip(it.id, 40), claim: clip(it.claim, 1200),
     papers: (Array.isArray(it.papers) ? it.papers : []).slice(0, 8).map((p) => ({
@@ -119,6 +125,7 @@ End your answer with only a JSON object, no other text after it:
 
 // {claim, context, exclude: [doi]} -> {papers: [...], quota}
 export async function findOnWeb(env, userId, body) {
+  await requirePro(env, userId);
   const claim = clip(body.claim, 1200);
   if (!claim) throw new AiError(400, "invalid_request", "Nothing to look for.");
   const exclude = (Array.isArray(body.exclude) ? body.exclude : []).slice(0, 50).map((d) => clip(d, 200).toLowerCase());

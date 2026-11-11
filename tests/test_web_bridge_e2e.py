@@ -174,20 +174,24 @@ def test_find_free_full_texts_in_the_browser(browser_name, tmp_path):
 
 @pytest.mark.parametrize("browser_name", BROWSERS)
 def test_claude_checks_what_my_sources_say(browser_name, tmp_path):
-    """Pro: Claude's verdict for each citation (through the bridge, with a pretend Claude API), the exact words in
-    "More details", and finding support in the library and on the web (and adding the paper found)."""
+    """Claude's decision for each citation (through the bridge, with a pretend Claude API): signing in in a window,
+    free accounts' allowance (the rest blurred, never sent), the exact words in "More details", and Pro (finding
+    support in the library and on the web, and adding the paper found)."""
     from playwright.sync_api import expect, sync_playwright
     import docx
     import anthropic_mock
     from test_sources import PAPER
     srv = anthropic_mock.start()
+    anthropic_mock.SEEN.clear()
     email = f"ai-{browser_name}-{int(time.time())}@example.com"
     bib = tmp_path / "two.bib"
     bib.write_text("@article{topham2017, title={Sustainable decommissioning of an offshore wind farm}, author={Topham, Eva}, year={2017}}\n"
                    "@article{lee2021, title={Export cable recovery costs}, author={Lee, Ann}, year={2021}}\n", encoding="utf-8")
     d = docx.Document()
     d.add_paragraph("Removing the export cables was the largest share of the decommissioning cost [@topham2017]. "
-                    "Leaving the cables buried doubled the cost [@topham2017].")
+                    "Leaving the cables buried doubled the cost [@topham2017]. "
+                    "Vessel day rates were the largest uncertainty in the cost model [@topham2017]. "
+                    "The farm had thirty turbines with foundations and cables [@topham2017].")
     doc = tmp_path / "claims.docx"
     d.save(str(doc))
     lee = ("Export cable recovery costs.\n\n" + " ".join(
@@ -210,58 +214,61 @@ def test_claude_checks_what_my_sources_say(browser_name, tmp_path):
             for key, text in (("topham2017", PAPER), ("lee2021", lee)):
                 assert page.evaluate("""async ([key, text]) => (await fetch('/api/clip/fulltext', {method: 'POST',
                     headers: {'Content-Type': 'application/json', 'X-Key': key}, body: JSON.stringify({text})})).status""", [key, text]) == 200
-            tab = lambda name: page.click(f'.side button.navb[data-tab="{name}"]')  # noqa: E731
-            tab("documents")
+            page.click('.side button.navb[data-tab="documents"]')
             page.set_input_files("#chkFile", str(doc))
             page.click("#chkSources", timeout=120000)
-            # not signed in: word matches, and the way to Claude's verdicts
-            expect(page.locator("#srcAi")).to_contain_text("sign in to your Citrello account", timeout=30000)
-            tab("settings")
-            page.fill("#acctEmail", email)
-            page.click("#acctSend")
-            expect(page.locator("#acctCodeRow")).to_be_visible(timeout=30000)
-            page.fill("#acctCode", B.bc.start_sign_in(email)["dev_code"])
-            page.click("#acctVerify")
-            expect(page.locator("#acctIn")).to_be_visible(timeout=30000)
-            tab("documents")
-            page.click("#chkSources")
-            page.click("#srcAiGo", timeout=30000)  # agrees to send sentences and passages to Claude, once
             src = page.locator("#chkSrc .src")
+            # not signed in: no word matches, an invitation; signing in happens in a window, right here
+            expect(page.locator("#srcAi")).to_contain_text("Let Claude check your citations", timeout=30000)
+            expect(src.nth(0)).to_contain_text("Not checked yet")
+            page.click("#srcAi [data-signin]")
+            expect(page.locator("#signinDlg")).to_be_visible()
+            page.fill("#siEmail", email)
+            page.click("#siSend")
+            expect(page.locator("#siStep2")).to_be_visible(timeout=30000)
+            page.fill("#siCode", B.bc.start_sign_in(email)["dev_code"])
+            page.click("#siVerify")
+            expect(page.locator("#signinDlg")).to_be_hidden(timeout=30000)
+            # straight on to Claude (no second question): this free account's 3 checks, the 4th citation blurred
             expect(src.nth(0)).to_contain_text("Supports this", timeout=60000)
             expect(src.nth(1)).to_contain_text("Seems to contradict this")
-            expect(src.nth(0).locator(".cite")).to_have_text("[@topham2017]")  # the citation, in colour
-            expect(page.locator("#srcAi")).to_contain_text("This month: 2 of 3 Claude checks, 0 of 3 web checks")
-            # More details: Claude's reason and the exact words, highlighted in their passage
+            expect(src.nth(3).locator(".src-locked")).to_be_visible()
+            expect(page.locator("#srcAi")).to_contain_text("1 more citation with Citrello Pro")
+            expect(page.locator("#srcAi")).to_contain_text("This month: 3 of 3 citation checks")
+            expect(src.nth(0).locator(".src-cite")).to_have_text("[@topham2017]")  # the citation as in the paper
+            assert not any("thirty turbines" in json.dumps(r["body"]) for r in anthropic_mock.SEEN)  # the blurred one was never sent
+            # More details: the paper, Claude's reason and the exact words, highlighted
             src.nth(1).locator("[data-src-more]").click()
             expect(src.nth(1).locator("mark")).to_contain_text("halved that cost")
             expect(src.nth(1)).to_contain_text("The paper says it halved the cost.")
-            # find support in the library: another paper that says it
+            # free account: finding support opens the window about Pro
+            src.nth(1).locator('[data-src-find="library"]').click()
+            expect(page.locator("#proDlg")).to_be_visible()
+            expect(page.locator("#proLead")).to_contain_text("better source in your library")
+            page.click("#proLater")
+            src.nth(3).locator(".src-locked").click()
+            expect(page.locator("#proDlg")).to_be_visible()
+            page.click("#proClose")
+            # with Pro (switched on by the admin for now): the library, then the web, then adding the paper found
+            assert B.call("POST", "/admin/pro", {"email": email, "pro": True}, headers={"Authorization": "Bearer testadmin"})[0] == 200
             src.nth(1).locator('[data-src-find="library"]').click()
             expect(src.nth(1).locator(".src-found")).to_contain_text("Found in your library", timeout=60000)
-            expect(src.nth(1).locator(".src-found")).to_contain_text("Export cable recovery costs")
             expect(src.nth(1).locator('.src-found button[data-copy="[@lee2021]"]')).to_be_visible()
-            # and on the web: Claude's search, then the paper goes to the library
             src.nth(1).locator('[data-src-find="web"]').click()
             found = src.nth(1).locator(".src-found")
             expect(found).to_contain_text("Found on the web", timeout=60000)
             expect(found).to_contain_text("Cable recovery dominates offshore wind decommissioning costs")
             found.locator("[data-src-addweb]").click()
             expect(found.locator("button[data-copy]")).to_be_visible(timeout=60000)
-            expect(page.locator("#srcAi")).to_contain_text("1 of 3 web checks")
-            # this test's free accounts get 3 checks: the 4th says so plainly; Pro (switched on by the admin for now) goes on
-            src.nth(1).locator('[data-src-find="library"]').click()
-            expect(src.nth(1).locator(".src-found")).to_contain_text("Free accounts get 3 Claude checks a month", timeout=60000)
-            assert B.call("POST", "/admin/pro", {"email": email, "pro": True}, headers={"Authorization": "Bearer testadmin"})[0] == 200
-            src.nth(1).locator('[data-src-find="library"]').click()
-            expect(src.nth(1).locator(".src-found")).to_contain_text("Found in your library", timeout=60000)
-            page.locator("#chkSrcPanel").scroll_into_view_if_needed()
-            page.screenshot(path=os.path.join(os.environ.get("CITRELLO_E2E_SHOTS") or str(tmp_path), f"web-bridge-{browser_name}-claude.png"))
-            # checking again doesn't ask (or pay) Claude twice: the verdicts come from this browser
+            # checking again: the blurred citation is checked now (Pro), the others come from this browser
             n = len(anthropic_mock.SEEN)
             page.click("#chkSources")
-            expect(src.nth(1)).to_contain_text("Seems to contradict this", timeout=30000)
-            expect(page.locator("#srcAi")).to_contain_text("Verdicts by Claude")
-            assert len(anthropic_mock.SEEN) == n
+            expect(src.nth(3).locator(".src-locked")).to_have_count(0, timeout=60000)
+            expect(src.nth(3).locator(".tag")).to_contain_text("Supports this")
+            expect(page.locator("#srcAi")).to_contain_text("(Pro)")
+            assert len(anthropic_mock.SEEN) == n + 1
+            page.locator("#chkSrcPanel").scroll_into_view_if_needed()
+            page.screenshot(path=os.path.join(os.environ.get("CITRELLO_E2E_SHOTS") or str(tmp_path), f"web-bridge-{browser_name}-claude.png"))
             assert not errors, errors
             b.close()
     finally:

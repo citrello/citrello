@@ -240,11 +240,15 @@ def check(path):
         paras.append(_paragraph(p._p, groups, cc_payloads, word_sources or {}))
 
     has_markers = any(citeformat.MARKER_RE.search(t) for t in paras)
+    numbers = {}  # numbered typed lists: each reference's number, to show the citation as [12]
     if not groups and not has_markers and entries:  # typed citations: match them to the typed list
         typed_refs = [{"number": num, "raw": text, "csl": core.parse_reference(text), "source": "parsed"}
                       for num, _, text in entries]
+        numeric = core.detect_mode(entries) == "numeric"
         finder = (core.numeric_finder({r["number"]: r for r in typed_refs}, {"bracket", "superscript"})
-                  if core.detect_mode(entries) == "numeric" else core.author_year_finder(typed_refs))
+                  if numeric else core.author_year_finder(typed_refs))
+        if numeric:
+            numbers = {id(r["csl"]): r["number"] for r in typed_refs}
         for n, p_el in enumerate(els):
             segs = core.segments(p_el)
             full = "".join(sg[3] for sg in segs)
@@ -276,7 +280,10 @@ def check(path):
                 if ident in seen:
                     continue
                 seen.add(ident)
-                entry = {"label": _label(csl), "title": csl.get("title", ""), "key": it["key"] if it else None}
+                entry = {"label": _label(csl), "title": csl.get("title", ""), "key": it["key"] if it else None,
+                         # how the citation looks in the paper: [12] for a numbered list, the marker, or author and year
+                         "cite": f"[{numbers[id(val)]}]" if kind == "csl" and id(val) in numbers
+                                 else f"[@{val}]" if kind == "key" else _label(csl)}
                 if it:  # what the browser extension needs to fetch the paper
                     entry.update(doi=it["csl"].get("DOI", ""), url=it["csl"].get("URL", ""), type=it["csl"].get("type", ""))
                 if not it:

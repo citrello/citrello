@@ -100,3 +100,20 @@ def test_library_candidates(tmp_path, monkeypatch):
     got = sources.library_candidates("Removing subsea cables is the largest decommissioning cost.")
     assert [p["key"] for p in got] == ["Topham2017"] and got[0]["full_text"]
     assert sources.library_candidates("Removing subsea cables is the largest decommissioning cost.", exclude=["Topham2017"]) == []
+
+
+def test_each_citation_shows_as_in_the_paper(tmp_path, monkeypatch):
+    _library(tmp_path, monkeypatch)
+    d = docx.Document()
+    d.add_paragraph("Leaving the cables buried halved the cost [1]. Reviews disagree [2].")
+    d.add_heading("References", level=1)
+    d.add_paragraph("1. Topham, E. and McMillan, D. (2017) Sustainable decommissioning of an offshore wind farm. "
+                    "Renewable Energy, 102, pp. 470-480. doi:10.1016/j.renene.2016.10.066")
+    d.add_paragraph("2. Someone, A. (2020) A paper nobody has. Journal of Things, 1, pp. 1-2.")
+    path = str(tmp_path / "t.docx")
+    d.save(path)
+    assert [s["papers"][0]["cite"] for s in sources.check(path)["sentences"]] == ["[1]", "[2]"]
+    d = docx.Document()
+    d.add_paragraph("Removing cables is costly [@Topham2017].")
+    d.save(path)
+    assert sources.check(path)["sentences"][0]["papers"][0]["cite"] == "[@Topham2017]"
