@@ -153,7 +153,7 @@ def test_00_welcome_on_first_launch(page):
 def test_00b_home_and_a_guided_check_of_the_sample_paper(page):
     """A new library opens on Home: what Citrello can do, each with a guided tour on the real screen."""
     expect(page.locator("#tab-home")).to_be_visible()
-    expect(page.locator(".home-tile")).to_have_count(9)
+    expect(page.locator(".home-tile")).to_have_count(8)
     shot(page, "home")
     page.click('.home-tile[data-tour="check"]')
     tip = page.locator("#tourTip")

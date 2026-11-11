@@ -512,7 +512,7 @@ def test_web_app_home_and_tours(browser_name, tmp_path):
         open_app(page)
         page.click("#wWebStart")
         expect(page.locator("#tab-home")).to_be_visible(timeout=30000)
-        expect(page.locator(".home-tile")).to_have_count(9)
+        expect(page.locator(".home-tile")).to_have_count(8)
         page.click('.home-tile[data-tour="cites"]')
         tip = page.locator("#tourTip")
         expect(tip.locator("h3")).to_have_text("Choose your paper")

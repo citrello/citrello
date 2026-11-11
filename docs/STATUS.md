@@ -154,7 +154,8 @@ in the library or on the web is Pro only (server: `pro_only`); Pro = 3000 checks
 UI (12 Nov): no word-match passages any more, only Claude's decisions; each row = the citation as in the paper ([12],
 [@Key] or author-year: `cite` from sources.py), the decision, "In my library", "From the web", "More details"
 (paper, reason, quote in its passage). Signing in and "Citrello Pro" open in windows (`openSignIn`, `openPro`); the
-Pro window's button emails hello@citrello.app until payments exist. Pro switched on by `/admin/pro` until payments exist.
+Pro window's button emails hello@citrello.app until payments exist. Home (12 Nov): 8 tiles ("Find references" merged into "Check my sources"), no icons, smaller, colour per group
+(Check a paper: lemon; Write: green; My library: blue); fits one 1366×768 screen. Pro switched on by `/admin/pro` until payments exist.
 Estimated cost per action (Opus / Sonnet / Haiku): verdict ~1.2 / 0.6 / <0.1 cents; library check ~3 / 1.6 / 0.1
 cents; web check ~20–30 / 12–18 cents (Haiku can't use the newer web search). Model: Sonnet 5.5 for both (Armin, 12 Nov; `AI_MODEL`, `AI_WEB_MODEL` in bridge/wrangler.toml). A real test runs
 by hand: workflow "Real test of Claude checks" (tests/ai_real_check.py, real key, prints verdicts, time, cost). Consent asked once ("sends each cited sentence and a few passages").

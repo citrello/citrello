@@ -137,19 +137,20 @@
   .home h1 { font-size: 36px; }
   .home-head { display: flex; justify-content: space-between; align-items: flex-end; gap: 12px; flex-wrap: wrap; }
   .home-guides { color: var(--muted); white-space: nowrap; }
-  .home-group { font: 600 13px Figtree, sans-serif; letter-spacing: .4px; text-transform: uppercase; color: var(--muted); margin: 22px 0 8px; }
-  .home-tiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(290px, 1fr)); gap: 12px; }
-  .home-tile { all: unset; box-sizing: border-box; cursor: pointer; display: flex; flex-direction: column; gap: 6px; padding: 18px 18px 14px;
-               background: var(--card); border: 1px solid var(--line); border-radius: 16px; transition: border-color .15s, transform .15s, box-shadow .15s; }
-  .home-tile:hover { border-color: var(--accent); transform: translateY(-2px); box-shadow: 6px 6px 0 var(--lemon); }
+  .home-group { font: 700 12.5px Figtree, sans-serif; letter-spacing: .5px; text-transform: uppercase; margin: 16px 0 6px; color: var(--grp-ink); }
+  .home-tiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 10px; }
+  .home-sec { --grp: var(--lemon); --grp-soft: var(--lemon-soft); --grp-ink: #7a5d00; }
+  .home-sec.g2 { --grp: var(--leaf); --grp-soft: var(--ok-soft); --grp-ink: var(--ok); }
+  .home-sec.g3 { --grp: var(--cobalt); --grp-soft: var(--sky); --grp-ink: var(--cobalt); }
+  .home-tile { all: unset; box-sizing: border-box; cursor: pointer; display: flex; flex-direction: column; gap: 4px; padding: 12px 14px 10px;
+               background: var(--grp-soft); border: 1px solid transparent; border-left: 5px solid var(--grp); border-radius: 12px;
+               transition: transform .15s, box-shadow .15s, border-color .15s; }
+  .home-tile:hover { transform: translateY(-2px); box-shadow: 4px 4px 0 var(--grp); border-color: var(--grp); border-left-width: 5px; }
   .home-tile:focus-visible { outline: 3px solid var(--leaf); outline-offset: 2px; }
-  .home-tile b { font: 400 19px/1.25 var(--serif); color: var(--cobalt); }
-  .home-tile .ht-text { color: var(--muted); font-size: 14px; flex: 1; }
-  .home-tile .ht-go { color: var(--accent); font-weight: 700; font-size: 13.5px; margin-top: 4px; }
-  .home-tile .ht-icon { width: 38px; height: 38px; border-radius: 11px; display: grid; place-items: center; background: var(--lemon); color: #14213d; margin-bottom: 4px; }
-  .home-tile.g2 .ht-icon { background: var(--ok-soft); color: var(--ok); } .home-tile.g3 .ht-icon { background: var(--sky); color: var(--cobalt); }
-  .home-tile .ht-icon svg { width: 20px; height: 20px; }
-  .ht-via { font-size: 12px; font-weight: 700; color: var(--muted); }
+  .home-tile b { font: 400 16.5px/1.25 var(--serif); color: var(--ink); }
+  .home-tile .ht-text { color: var(--muted); font-size: 13px; line-height: 1.4; flex: 1; }
+  .home-tile .ht-go { color: var(--grp-ink); font-weight: 700; font-size: 12.5px; margin-top: 2px; }
+  @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .home-sec { --grp-ink: var(--lemon); } :root:not([data-theme="light"]) .home-sec.g2 { --grp-ink: var(--ok); } :root:not([data-theme="light"]) .home-sec.g3 { --grp-ink: var(--accent); } }
   .tour-resume { display: flex; gap: 12px; align-items: center; justify-content: space-between; flex-wrap: wrap; background: var(--lemon-soft);
                  border-radius: 14px; padding: 12px 16px; margin: 12px 0 0; max-width: 1100px; }
   /* the tour: a spotlight on the button to click and a bubble that says what to do */
@@ -367,25 +368,25 @@
       <label class="small home-guides"><input type="checkbox" id="guidesOn" checked> Show step-by-step guides</label></div>
     <div class="tour-resume hidden" id="tourResume"><span id="tourResumeText"></span>
       <span><button class="primary" id="tourResumeGo">Carry on</button> <button class="link" id="tourResumeDrop">Forget it</button></span></div>
-    <h2 class="home-group">Check a paper</h2>
+    <div class="home-sec"><h2 class="home-group">Check a paper</h2>
     <div class="home-tiles">
-      <button class="home-tile" data-tour="check"><span class="ht-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 12l2 2 4-4"/><circle cx="12" cy="12" r="9"/></svg></span><b>Catch mistakes in my references</b><span class="ht-text">Retracted papers, DOIs that don't exist (often made up by AI), wrong authors or years, the same paper listed twice.</span><span class="ht-go">Show me how →</span></button>
-      <button class="home-tile" data-tour="cites"><span class="ht-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 6h10M4 12h7M4 18h10"/><path d="M17 9l3 3-3 3"/></svg></span><b>Make sure every citation matches the list</b><span class="ht-text">Citations with no reference behind them, references never cited, gaps in the numbering.</span><span class="ht-go">Show me how →</span></button>
-      <button class="home-tile" data-tour="sources"><span class="ht-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="6"/><path d="M20 20l-4.2-4.2"/><path d="M9 11h4"/></svg></span><b>Check my sources say what I wrote</b><span class="ht-text">Each cited sentence next to what the paper really says, from the papers' full text.</span><span class="ht-go">Show me how →</span></button>
+      <button class="home-tile" data-tour="check"><b>Catch mistakes in my references</b><span class="ht-text">Retracted papers, DOIs that don't exist (often made up by AI), wrong authors or years, the same paper listed twice.</span><span class="ht-go">Show me how →</span></button>
+      <button class="home-tile" data-tour="cites"><b>Make sure every citation matches the list</b><span class="ht-text">Citations with no reference behind them, references never cited, gaps in the numbering.</span><span class="ht-go">Show me how →</span></button>
+      <button class="home-tile" data-tour="sources"><b>Check my sources say what I wrote</b><span class="ht-text">Claude reads each cited paper and says if it supports your sentence. If not, find a better reference in your library or on the web.</span><span class="ht-go">Show me how →</span></button>
     </div>
-    <h2 class="home-group">Write</h2>
+    </div><div class="home-sec g2"><h2 class="home-group">Write</h2>
     <div class="home-tiles">
-      <button class="home-tile g2" data-tour="fix"><span class="ht-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 4h8l4 4v12H7z"/><path d="M15 4v4h4"/><path d="M10 14l2 2 3-4"/></svg></span><b>Turn typed references into live citations</b><span class="ht-text">Any Word file becomes live citations and a correct reference list, in any of 10,000 styles.</span><span class="ht-go">Show me how →</span></button>
-      <button class="home-tile g2" data-tour="cite"><span class="ht-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 20h8"/><path d="M16.5 3.5a2.1 2.1 0 013 3L7 19l-4 1 1-4z"/></svg></span><b>Cite while I write</b><span class="ht-text">Find a paper, put its marker in your text, and Citrello builds the reference list.</span><span class="ht-go">Show me how →</span></button>
-      <button class="home-tile g2" data-tour="ai"><span class="ht-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a8 8 0 01-11.6 7.1L4 20l1-4.4A8 8 0 1121 12z"/><path d="M9 12h.01M12 12h.01M15 12h.01"/></svg></span><b>Write with Claude or ChatGPT from my library</b><span class="ht-text">They cite only papers you really have, so no reference is made up.</span><span class="ht-go">Show me how →</span></button>
-      <button class="home-tile g2" data-tour="find"><span class="ht-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="6"/><path d="M20 20l-4.2-4.2"/><path d="M11 8v6M8 11h6"/></svg></span><b>Find references for what I'm writing</b><span class="ht-text">Claude or ChatGPT searches, reads and adds the right papers to your library.</span><span class="ht-via">With Claude or ChatGPT</span><span class="ht-go">Show me how →</span></button>
+      <button class="home-tile" data-tour="fix"><b>Turn typed references into live citations</b><span class="ht-text">Any Word file becomes live citations and a correct reference list, in any of 10,000 styles.</span><span class="ht-go">Show me how →</span></button>
+      <button class="home-tile" data-tour="cite"><b>Cite while I write</b><span class="ht-text">Find a paper, put its marker in your text, and Citrello builds the reference list.</span><span class="ht-go">Show me how →</span></button>
+      <button class="home-tile" data-tour="ai"><b>Write with Claude or ChatGPT from my library</b><span class="ht-text">They cite only papers you really have, so no reference is made up.</span><span class="ht-go">Show me how →</span></button>
     </div>
-    <h2 class="home-group">My library</h2>
+    </div><div class="home-sec g3"><h2 class="home-group">My library</h2>
     <div class="home-tiles">
-      <button class="home-tile g3" data-tour="library"><span class="ht-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 4h3v16H5zM10 4h3v16h-3z"/><path d="M15.5 5l3-.8 3.4 15.6-3 .8z"/></svg></span><b>Tidy up my library</b><span class="ht-text">Bring it from Zotero, Mendeley or EndNote, check every reference online, and add the papers' text.</span><span class="ht-go">Show me how →</span></button>
-      <button class="home-tile g3" data-tour="latex"><span class="ht-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 8l-4 4 4 4M16 8l4 4-4 4M13.5 6l-3 12"/></svg></span><b>Get my LaTeX paper ready</b><span class="ht-text">Check the citations against the .bib, keep a .bib for Overleaf, and make an arXiv-ready .zip.</span><span class="ht-go">Show me how →</span></button>
+      <button class="home-tile" data-tour="library"><b>Tidy up my library</b><span class="ht-text">Bring it from Zotero, Mendeley or EndNote, check every reference online, and add the papers' text.</span><span class="ht-go">Show me how →</span></button>
+      <button class="home-tile" data-tour="latex"><b>Get my LaTeX paper ready</b><span class="ht-text">Check the citations against the .bib, keep a .bib for Overleaf, and make an arXiv-ready .zip.</span><span class="ht-go">Show me how →</span></button>
     </div>
-    <p class="small muted" style="margin-top:22px">Know your way around? Go straight to your <button class="link" data-go="library">library</button>.</p>
+    </div>
+    <p class="small muted" style="margin-top:16px">Know your way around? Go straight to your <button class="link" data-go="library">library</button>.</p>
   </section>
 
   <!-- ================= LIBRARY ================= -->
@@ -2662,7 +2663,6 @@ const STEP_FIX = {el: "#chkFixPanel", title: "Fix it in one click",
 const STEP_CONNECT = (why) => ({tab: "settings", el: "#connCard", title: "Connect Claude or ChatGPT",
   text: `<p>${why} Click Claude or ChatGPT and follow the picture guide: it takes about two minutes, once.</p><p>Already connected? Click Next.</p>`});
 const SOURCES_PROMPT = "I've attached my paper. For every sentence with a citation, use Citrello's find_in_papers tool to read what the cited paper says, and list the sentences the paper doesn't support, quoting the passage as proof.";
-const FIND_PROMPT = "Find 5 peer-reviewed papers that support the paragraph below. Read their abstracts (and the full text where Citrello can get it), keep only those that really support it, check them with Citrello and add them to my Citrello library in the project \"New references\".\n\nParagraph: ";
 const WRITE_PROMPT = "Write the introduction of my paper using only references from my Citrello library, and give me a Word file with live citations in APA style.";
 const TOURS = {
   check: {title: "Catch mistakes in my references", steps: [STEP_DOC("a Word document or a PDF"), STEP_WAIT,
@@ -2709,11 +2709,6 @@ const TOURS = {
     STEP_CONNECT("Citrello lets Claude and ChatGPT search your library, cite from it and write Word files with live citations."),
     {title: "Then just ask", text: `<p>In a new chat, for example:</p>${tourCopy(WRITE_PROMPT)}
        <p class="small muted">They cite with <code class="key">[@Key]</code> markers from your library, so no reference is made up. ${esc(keepOpen)}</p>`, actions: AI_LINKS(WRITE_PROMPT)}]},
-  find: {title: "Find references for what I'm writing", steps: [
-    {title: "Ask for references", text: `<p>Send this with your paragraph at the end:</p>${tourCopy(FIND_PROMPT + "…")}
-       <p class="small muted">Each paper is checked online before it's added. The first time, Citrello shows you how to connect Claude or ChatGPT (about two minutes).</p>`, actions: AI_LINKS(FIND_PROMPT)},
-    {tab: "library", el: "#projNav", title: "They appear in your library",
-     text: "<p>In the project <b>New references</b>. Open a reference to see its check and copy its marker.</p>"}]},
   library: {title: "Tidy up my library", steps: [
     {tab: "library", el: "#openImport", title: "Bring your library", click: true,
      text: "<p>Click <b>Import</b> and pick where it comes from: Zotero, Mendeley, EndNote or a file. Duplicates are skipped.</p><p>Your references are already here? Click Next.</p>"},
