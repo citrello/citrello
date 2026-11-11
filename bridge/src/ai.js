@@ -107,10 +107,11 @@ export async function judge(env, userId, body) {
   return { results, usage: usageOf(msg), quota: await quota(env, userId) };
 }
 
-const WEB_SYSTEM = `You help researchers find published sources for a sentence in their manuscript. Search the web
-for peer-reviewed papers (journal articles, conference papers, books from academic publishers) whose findings support
-the sentence. Prefer recent, well-cited work with a DOI. Read each paper's abstract (or page) before choosing it, and
-never invent papers, authors or DOIs: only list papers you found. List at most 5.
+const WEB_SYSTEM = `You help researchers find published sources for a sentence in their manuscript. Find peer-reviewed
+papers (journal articles, conference papers, books from academic publishers) whose findings support the sentence.
+Use web_search to find candidates, then web_fetch to open each promising candidate's page (its DOI link or the
+publisher's page) and read its abstract before listing it. Prefer recent, well-cited work with a DOI. Never invent
+papers, authors or DOIs: only list papers whose page you opened. List at most 5; 3 good ones are enough.
 End your answer with only a JSON object, no other text after it:
 {"papers": [{"title": "", "authors": "Family name of the first author, or 'Family & Family', or 'Family et al.'",
 "year": "", "doi": "10.xxxx/... or empty", "url": "", "verdict": "supports" or "partly",
@@ -124,7 +125,9 @@ export async function findOnWeb(env, userId, body) {
   const done = await spend(env, userId, 1, "web");
   const params = {
     model: webModel(env), max_tokens: 16000, ...fallback(webModel(env)), output_config: { effort: "medium" }, system: WEB_SYSTEM,
-    tools: [{ type: /haiku/.test(webModel(env)) ? "web_search_20250305" : "web_search_20260209", name: "web_search", max_uses: 6 }],
+    tools: /haiku/.test(webModel(env))  // Haiku has the basic versions of the web tools
+      ? [{ type: "web_search_20250305", name: "web_search", max_uses: 4 }, { type: "web_fetch_20250910", name: "web_fetch", max_uses: 5, max_content_tokens: 5000 }]
+      : [{ type: "web_search_20260209", name: "web_search", max_uses: 4 }, { type: "web_fetch_20260209", name: "web_fetch", max_uses: 5, max_content_tokens: 5000 }],
     messages: [{ role: "user", content: `The sentence: <claim>${claim}</claim>` +
       (body.context ? `\nThe paragraph around it: <context>${clip(body.context, 2000)}</context>` : "") +
       (exclude.length ? `\nAlready cited (don't list): ${exclude.join(", ")}` : "") }],
