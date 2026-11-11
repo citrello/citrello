@@ -96,6 +96,17 @@ jobs:
       - name: Update the database tables
         if: steps.ready.outputs.go == 'true'
         run: npx wrangler d1 migrations apply citrello --remote
+      - name: Find or create the cloud copy's storage (R2 bucket in the EU)
+        if: steps.ready.outputs.go == 'true'
+        run: |
+          if npx wrangler r2 bucket list --jurisdiction eu 2>/dev/null | grep -q "citrello-cloud"; then
+            echo "The cloud copy's storage is there."
+          elif npx wrangler r2 bucket create citrello-cloud --jurisdiction eu; then
+            echo "Created the cloud copy's storage."
+          else
+            echo "::warning::Couldn't create the R2 bucket for the cloud copy (the Cloudflare API token needs the 'Workers R2 Storage: Edit' permission, and R2 must be enabled in the Cloudflare dashboard). Deploying without the cloud copy."
+            python3 -c "import re; p='wrangler.toml'; s=open(p).read(); open(p,'w').write(re.sub(r'# The cloud copy[^\n]*\n\[\[r2_buckets\]\][^\[]*', '', s))"
+          fi
       - name: Deploy
         if: steps.ready.outputs.go == 'true'
         run: npx wrangler deploy

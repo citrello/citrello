@@ -11,6 +11,7 @@
 import { Relay } from "./relay.js";
 import * as pages from "./pages.js";
 import * as ai from "./ai.js";
+import * as cloud from "./cloud.js";
 
 export { Relay };
 
@@ -30,8 +31,8 @@ const now = () => Math.floor(Date.now() / 1000);
 
 const CORS = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Methods": "GET, POST, DELETE, OPTIONS",
-  "Access-Control-Allow-Headers": "Authorization, Content-Type, Mcp-Session-Id, Mcp-Protocol-Version",
+  "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
+  "Access-Control-Allow-Headers": "Authorization, Content-Type, Mcp-Session-Id, Mcp-Protocol-Version, X-Items, X-Texts, X-Device",
   "Access-Control-Expose-Headers": "WWW-Authenticate, Mcp-Session-Id",
 };
 
@@ -291,6 +292,7 @@ async function apiDeleteAccount(request, env) {
     env.DB.prepare("DELETE FROM users WHERE id = ?").bind(d.user_id),
   ]);
   await relayCall(env, d.user_id, "/disconnect", {});
+  await cloud.remove(env, d.user_id);  // the cloud copy of the library goes with the account
   return json({ ok: true });
 }
 
@@ -626,6 +628,17 @@ async function aiCall(request, env, fn) {
   }
 }
 
+// The cloud copy of a web-app library (src/cloud.js): signed-in accounts only
+async function cloudCall(request, env, fn) {
+  const d = await deviceFromRequest(env, request);
+  try {
+    return json(await fn(d));
+  } catch (e) {
+    if (e instanceof cloud.CloudError) throw new HttpError(e.status, e.code, e.message);
+    throw e;
+  }
+}
+
 // Turn Citrello Pro on or off for an account (until payments exist): {"email": ..., "pro": true}
 async function adminPro(request, env) {
   requireAdmin(request, env);
@@ -737,6 +750,16 @@ async function route(request, env, ctx) {
   if (path === "/api/ai/judge" && m === "POST") return aiCall(request, env, async (d) => ai.judge(env, d.user_id, await readBody(request)));
   if (path === "/api/ai/find-web" && m === "POST") return aiCall(request, env, async (d) => ai.findOnWeb(env, d.user_id, await readBody(request)));
   if (path === "/admin/pro" && m === "POST") return adminPro(request, env);
+  if (path === "/api/cloud" && m === "GET") return cloudCall(request, env, (d) => cloud.info(env, d.user_id));
+  if (path === "/api/cloud" && m === "PUT") return cloudCall(request, env, (d) => cloud.save(env, d.user_id, request));
+  if (path === "/api/cloud" && m === "DELETE") return cloudCall(request, env, async (d) => { await cloud.remove(env, d.user_id); return { ok: true }; });
+  if (path === "/api/cloud/data" && m === "GET") {
+    const d = await deviceFromRequest(env, request);
+    try {
+      const obj = await cloud.load(env, d.user_id);
+      return new Response(obj.body, { headers: { "Content-Type": "application/gzip", "Cache-Control": "no-store", ...CORS } });
+    } catch (e) { if (e instanceof cloud.CloudError) throw new HttpError(e.status, e.code, e.message); throw e; }
+  }
 
   if (path === "/admin/stats") return adminStats(request, env);
   if (path === "/admin/broadcast" && m === "POST") return adminBroadcast(request, env);

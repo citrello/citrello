@@ -257,3 +257,31 @@ def test_import_mendeley_with_a_token_from_the_browser(web, monkeypatch, tmp_pat
         assert call(web, "POST", "/api/web/import-mendeley", {})[0] == 400
     finally:
         srv.shutdown()
+
+
+def test_cloud_copy_bundle_and_restore(web):
+    """The cloud copy: the library and the papers' text in one gzip file; restoring it replaces both."""
+    import fulltext
+    import gzip
+    with library.editing() as data:
+        data.update(items=[], projects=[])
+    call(web, "POST", "/api/library/import", BIB, {"X-Filename": "refs.bib", "X-Project": "Thesis"})
+    fulltext.attach("Topham2017", "Cable removal was the largest cost. " * 100, "pdf")
+    st1 = call(web, "GET", "/api/web/state")[1]
+    assert st1["stamp"] and st1["cloud_device"].startswith("browser-")
+    assert call(web, "GET", "/api/web/state")[1]["cloud_device"] == st1["cloud_device"]  # the same browser every time
+    st, body, hdrs = call(web, "GET", "/api/web/cloud-bundle")
+    assert st == 200 and body[:2] == b"\x1f\x8b" and hdrs["X-Items"] == "1" and int(hdrs["X-Texts"]) >= 1
+    bundle = json.loads(gzip.decompress(body))
+    assert bundle["library"]["items"][0]["key"] == "Topham2017"
+    assert any("largest cost" in t for t in bundle["fulltext"].values())
+    assert call(web, "POST", "/api/web/cloud-saved", {"stamp": hdrs["X-Stamp"]})[0] == 200
+    assert call(web, "GET", "/api/web/state")[1]["cloud_stamp"] == st1["stamp"]  # nothing changed since
+    # another browser: empty library, the cloud copy comes back with the paper's text
+    call(web, "POST", "/api/library/delete", {"keys": ["Topham2017"]})
+    assert library.load()["items"] == []
+    st, out, _ = call(web, "POST", "/api/web/cloud-restore", body)
+    assert st == 200 and out["items"] == 1
+    it = library.get(library.load(), "Topham2017")
+    assert it and "largest cost" in fulltext.read(it)
+    assert call(web, "POST", "/api/web/cloud-restore", b"not gzip")[0] == 400

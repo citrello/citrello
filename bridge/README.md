@@ -111,3 +111,11 @@ stored except monthly counts per account (`ai_usage`: checks, and web checks).
   `AI_PRO_WEB` web checks (0 / 100). Library and web checks are Pro only (`pro_only`). `ANTHROPIC_BASE_URL` points the tests at a pretend Claude.
 - Pro, until payments exist: `curl -X POST -H "Authorization: Bearer ADMIN_TOKEN" -H "Content-Type: application/json"
   -d '{"email":"someone@example.com","pro":true}' https://mcp.citrello.app/admin/pro`
+
+## The cloud copy of web-app libraries (`/api/cloud`)
+Signed in, citrello.app/app saves its library (references, projects, papers' text; one gzip file) here and brings
+it back in another browser (`src/cloud.js`). Stored in the R2 bucket `citrello-cloud` with EU jurisdiction (binding
+`CLOUD`), one object per account, replaced on each save, deleted with the account or from Settings. Limits:
+`CLOUD_FREE_MB` (100) and `CLOUD_PRO_MB` (1000). The deploy workflow creates the bucket; that needs R2 enabled in the
+Cloudflare dashboard and the API token's "Workers R2 Storage: Edit" permission (otherwise it deploys without the
+cloud copy and says so).

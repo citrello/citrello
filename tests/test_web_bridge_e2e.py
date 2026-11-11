@@ -273,3 +273,75 @@ def test_claude_checks_what_my_sources_say(browser_name, tmp_path):
             b.close()
     finally:
         srv.stop()
+
+
+@pytest.mark.parametrize("browser_name", BROWSERS)
+def test_cloud_copy_keeps_the_library(browser_name, tmp_path):
+    """Signed out, the Library says to sign in so the library isn't lost; signing in (in a window) saves a cloud copy;
+    in another browser, signing in brings the library back with the papers' text; Settings can turn it off."""
+    from playwright.sync_api import expect, sync_playwright
+    from test_sources import PAPER
+    email = f"cloud-{browser_name}-{int(time.time())}@example.com"
+    bib = tmp_path / "two.bib"
+    bib.write_text("@article{topham2017, title={Sustainable decommissioning of an offshore wind farm}, author={Topham, Eva}, year={2017}}\n"
+                   "@article{lee2021, title={Export cable recovery costs}, author={Lee, Ann}, year={2021}}\n", encoding="utf-8")
+    url = f"{BASE}/app/?bridge={urllib.parse.quote(B.bc.BRIDGE)}"
+
+    def open_app(ctx):
+        page = ctx.new_page()
+        page.on("pageerror", lambda e: errors.append(str(e)))
+        page.goto(url)
+        page.wait_for_selector("#webCover", state="detached", timeout=LOAD)
+        page.click("#wWebStart")
+        return page
+
+    def sign_in(page):
+        expect(page.locator("#signinDlg")).to_be_visible()
+        page.fill("#siEmail", email)
+        page.click("#siSend")
+        expect(page.locator("#siStep2")).to_be_visible(timeout=30000)
+        page.fill("#siCode", B.bc.start_sign_in(email)["dev_code"])
+        page.click("#siVerify")
+        expect(page.locator("#signinDlg")).to_be_hidden(timeout=30000)
+
+    errors = []
+    with sync_playwright() as pw:
+        b = getattr(pw, browser_name).launch()
+        # browser A: a library, then the reminder: sign in so you don't lose it
+        a = open_app(b.new_context(viewport={"width": 1280, "height": 900}))
+        a.click('.side button.navb[data-tab="library"]')
+        a.click("#openImport")
+        a.click('[data-guide="imp-file"]')
+        a.set_input_files("#importFile", str(bib))
+        expect(a.locator("#gResult")).to_contain_text("2 added", timeout=60000)
+        a.keyboard.press("Escape")
+        assert a.evaluate("""async (text) => (await fetch('/api/clip/fulltext', {method: 'POST',
+            headers: {'Content-Type': 'application/json', 'X-Key': 'topham2017'}, body: JSON.stringify({text})})).status""", PAPER) == 200
+        a.click('.side button.navb[data-tab="settings"]')
+        a.click('.side button.navb[data-tab="library"]')
+        nag = a.locator("#webBackupNag")
+        expect(nag).to_contain_text("Sign in so you don't lose it", timeout=30000)
+        a.click("#webNagSignIn")
+        sign_in(a)
+        a.click('.side button.navb[data-tab="settings"]')
+        expect(a.locator("#webCloudInfo")).to_contain_text("2 references and 1 papers' text", timeout=60000)
+        a.click('.side button.navb[data-tab="library"]')
+        expect(nag).to_be_hidden()  # signed in, with the cloud copy: no reminder
+        # browser B: empty; signing in brings the library back, with the paper's text
+        bb = open_app(b.new_context(viewport={"width": 1280, "height": 900}))
+        bb.click('.side button.navb[data-tab="settings"]')
+        bb.fill("#acctEmail", email)
+        bb.click("#acctSend")
+        expect(bb.locator("#acctCodeRow")).to_be_visible(timeout=30000)
+        bb.fill("#acctCode", B.bc.start_sign_in(email)["dev_code"])
+        bb.click("#acctVerify")
+        bb.click('.side button.navb[data-tab="library"]')
+        expect(bb.locator("#libRows .ref")).to_have_count(2, timeout=60000)
+        expect(bb.locator("#libChips")).to_contain_text("1 with full text")
+        # Settings: turn it off (and delete it from the server)
+        bb.on("dialog", lambda d: d.accept())
+        bb.click('.side button.navb[data-tab="settings"]')
+        bb.click("#webCloudOff")
+        expect(bb.locator("#webCloudInfo")).to_contain_text("The cloud copy is off", timeout=30000)
+        assert not errors, errors
+        b.close()

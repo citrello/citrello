@@ -59,11 +59,17 @@ def _web_state():
         return {}
 
 
+def _device_id():
+    import secrets
+    return "browser-" + secrets.token_hex(6)
+
+
 def _save_web_state(**values):
     st = _web_state()
     st.update(values)
     with open(BACKUP_FILE, "w", encoding="utf-8") as f:
         json.dump(st, f)
+    return next(iter(values.values()), None) if len(values) == 1 else None
 
 
 def import_mendeley(token, project=""):
@@ -131,6 +137,66 @@ def restore(raw):
     return len(data["items"])
 
 
+# ---------------------------------------------------------------------------
+# The cloud copy: the library and the papers' text in one gzip file (the page sends it to Citrello's server when
+# signed in, and brings it back in another browser)
+# ---------------------------------------------------------------------------
+
+def _fulltext_files():
+    import fulltext
+    folder = fulltext.folder()
+    return folder, sorted(f for f in (os.listdir(folder) if os.path.isdir(folder) else []) if f.endswith(".txt"))
+
+
+def library_stamp():
+    """Changes whenever the library or a paper's text changes (to know when to save the cloud copy again)."""
+    folder, files = _fulltext_files()
+    parts = []
+    lib = os.path.join(library.HOME, "library.json")
+    if os.path.exists(lib):
+        st = os.stat(lib)
+        parts.append(f"{st.st_size}:{int(st.st_mtime)}")
+    for f in files:
+        st = os.stat(os.path.join(folder, f))
+        parts.append(f"{f}:{st.st_size}:{int(st.st_mtime)}")
+    import hashlib
+    return hashlib.sha1("|".join(parts).encode()).hexdigest()[:16]
+
+
+def cloud_bundle():
+    """-> (gzip bytes, number of references, number of texts)"""
+    import gzip
+    data = library.load()
+    folder, files = _fulltext_files()
+    texts = {}
+    for f in files:
+        with open(os.path.join(folder, f), encoding="utf-8") as fh:
+            texts[f] = fh.read()
+    raw = json.dumps({"citrello_cloud": 1, "library": data, "fulltext": texts}, ensure_ascii=False).encode("utf-8")
+    return gzip.compress(raw, 6), len(data["items"]), len(texts)
+
+
+def cloud_restore(raw):
+    """Replace this browser's library (and papers' text) with a cloud copy. Returns the number of references."""
+    import gzip
+    try:
+        bundle = json.loads(gzip.decompress(raw).decode("utf-8"))
+    except (OSError, ValueError):
+        raise ValueError("The cloud copy couldn't be read.")
+    if not isinstance(bundle, dict) or bundle.get("citrello_cloud") != 1:
+        raise ValueError("That isn't a Citrello cloud copy.")
+    n = restore(json.dumps(bundle["library"]))
+    folder, files = _fulltext_files()
+    os.makedirs(folder, exist_ok=True)
+    for f in files:
+        os.remove(os.path.join(folder, f))
+    for name, text in (bundle.get("fulltext") or {}).items():
+        if name.endswith(".txt") and "/" not in name and "\\" not in name and not name.startswith("."):
+            with open(os.path.join(folder, name), "w", encoding="utf-8") as fh:
+                fh.write(text)
+    return n
+
+
 class WebHandler(app.Handler):
     """app.Handler without a socket: the request comes from the worker and the answer goes back to it."""
 
@@ -192,7 +258,12 @@ class WebHandler(app.Handler):
             data = library.load()
             st = _web_state()
             return self.send(200, {"items": len(data["items"]), "last_backup": st.get("last_backup"),
-                                   "backup_count": st.get("backup_count", 0)})
+                                   "backup_count": st.get("backup_count", 0), "stamp": library_stamp(),
+                                   "cloud_stamp": st.get("cloud_stamp"), "cloud_at": st.get("cloud_at"),
+                                   "cloud_device": st.get("device_id") or _save_web_state(device_id=_device_id())})
+        if path == "/api/web/cloud-bundle":  # the cloud copy to save (the page sends it to Citrello's server)
+            body, items, texts = cloud_bundle()
+            return self.send(200, body, "application/gzip", {"X-Items": str(items), "X-Texts": str(texts), "X-Stamp": library_stamp()})
         if path in ("/login", "/callback", "/api/word/Citrello.bas"):
             return self.send(404, {"error": WEB_ONLY_MISSING})
         return super().do_GET()
@@ -204,6 +275,17 @@ class WebHandler(app.Handler):
             return self.send(*import_mendeley(str(b.get("token", "")), str(b.get("project", ""))))
         if path == "/api/web/import-zotero-file":
             return self.send(*import_zotero_file(self._body, self.headers.get("X-Project", "")))
+        if path == "/api/web/cloud-saved":  # the page saved the cloud copy: remember what was saved
+            b = self.json_body()
+            _save_web_state(cloud_stamp=str(b.get("stamp", ""))[:40], cloud_at=time.time())
+            return self.send(200, {"ok": True})
+        if path == "/api/web/cloud-restore":  # a cloud copy replaces this browser's library
+            try:
+                n = cloud_restore(self._body)
+            except ValueError as e:
+                return self.send(400, {"error": str(e)})
+            _save_web_state(cloud_stamp=library_stamp(), cloud_at=time.time())
+            return self.send(200, {"items": n})
         if path == "/api/web/restore":
             try:
                 return self.send(200, {"items": restore(self._body)})

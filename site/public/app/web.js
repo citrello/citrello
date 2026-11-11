@@ -66,6 +66,7 @@
       else if (m.type === "progress") { if (m.body) progress.set(m.path, m.body); else progress.delete(m.path); }
       else if (m.type === "library-changed") {
         if (typeof loadLibrary === "function") loadLibrary();
+        cloudSoon();
         webDocuments().catch(() => {});
       }
       else if (m.type === "connection") window.dispatchEvent(new CustomEvent("citrello-connection", { detail: m.state }));
@@ -229,15 +230,113 @@
       : `No backup yet. The library has ${s.items} references.`;
     const nag = document.getElementById("webBackupNag");
     if (nag) {
+      const session = await (await fetch("/api/ai/session")).json().catch(() => ({}));
+      const signedIn = !!session.signed_in, off = cloudOff();
       const old = !s.last_backup || Date.now() / 1000 - s.last_backup > 7 * DAY;
       const grown = s.items - (s.backup_count || 0) >= 10;
-      const show = s.items > 0 && (old || grown);
+      // signed out: sign in, and the cloud copy keeps the library safe; signed in with the cloud copy off: backups
+      const show = s.items > 0 && (!signedIn || (off && (old || grown)));
       nag.classList.toggle("hidden", !show);
-      document.getElementById("webBackupNagText").textContent = s.last_backup
-        ? `Your library is kept in this browser only. Your last backup has ${s.backup_count} of ${s.items} references.`
-        : "Your library is kept in this browser only. Save a backup file in case the browser's data is cleared.";
+      const signIn = document.getElementById("webNagSignIn"), backup = document.getElementById("webNagBackup");
+      if (signIn) signIn.classList.toggle("hidden", signedIn);
+      if (backup) backup.classList.toggle("hidden", !signedIn);
+      document.getElementById("webBackupNagText").innerHTML = !signedIn
+        ? "<b>Your library is only in this browser.</b> Sign in so you don't lose it: Citrello keeps a safe copy (stored in the EU) and brings it back on any computer."
+        : s.last_backup ? `Your library is kept in this browser only. Your last backup has ${s.backup_count} of ${s.items} references.`
+          : "Your library is kept in this browser only. Save a backup file in case the browser's data is cleared.";
     }
+    const settings = document.getElementById("tab-settings");
+    if (settings && !settings.classList.contains("hidden")) cloudInfo(s).catch(() => {});  // only when it's on screen
   }
+
+  // ---------- the cloud copy: signed in, the library (with the papers' text) is saved to Citrello's server ----------
+  // A few seconds after each change and once a minute. In a new browser it comes back by itself; when this browser
+  // and the cloud copy both changed, the person chooses. Stored in the EU; turned off (and deleted) in Settings.
+  const cloudOff = () => { try { return localStorage.getItem("citrelloCloudOff") === "1"; } catch { return false; } };
+  let cloudBusy = false, cloudTimer = null, cloudLast = null;
+  async function cloudSession() {
+    const s = await (await fetch("/api/ai/session")).json().catch(() => ({}));
+    return s.signed_in ? s : null;
+  }
+  const cloudCall = (sess, method, path, opts = {}) => realFetch(sess.bridge + path,
+    { method, body: opts.body, headers: { "Authorization": "Bearer " + sess.token, ...(opts.headers || {}) } });
+  function cloudSay(text, kind) {
+    const el = document.getElementById("webCloudMsg");
+    if (el) { el.className = "notice " + (kind || "ok"); el.textContent = text; el.classList.toggle("hidden", !text); }
+  }
+  async function cloudRestore(sess, info) {
+    const r = await cloudCall(sess, "GET", "/api/cloud/data");
+    if (!r.ok) throw new Error("The cloud copy couldn't be downloaded.");
+    const res = await fetch("/api/web/cloud-restore", { method: "POST", body: await r.arrayBuffer() });
+    const d = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(d.error || "The cloud copy couldn't be restored.");
+    if (typeof loadLibrary === "function") loadLibrary();
+    if (typeof toast === "function") toast(`Your library is back: ${d.items} references from your cloud copy`);
+    return d;
+  }
+  async function cloudSync(why) {
+    if (cloudBusy || cloudOff()) return;
+    cloudBusy = true;
+    try {
+      const sess = await cloudSession();
+      if (!sess) return;
+      const ir = await cloudCall(sess, "GET", "/api/cloud");
+      const info = await ir.json().catch(() => ({}));
+      if (!ir.ok || !info.ready) return;
+      const st = await (await fetch("/api/web/state")).json();
+      const changedHere = st.stamp !== st.cloud_stamp;
+      const changedThere = info.exists && info.device !== st.cloud_device && info.saved_at > (st.cloud_at || 0);
+      if (info.exists && st.items === 0) await cloudRestore(sess, info);       // a new browser: it comes back
+      else if (changedThere && !changedHere) await cloudRestore(sess, info);  // another browser saved newer work
+      else if (changedThere && changedHere) {                                  // both changed: the person chooses
+        const when = new Date(info.saved_at * 1000).toLocaleString();
+        if (confirm(`Your cloud copy (${info.items} references, saved ${when} in another browser) is different from ` +
+                    `the library in this browser (${st.items} references).\n\nOK: use the cloud copy here.\n` +
+                    "Cancel: keep this browser's library and save it to the cloud.")) await cloudRestore(sess, info);
+        else await cloudSave(sess, st);
+      } else if (changedHere) await cloudSave(sess, st);
+      cloudLast = null;
+      backupState().catch(() => {});
+    } catch (e) {
+      cloudLast = e.message;
+      cloudSay(e.message, "err");
+    } finally { cloudBusy = false; }
+  }
+  async function cloudSave(sess) {
+    const b = await fetch("/api/web/cloud-bundle");
+    const body = await b.arrayBuffer();
+    const st = await (await fetch("/api/web/state")).json();
+    const r = await cloudCall(sess, "PUT", "/api/cloud", { body, headers: { "Content-Type": "application/gzip",
+      "X-Items": b.headers.get("X-Items") || "0", "X-Texts": b.headers.get("X-Texts") || "0", "X-Device": st.cloud_device } });
+    const d = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(d.error_description || "The cloud copy couldn't be saved.");
+    await fetch("/api/web/cloud-saved", { method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ stamp: b.headers.get("X-Stamp") }) });
+  }
+  async function cloudInfo(st) {  // Settings: what's saved, and turning it off
+    const el = document.getElementById("webCloudInfo");
+    if (!el) return;
+    const sess = await cloudSession();
+    const on = document.getElementById("webCloudOn"), offBtn = document.getElementById("webCloudOff");
+    if (!sess) { el.textContent = "Sign in, and Citrello keeps a copy of your library safe (stored in the EU) and brings it back on any computer.";
+      on.classList.add("hidden"); offBtn.classList.add("hidden"); return; }
+    if (cloudOff()) { el.textContent = "The cloud copy is off: your library is only in this browser.";
+      on.classList.remove("hidden"); offBtn.classList.add("hidden"); return; }
+    const info = await (await cloudCall(sess, "GET", "/api/cloud")).json().catch(() => ({}));
+    on.classList.add("hidden"); offBtn.classList.toggle("hidden", !info.ready);
+    el.textContent = !info.ready ? "The cloud copy isn't switched on yet." : !info.exists ? "Saving your library to the cloud copy…"
+      : `Cloud copy: saved ${new Date(info.saved_at * 1000).toLocaleString()}, ${info.items} references and ${info.texts} papers' text ` +
+        `(${(info.bytes / 1048576).toFixed(1)} MB of ${Math.round(info.limit_bytes / 1048576)} MB). Stored in the EU.` +
+        (st && st.stamp !== st.cloud_stamp ? " Saving the latest changes…" : "");
+  }
+  async function cloudRemove() {
+    if (!confirm("Turn off the cloud copy and delete it from Citrello's server? Your library stays in this browser.")) return;
+    const sess = await cloudSession();
+    if (sess) await cloudCall(sess, "DELETE", "/api/cloud");
+    try { localStorage.setItem("citrelloCloudOff", "1"); } catch {}
+    backupState().catch(() => {});
+  }
+  const cloudSoon = () => { clearTimeout(cloudTimer); cloudTimer = setTimeout(() => cloudSync("changed"), 6000); };
   // Word files the connector saved (Settings → ChatGPT and Claude)
   async function webDocuments() {
     const box = document.getElementById("webDocs");
@@ -269,6 +368,13 @@
   document.addEventListener("DOMContentLoaded", () => {
     if (CLIP) return;
     ready.then(backupState).catch(() => {});
+    ready.then(() => { cloudSync("start"); setInterval(() => cloudSync("timer"), 60000); }).catch(() => {});
+    const nagSignIn = document.getElementById("webNagSignIn");
+    if (nagSignIn) nagSignIn.onclick = () => typeof openSignIn === "function" && openSignIn(() => cloudSync("signin"),
+      "Sign in so you don't lose your library: Citrello keeps a copy safe (stored in the EU) and brings it back on any computer.");
+    const off = document.getElementById("webCloudOff"), on = document.getElementById("webCloudOn");
+    if (off) off.onclick = () => cloudRemove().catch((e) => cloudSay(e.message, "err"));
+    if (on) on.onclick = () => { try { localStorage.removeItem("citrelloCloudOff"); } catch {} cloudSync("on").then(() => backupState()); };
     document.addEventListener("click", (e) => {
       if (e.target.closest && e.target.closest('.side button.navb')) setTimeout(() => {
         backupState().catch(() => {});
@@ -331,5 +437,5 @@
     if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", show); else show();
   });
 
-  window.citrelloWeb = { ready, config, mendeleyToken };
+  window.citrelloWeb = { ready, config, mendeleyToken, cloudSync };
 })();

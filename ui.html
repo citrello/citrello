@@ -399,7 +399,7 @@
       <div class="qadd hidden" id="qAdd"><span id="qAddText"></span><button class="primary" id="qAddBtn">Add to library</button></div>
       <div id="qAddResult"></div>
       <div class="notice warn web-only hidden" id="webBackupNag" role="status" style="display:flex;align-items:center;gap:12px;justify-content:space-between"><span id="webBackupNagText"></span>
-        <a class="btn" href="/api/web/backup">Back up now</a></div>
+        <button class="primary hidden" id="webNagSignIn">Sign in</button><a class="btn hidden" id="webNagBackup" href="/api/web/backup">Back up now</a></div>
       <select id="projectFilter" class="hidden" aria-hidden="true"><option value="*">All projects</option></select>
       <div class="page-head lib-head"><div><h1 id="libTitle">Library</h1>
         <p class="desktop-only">Shared with Claude and ChatGPT in every chat, and live in your Word documents.</p>
@@ -666,7 +666,11 @@
         <p class="small muted">To use it on several computers, keep this folder in OneDrive or Dropbox. Back it up with Library → Export → CSL-JSON.</p>
         </div>
         <div class="web-only">
-        <p class="small muted" style="margin:0">Stored in this browser only: nothing is sent to Citrello. Clearing this site's data in your browser deletes it, so keep a backup file.</p>
+        <p class="small muted" style="margin:0">Stored in this browser. When you're signed in, Citrello also keeps a cloud copy of it (stored in the EU), so it comes back on any computer and isn't lost if the browser's data is cleared.</p>
+        <p class="small" id="webCloudInfo"></p>
+        <div class="notice hidden" id="webCloudMsg"></div>
+        <div class="row"><button class="hidden" id="webCloudOn">Turn the cloud copy on</button>
+          <button class="link hidden" id="webCloudOff">Turn off and delete the cloud copy</button></div>
         <p class="small" id="webBackupInfo"></p>
         <div class="row"><a class="btn primary" href="/api/web/backup" id="webBackup">Back up the library</a>
           <label class="btn" for="webRestoreFile">Restore from a backup…</label>
@@ -1281,6 +1285,7 @@ function renderAccount(a) {
   $("acctMsg").innerHTML = "";
   $("acctWho").textContent = a.email;
   if (a.signed_in && typeof chk !== "undefined" && chk && chk.sources && chk.sources.ai && chk.sources.ai.state === "signin") aiJudgeAll();  // signed in from Settings: carry on
+  if (a.signed_in && window.citrelloWeb && window.citrelloWeb.cloudSync) window.citrelloWeb.cloudSync("signin");  // the cloud copy starts
   const [kind, text] = STATE_TEXT[a.state] || STATE_TEXT.offline;
   $("acctConn").innerHTML = `<div class="notice ${kind}">${esc(text)}${a.state === "offline" && a.error ? " <span class=small>(" + esc(a.error) + ")</span>" : ""}</div>`;
   const acc = a.account;

@@ -85,3 +85,30 @@ def test_claude_checks(claude):
     st, _, raw = call("POST", "/api/ai/judge", {"kind": "library", "items": [dict(ITEM, papers=two)]}, headers=me)
     assert st == 200 and json.loads(raw)["quota"]["used"] == used + 1
     assert call("POST", "/api/ai/judge", {"items": []}, headers=me)[0] == 400
+
+
+def test_cloud_copy_endpoints():
+    """The cloud copy of a web-app library: signed-in accounts, gzip files only, one per account, deleted with it."""
+    import gzip
+    assert call("GET", "/api/cloud")[0] == 401
+    me = sign_in(f"cloud{int(time.time())}@example.com")
+    st, _, raw = call("GET", "/api/cloud", headers=me)
+    assert st == 200 and json.loads(raw) == dict(json.loads(raw), ready=True, exists=False)
+    import http.client
+    from test_bridge_e2e import U
+
+    def put(body, extra=None):
+        c = http.client.HTTPConnection(U.hostname, U.port or 80, timeout=30)
+        c.request("PUT", "/api/cloud", body, {**me, "X-Items": "2", "X-Texts": "1", "X-Device": "browser-test", **(extra or {})})
+        r = c.getresponse()
+        return r.status, json.loads(r.read())
+    assert put(b"not gzip")[0] == 400
+    data = gzip.compress(json.dumps({"citrello_cloud": 1, "library": {"items": []}, "fulltext": {}}).encode())
+    st, info = put(data)
+    assert st == 200 and info["exists"] and info["items"] == 2 and info["texts"] == 1 and info["device"] == "browser-test"
+    c = http.client.HTTPConnection(U.hostname, U.port or 80, timeout=30)
+    c.request("GET", "/api/cloud/data", headers=me)
+    r = c.getresponse()
+    assert r.status == 200 and r.read() == data
+    assert call("DELETE", "/api/cloud", headers=me)[0] == 200
+    assert json.loads(call("GET", "/api/cloud", headers=me)[2])["exists"] is False

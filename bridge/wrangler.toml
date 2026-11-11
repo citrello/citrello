@@ -18,6 +18,12 @@ database_name = "citrello"
 database_id = "00000000-0000-0000-0000-000000000000"  # replaced by the deploy workflow
 migrations_dir = "migrations"
 
+# The cloud copy of web-app libraries (src/cloud.js): an R2 bucket kept in the EU
+[[r2_buckets]]
+binding = "CLOUD"
+bucket_name = "citrello-cloud"
+jurisdiction = "eu"
+
 [[durable_objects.bindings]]
 name = "RELAY"
 class_name = "Relay"
