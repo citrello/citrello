@@ -176,6 +176,19 @@ def test_00b_home_and_a_guided_check_of_the_sample_paper(page):
     expect(tip.locator("h3")).to_have_text("Fix it in one click")
     page.click("#ttNext")  # Done
     expect(tip).to_have_count(0)
+    tab(page, "home")
+    expect(page.locator('.home-tile[data-tour="check"] .ht-go')).to_have_text("Show me again →")  # remembered
+    # people who know the way turn the guides off: a tile then goes straight to its screen
+    page.uncheck("#guidesOn")
+    expect(page.locator('.home-tile[data-tour="cites"] .ht-go')).to_have_text("Go there →")
+    page.click('.home-tile[data-tour="sources"]')
+    expect(page.locator("#tab-documents")).to_be_visible()
+    expect(page.locator("#chkDrop")).to_have_class(re.compile("flash"))
+    expect(tip).to_have_count(0)
+    page.reload()
+    tab(page, "home")
+    expect(page.locator("#guidesOn")).not_to_be_checked()  # kept
+    page.check("#guidesOn")
     # a tour left halfway is offered again on Home
     tab(page, "home")
     page.click('.home-tile[data-tour="library"]')

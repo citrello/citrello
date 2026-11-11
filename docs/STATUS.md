@@ -125,7 +125,12 @@ references" tours send people to their Claude/ChatGPT (prompt to copy, links tha
 "Check and fix" results, tour 3): every sentence that cites a paper next to the passages of that paper's full text
 that match it best (BM25 + the best sentences, shared words highlighted), no AI, on the computer; reads [@Key]
 markers, Zotero/Mendeley/EndNote/Word fields, Mendeley Cite controls and typed [1] / (Author, year) citations; Word
-documents only for now (not PDFs). Next: an optional AI verdict with a cheap
+documents only for now (not PDFs). 11 Nov (Armin): Full texts has two cards, "Every paper you can open" (with the
+extension: it reads open-access and subscribed papers; without: free copies now + get the extension; tip to sign in to
+the university library first) and "PDFs you already have". "Ask Claude / ChatGPT" opens the connector guide the
+first time with the question waiting at its end (remembered per browser once done). Regular users: "Show
+step-by-step guides" on Home (off → tiles go straight to the screen, the button flashes; "Don't show guides" in the
+bubble), finished tours say "Show me again". Next: an optional AI verdict with a cheap
 model paid by Citrello within a free monthly allowance for signed-in users (about 1–2 cents per paper); "find
 references" (OpenAlex + stronger model, ~5–10 cents per paragraph) later, possibly paid credits.
 

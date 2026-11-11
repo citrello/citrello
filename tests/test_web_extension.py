@@ -69,10 +69,10 @@ def test_extension_fetches_full_texts_and_adds_from_the_toolbar(tmp_path):
 
             # bulk: the extension's fetch page visits each paper and hands the text to Citrello
             page.click('.side button.navb[data-tab="papers"]')
-            expect(page.locator("#ftWays")).to_contain_text("With your university access")
+            expect(page.locator("#ftWays")).to_contain_text("Every paper you can open")
             page.uncheck("#ftVerify")  # these references point at pretend pages on purpose: no online check
             with ctx.expect_page() as fetch_page:
-                page.click("#ftExt")
+                page.click("#ftGet")
             fp = fetch_page.value
             expect(fp.locator("#list li")).to_have_count(3, timeout=15000)
             fp.click("#start")
@@ -237,7 +237,7 @@ def test_extension_finds_the_pdf_and_waits_for_you_at_a_check(tmp_path):
             page.click('.side button.navb[data-tab="papers"]')
             page.uncheck("#ftVerify")  # these references point at pretend pages on purpose: no online check
             with ctx.expect_page() as fetch_page:
-                page.click("#ftExt")
+                page.click("#ftGet")
             fp = fetch_page.value
             fp.click("#start")
             # the check: the extension stops, shows the page to the person and waits
@@ -382,7 +382,7 @@ def test_extension_waits_for_pages_knows_platforms_and_runs_in_parallel(tmp_path
             page.click('.side button.navb[data-tab="papers"]')
             page.uncheck("#ftVerify")  # these references point at pretend pages on purpose: no online check
             with ctx.expect_page() as fetch_page:
-                page.click("#ftExt")
+                page.click("#ftGet")
             fp = fetch_page.value
             fp.click("#start")
             fp.wait_for_function("document.querySelectorAll('#list li.work').length >= 2", timeout=60000)  # two at once

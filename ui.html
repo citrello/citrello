@@ -120,6 +120,8 @@
   /* Home: what you can do, each with a guided tour on the real screen */
   .home { max-width: 1100px; }
   .home h1 { font-size: 36px; }
+  .home-head { display: flex; justify-content: space-between; align-items: flex-end; gap: 12px; flex-wrap: wrap; }
+  .home-guides { color: var(--muted); white-space: nowrap; }
   .home-group { font: 600 13px Figtree, sans-serif; letter-spacing: .4px; text-transform: uppercase; color: var(--muted); margin: 22px 0 8px; }
   .home-tiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(290px, 1fr)); gap: 12px; }
   .home-tile { all: unset; box-sizing: border-box; cursor: pointer; display: flex; flex-direction: column; gap: 6px; padding: 18px 18px 14px;
@@ -199,6 +201,11 @@
   .ft-ways { display: grid; grid-template-columns: repeat(auto-fit, minmax(270px, 1fr)); gap: 14px; max-width: 980px; }
   .ftway { margin: 0; display: flex; flex-direction: column; } .ftway h3 { margin: 10px 0 4px; font-size: 17px; }
   .ftway p { margin: 0 0 10px; font-size: 14px; }
+  .ftway p.ft-tip { background: var(--lemon-soft); border-radius: 10px; padding: 8px 10px; margin: 12px 0 0; font-size: 13px; }
+  .g-ask { margin-top: 12px; padding: 10px 12px; border-radius: 12px; background: var(--lemon-soft); }
+  .g-ask p { margin: 0 0 6px; }
+  @keyframes flash { 0%, 100% { box-shadow: 0 0 0 0 transparent; } 30%, 70% { box-shadow: 0 0 0 5px var(--lemon); } }
+  .flash { animation: flash 1.6s ease 1; border-radius: 12px; }
   .ftway-art { border-radius: 10px; background: var(--bg); border: 1px solid var(--line); overflow: hidden; }
   .ftway-art svg { display: block; width: 100%; height: auto; }
   #papersMsg { max-width: 980px; margin: 12px 0; }
@@ -326,8 +333,9 @@
   </div>
   <!-- ================= HOME ================= -->
   <section id="tab-home" class="home hidden">
-    <div class="page-head"><h1>What would you like to do?</h1>
-      <p>Pick one: Citrello shows you each click, on the real screen.</p></div>
+    <div class="page-head home-head"><div><h1>What would you like to do?</h1>
+      <p id="homeLead">Pick one: Citrello shows you each click, on the real screen.</p></div>
+      <label class="small home-guides"><input type="checkbox" id="guidesOn" checked> Show step-by-step guides</label></div>
     <div class="tour-resume hidden" id="tourResume"><span id="tourResumeText"></span>
       <span><button class="primary" id="tourResumeGo">Carry on</button> <button class="link" id="tourResumeDrop">Forget it</button></span></div>
     <h2 class="home-group">Check a paper</h2>
@@ -739,7 +747,7 @@ document.querySelectorAll(".side button.navb").forEach((b) => b.onclick = () => 
   document.querySelectorAll(".side button.navb").forEach((x) => x.classList.toggle("active", x === b));
   window.scrollTo(0, 0);
   ["home", "library", "papers", "documents", "settings"].forEach((t) => show("tab-" + t, t === b.dataset.tab));
-  if (b.dataset.tab === "home") renderResume();
+  if (b.dataset.tab === "home") { renderResume(); renderTiles(); }
   if (b.dataset.tab === "papers") { $("papersMsg").innerHTML = ""; loadPapers(); }
   if (b.dataset.tab === "library") loadLibrary();
   if (b.dataset.tab === "documents") loadBibExports();
@@ -1107,16 +1115,27 @@ function renderGuide() {
   $("gDots").innerHTML = guide.steps.map((_, i) => `<i class="${i === guideStep ? "on" : ""}"></i>`).join("");
   $("gBack").disabled = guideStep === 0;
   $("gNext").textContent = guideStep === n - 1 ? "Done" : "Next";
+  if (guide.ask) {  // opened from "Ask Claude / ChatGPT": the question waits at the end
+    const name = AI_NAMES[guide.ask.which];
+    if (guideStep === n - 1) $("gText").innerHTML += `<div class="g-ask"><p><b>Connected?</b> Now ask ${name}:</p>${copyRow(guide.ask.prompt)}
+      <button class="primary" id="gAsk">Open ${name} with this question</button></div>`;
+    else if (guideStep === 0) $("gText").innerHTML += `<p class="small muted">Already connected ${name} to Citrello? <button class="link" id="gAsk">Skip to the question</button></p>`;
+    if ($("gAsk")) $("gAsk").onclick = () => { aiReady(guide.ask.which, true); openAI(guide.ask.which, guide.ask.prompt); $("guide").close(); };
+  }
 }
-function openGuide(name) {
-  guide = GUIDES[name](); guideStep = 0; renderGuide();
+function openGuide(name, extra) {
+  guide = Object.assign(GUIDES[name](), extra || {}); guideStep = 0; guide.name = name; renderGuide();
   $("guide").showModal();
   (guide.sections ? $("guide").querySelector("#gText button, #gText label.btn, #gText .drop") || $("gNext") : $("gNext")).focus();
 }
 document.addEventListener("click", (e) => {
   const t = e.target.closest("[data-guide]"); if (t) openGuide(t.dataset.guide);
 });
-$("gNext").onclick = () => { if (guide.steps && guideStep < guide.steps.length - 1) { guideStep++; renderGuide(); } else $("guide").close(); };
+$("gNext").onclick = () => {
+  if (guide.steps && guideStep < guide.steps.length - 1) { guideStep++; renderGuide(); return; }
+  if (AI_NAMES[guide.name]) aiReady(guide.name, true);  // went through the whole connector guide
+  $("guide").close();
+};
 $("gBack").onclick = () => { if (guideStep > 0) { guideStep--; renderGuide(); } };
 $("gClose").onclick = () => $("guide").close();
 $("guide").addEventListener("click", async (e) => {
@@ -1131,6 +1150,23 @@ $("guide").addEventListener("keydown", (e) => {
   if (e.key === "ArrowLeft" && guideStep > 0) { guideStep--; renderGuide(); }
 });
 
+
+// ---------- asking Claude or ChatGPT ----------
+// The first time, "Ask Claude" opens the connector guide (Citrello must be connected for it to read your library),
+// with the question waiting at its end; once it's connected, it opens a new chat with the question.
+const AI_NAMES = {claude: "Claude", chatgpt: "ChatGPT"};
+function aiReady(which, set) {
+  try {
+    const done = JSON.parse(localStorage.getItem("citrelloAiReady") || "[]");
+    if (set && !done.includes(which)) localStorage.setItem("citrelloAiReady", JSON.stringify([...done, which]));
+    return set || done.includes(which);
+  } catch { return !!set; }
+}
+const openAI = (which, prompt) => window.open((which === "claude" ? "https://claude.ai/new?q=" : "https://chatgpt.com/?q=") + encodeURIComponent(prompt), "_blank", "noopener");
+function askAI(which, prompt) {
+  if (aiReady(which)) return openAI(which, prompt);
+  openGuide(which, {ask: {which, prompt}});
+}
 
 // ---------- account ----------
 const STATE_TEXT = {online: ["ok", document.documentElement.classList.contains("web")
@@ -1666,17 +1702,17 @@ let papersLib = {items: []};
 function renderPapersWays() {
   const card = (art, title, html) => `<div class="card ftway"><div class="ftway-art">${art}</div><h3>${title}</h3>${html}</div>`;
   $("ftWays").innerHTML =
-    card(A.extension(), "With your university access", extVersion
-      ? `<p>The Citrello extension opens each paper without full text in a background tab, with your login, and brings its text here.
-         Slowly, about one paper every 15 seconds, while you keep working.</p>
-         <button class="primary" id="ftExt">Fetch the missing ones with my access</button>`
-      : `<p>The <b>Citrello browser extension</b> opens each paper with your university or library login and brings its text here, while you keep working.</p>
-         <a class="btn primary" href="https://citrello.app/extension" target="_blank" rel="noopener">Get the extension</a>
-         <p class="small muted" style="margin:8px 0 0">Without it: open each paper and click the Citrello browser button on it.</p>`) +
-    card(A.freeTexts(), "Free copies", `<p>For papers with a DOI, Citrello looks for a legal free copy (Unpaywall, Europe PMC, arXiv) and keeps its text.</p>
-       <button id="ftFree">Find free full texts</button>
-       <p class="small muted web-only" style="margin:6px 0 0">Free PDFs come through Citrello's server, because most repositories don't let web pages download them. Only the DOI is sent and nothing is kept.</p>
-       <div class="bar hidden" id="ftFreeBarWrap"><div id="ftFreeBar"></div></div><div id="ftFreeMsg" class="small"></div>`) +
+    card(A.extension(), "Every paper you can open", (extVersion
+      ? `<p>Citrello opens each paper that has no text yet in a background tab of this browser and brings its text here: open-access
+         papers and those your university or library gives you. About one paper every 15 seconds, while you keep working.</p>
+         <button class="primary" id="ftGet">Get the full texts</button>`
+      : `<p>Citrello finds legal free copies of your papers (Unpaywall, Europe PMC, arXiv) and keeps their text.</p>
+         <button class="primary" id="ftGet">Get the free ones now</button>
+         <p style="margin:10px 0 0">For the papers your university or library pays for, add the <b>Citrello browser extension</b>: it opens each one with your login, in the background.</p>
+         <a class="btn" href="https://citrello.app/extension" target="_blank" rel="noopener">Get the extension</a>`) +
+      `<p class="small ft-tip"><b>Tip:</b> first sign in to your university library in this browser (or turn on its VPN), so publishers recognise you and Citrello can read more papers.</p>
+       <div class="bar hidden" id="ftFreeBarWrap"><div id="ftFreeBar"></div></div><div id="ftFreeMsg" class="small"></div>
+       ${extVersion ? "" : `<p class="small muted web-only" style="margin:6px 0 0">Free PDFs come through Citrello's server, because most repositories don't let web pages download them. Only the DOI is sent and nothing is kept.</p>`}`) +
     card(A.papers(), "PDFs you already have", `<p>Drop them here: each is matched to its reference (by DOI or title) and only its text is kept.</p>
        <label class="drop" for="ftFiles" style="padding:14px"><input type="file" id="ftFiles" accept=".pdf" multiple hidden><strong>Choose PDFs</strong> or drag them here</label>
        <div class="row" style="margin-top:8px"><label class="btn" for="ftFolder">Choose a whole folder…</label><input type="file" id="ftFolder" webkitdirectory multiple hidden></div>
@@ -1775,7 +1811,7 @@ async function verifyFirst() {
   return fixed ? `${fixed} DOI${fixed === 1 ? " was" : "s were"} corrected first. ` : "";
 }
 async function fetchWithExtension() {
-  $("ftExt").disabled = true;
+  $("ftGet").disabled = true;
   try {
     const first = await verifyFirst();
     const papers = papersLib.items.filter((i) => !i.fulltext && (i.doi || i.url)).map((i) => ({key: i.key, doi: i.doi, url: i.url, title: i.title, type: i.type}));
@@ -1783,12 +1819,12 @@ async function fetchWithExtension() {
     if (first) impNote("ok", first + "Step 2 of 2: the extension is opening the papers…");
     window.postMessage({citrelloExt: "fetch", papers, fast: !!window.CITRELLO_TEST_FAST}, location.origin);
   } catch (e) { impNote("err", esc(e.message)); }
-  finally { if ($("ftExt")) $("ftExt").disabled = false; }
+  finally { if ($("ftGet")) $("ftGet").disabled = false; }
 }
 
 // free full texts for the references shown (a job: progress, then a summary)
 async function findFree() {
-  $("ftFree").disabled = true; show("ftFreeBarWrap"); $("ftFreeBar").style.width = "3%";
+  $("ftGet").disabled = true; show("ftFreeBarWrap"); $("ftFreeBar").style.width = "3%";
   try {
     const first = await verifyFirst();  // wrong DOIs corrected first
     const {id, n} = await post("/api/fulltext/find-free", {q: "", project: "*"});  // the whole library
@@ -1797,21 +1833,20 @@ async function findFree() {
       const s = await api(`/api/fulltext/find-free/${id}`);
       if ($("ftFreeBar")) $("ftFreeBar").style.width = s.n ? `${Math.max(3, 100 * s.i / s.n)}%` : "3%";
       if (!s.done) { if ($("ftFreeMsg")) $("ftFreeMsg").textContent = s.n ? `Checking ${s.i + 1} of ${s.n}: ${s.key}` : ""; return setTimeout(tick, 700); }
-      if ($("ftFree")) $("ftFree").disabled = false;
+      if ($("ftGet")) $("ftGet").disabled = false;
       if (s.error) return impNote("err", esc(s.error));
       const r = s.result;
       if ($("ftFreeMsg")) $("ftFreeMsg").textContent = "";
       impNote(r.found ? "ok" : "warn", first + `Free full text found for ${r.found} of ${r.checked} paper${r.checked === 1 ? "" : "s"}.` +
-        (r.missing ? ` ${r.missing} need your access: open them with the browser button, or drop their PDFs above.` : "") +
+        (r.missing ? ` ${r.missing} need your access: add the Citrello browser extension to fetch them, or drop their PDFs above.` : "") +
         (r.no_doi ? ` ${r.no_doi} without a DOI weren't searched.` : ""));
       loadLibrary();
     };
     tick();
-  } catch (e) { $("ftFree").disabled = false; hide("ftFreeBarWrap"); impNote("err", esc(e.message)); }
+  } catch (e) { $("ftGet").disabled = false; hide("ftFreeBarWrap"); impNote("err", esc(e.message)); }
 }
 const hide = (id) => show(id, false);
-IMPORT_ACTIONS.ftFree = findFree;
-IMPORT_ACTIONS.ftExt = fetchWithExtension;
+IMPORT_ACTIONS.ftGet = () => (extVersion ? fetchWithExtension() : findFree());  // with the extension it reads open-access papers too
 $("guide").addEventListener("change", (e) => {
   if (e.target.id !== "ftFiles" && e.target.id !== "ftFolder") return;
   const files = [...e.target.files]; e.target.value = ""; attachPdfs(files);
@@ -2204,9 +2239,7 @@ $("usageStats").onchange = async () => {
 // A step moves on by itself when its `done` test becomes true (the file was chosen, the check finished...) or when
 // the highlighted button is clicked (`click: true`). Steps without an element show the bubble in the middle.
 const goTab = (t) => document.querySelector(`.side button.navb[data-tab="${t}"]`).click();
-const AI_LINKS = (prompt) => [
-  {label: "Open Claude", run: () => window.open("https://claude.ai/new?q=" + encodeURIComponent(prompt), "_blank", "noopener")},
-  {label: "Open ChatGPT", run: () => window.open("https://chatgpt.com/?q=" + encodeURIComponent(prompt), "_blank", "noopener")}];
+const AI_LINKS = (prompt) => [{label: "Ask Claude", run: () => askAI("claude", prompt)}, {label: "Ask ChatGPT", run: () => askAI("chatgpt", prompt)}];
 const tourCopy = (text) => `<div class="g-copy"><code>${esc(text)}</code><button data-copy="${esc(text)}">Copy</button></div>`;
 const checkDone = () => chk && chk.state && chk.state !== "checking";
 const STEP_DOC = (what, sample = true) => ({tab: "documents", el: "#chkDrop", title: "Choose your paper",
@@ -2234,16 +2267,16 @@ const TOURS = {
     {el: "#chkCites", title: "Citations and the reference list",
      text: "<p>Every citation in the text is matched with the list: citations with no reference behind them, references never cited, gaps in the numbering and duplicates are listed here.</p>"},
     STEP_FIX]},
-  sources: {title: "Check my sources say what I wrote", steps: [
+  sources: {title: "Check my sources say what I wrote", straight: {tab: "documents", el: "#chkDrop"}, steps: [
     {tab: "papers", el: "#ftWays", title: "Give Citrello the papers' text",
-     text: "<p>To show what a paper says, Citrello needs its text. Pick a way: free open-access copies, your university access (with the browser extension), or PDFs you have. Only the text is kept, never the PDF.</p><p>Already done? Click Next.</p>"},
+     text: "<p>To show what a paper says, Citrello needs its text: from the web (free copies, and with the browser extension the papers your university gives you), or from PDFs you have. Only the text is kept, never the PDF.</p><p>Already done? Click Next.</p>"},
     STEP_DOC("your Word document", false), STEP_WAIT,
     {el: "#chkSrcPanel", title: "Show what your sources say", done: () => !!(chk && chk.sources),
      text: "<p>Click <b>Show what my sources say</b>. If the references aren't in your library yet, add them first with the button above.</p>"},
     {el: "#chkSrc", title: "Read them side by side",
      text: "<p>Under each sentence: the passages of the cited paper that match it best, with the shared words highlighted. If the paper doesn't say what you wrote, change the sentence or the citation.</p>",
      missing: "<p>No passages to show yet: add the papers' text (Full texts), then click <b>Show again</b>.</p>"},
-    {title: "Want a verdict on each sentence?", text: `<p>Claude or ChatGPT can judge every sentence using these texts through Citrello (connect it once under Settings). In a new chat, attach your paper and send:</p>${tourCopy(SOURCES_PROMPT)}`,
+    {title: "Want a verdict on each sentence?", text: `<p>Claude or ChatGPT can judge every sentence using these texts through Citrello. Attach your paper in the new chat; the question is filled in for you. The first time, Citrello shows you how to connect it (about two minutes).</p>${tourCopy(SOURCES_PROMPT)}`,
      actions: AI_LINKS(SOURCES_PROMPT)}]},
   fix: {title: "Turn typed references into live citations", steps: [STEP_DOC("the Word document"), STEP_WAIT,
     {el: "#chkFixPanel", title: "Choose the style", text: "<p>Pick a style from the list, or type a journal's name underneath to find its own style (there are over 10,000).</p>"},
@@ -2266,9 +2299,8 @@ const TOURS = {
     {title: "Then just ask", text: `<p>In a new chat, for example:</p>${tourCopy(WRITE_PROMPT)}
        <p class="small muted">They cite with <code class="key">[@Key]</code> markers from your library, so no reference is made up. ${esc(keepOpen)}</p>`, actions: AI_LINKS(WRITE_PROMPT)}]},
   find: {title: "Find references for what I'm writing", steps: [
-    STEP_CONNECT("Claude or ChatGPT searches for papers and adds them to your library through Citrello."),
     {title: "Ask for references", text: `<p>Send this with your paragraph at the end:</p>${tourCopy(FIND_PROMPT + "…")}
-       <p class="small muted">Each paper is checked online before it's added.</p>`, actions: AI_LINKS(FIND_PROMPT)},
+       <p class="small muted">Each paper is checked online before it's added. The first time, Citrello shows you how to connect Claude or ChatGPT (about two minutes).</p>`, actions: AI_LINKS(FIND_PROMPT)},
     {tab: "library", el: "#projNav", title: "They appear in your library",
      text: "<p>In the project <b>New references</b>. Open a reference to see its check and copy its marker.</p>"}]},
   library: {title: "Tidy up my library", steps: [
@@ -2301,7 +2333,29 @@ function renderResume() {
 }
 $("tourResumeGo").onclick = () => { const t = tourSaved(); if (t) startTour(t.key, t.i); };
 $("tourResumeDrop").onclick = () => { try { localStorage.removeItem("citrelloTour"); } catch {} renderResume(); };
-document.querySelectorAll(".home-tile[data-tour]").forEach((b) => b.onclick = () => startTour(b.dataset.tour));
+const store = {
+  get: (k, d) => { try { return JSON.parse(localStorage.getItem(k) ?? "null") ?? d; } catch { return d; } },
+  set: (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} },
+};
+const guidesOn = () => store.get("citrelloGuides", true);
+function renderTiles() {  // regular users: the tiles go straight to the right screen, no bubbles
+  $("guidesOn").checked = guidesOn();
+  $("homeLead").textContent = guidesOn() ? "Pick one: Citrello shows you each click, on the real screen." : "Pick one to go straight there.";
+  const done = store.get("citrelloToursDone", []);
+  document.querySelectorAll(".home-tile[data-tour]").forEach((b) => {
+    b.querySelector(".ht-go").textContent = !guidesOn() ? "Go there →" : done.includes(b.dataset.tour) ? "Show me again →" : "Show me how →";
+  });
+}
+$("guidesOn").onchange = () => { store.set("citrelloGuides", $("guidesOn").checked); renderTiles(); };
+function goStraight(key) {  // the screen where the task starts, with what to click flashing once
+  const t = TOURS[key], go = t.straight || t.steps[0];
+  if (!go.el) return startTour(key);  // it starts with a question for Claude or ChatGPT: show it
+  if (go.tab) goTab(go.tab);
+  const el = stepEl(go);
+  if (el) { el.scrollIntoView({block: "center", behavior: "smooth"}); el.classList.remove("flash"); void el.offsetWidth; el.classList.add("flash"); }
+}
+document.querySelectorAll(".home-tile[data-tour]").forEach((b) => b.onclick = () => (guidesOn() ? startTour(b.dataset.tour) : goStraight(b.dataset.tour)));
+renderTiles();
 document.querySelectorAll("[data-go]").forEach((b) => b.onclick = () => goTab(b.dataset.go));
 
 function tourEls() {
@@ -2325,6 +2379,7 @@ function endTour(finished) {
   if (tour && tour.el && tour.onClick) tour.el.removeEventListener("click", tour.onClick, true);
   const k = tour && tour.key; tour = null; tourSave();
   ["tourSpot", "tourTip"].forEach((id) => $(id) && $(id).remove());
+  if (finished && k) store.set("citrelloToursDone", [...new Set([...store.get("citrelloToursDone", []), k])]);
   if (finished && k) toast("Done: you know how to " + TOURS[k].title.charAt(0).toLowerCase() + TOURS[k].title.slice(1));
 }
 const stepEl = (st) => { if (!st.el) return null; const e = typeof st.el === "function" ? st.el() : document.querySelector(st.el);
@@ -2372,7 +2427,8 @@ function tourRender(fresh) {
       <h3>${esc(st.title)}</h3><div class="tt-text">${!el && st.el && st.missing ? st.missing : st.text}</div>
       ${st.actions ? `<div class="tt-actions">${st.actions.map((a, n) => `<button class="${a.primary ? "primary" : ""}" data-tt-act="${n}">${esc(a.label)}</button>`).join("")}</div>` : ""}
       ${tour.showAll ? `<ol class="tt-steps">${steps.map((s, n) => `<li class="${tour.seen.has(n) ? "done" : ""} ${n === tour.i ? "now" : ""}" data-tt-go="${n}">${esc(s.title)}</li>`).join("")}</ol>` : ""}
-      <div class="tt-foot"><button class="link" id="ttAll">${tour.showAll ? "Hide the steps" : "See all steps"}</button><span class="grow"></span>
+      <div class="tt-foot"><button class="link" id="ttAll">${tour.showAll ? "Hide the steps" : "See all steps"}</button>
+        <button class="link small" id="ttOff" title="Home's tiles then go straight to the right screen">Don't show guides</button><span class="grow"></span>
         ${waiting ? `<span class="tt-wait">${esc(st.waitText)}</span>` : ""}
         <button id="ttBack" ${tour.i ? "" : "disabled"}>Back</button>
         <button class="primary" id="ttNext">${tour.i === steps.length - 1 ? "Done" : "Next"}</button></div>`;
@@ -2380,6 +2436,7 @@ function tourRender(fresh) {
     $("ttBack").onclick = () => tourGo(tour.i - 1);
     $("ttNext").onclick = () => tourGo(tour.i + 1);
     $("ttAll").onclick = () => { tour.showAll = !tour.showAll; tourRender(true); };
+    $("ttOff").onclick = () => { store.set("citrelloGuides", false); renderTiles(); endTour(false); toast("Guides are off. Turn them back on at the top of Home."); };
     tip.querySelectorAll("[data-tt-act]").forEach((b) => b.onclick = () => st.actions[+b.dataset.ttAct].run());
     tip.querySelectorAll("[data-tt-go]").forEach((li) => li.onclick = () => tourGo(+li.dataset.ttGo));
     tour.waiting = waiting;

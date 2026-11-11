@@ -161,7 +161,7 @@ def test_find_free_full_texts_in_the_browser(browser_name, tmp_path):
         expect(page.locator("#libRows .ref")).to_have_count(3, timeout=60000)
         page.click("#gNext")
         page.click('.side button.navb[data-tab="papers"]')
-        page.click("#ftFree")
+        page.click("#ftGet")
         expect(page.locator("#papersMsg")).to_contain_text("Free full text found for 2 of 3", timeout=240000)
         expect(page.locator("#papersMsg")).to_contain_text("1 need your access")
         page.click('.side button.navb[data-tab="library"]')

@@ -528,8 +528,24 @@ def test_web_app_home_and_tours(browser_name, tmp_path):
         expect(page.locator("#tab-settings")).to_be_visible()
         page.click("#ttNext")
         expect(tip).to_contain_text("Write the introduction of my paper")
-        expect(tip.locator("button", has_text="Open Claude")).to_be_visible()
-        expect(tip.locator("button", has_text="Open ChatGPT")).to_be_visible()
+        expect(tip.locator("button", has_text="Ask ChatGPT")).to_be_visible()
+        # the first time, "Ask Claude" goes through connecting Claude, with the question waiting at the end
+        tip.locator("button", has_text="Ask Claude").click()
+        expect(page.locator("#guide")).to_be_visible()
+        expect(page.locator("#gTitle")).to_have_text("Connect Claude")
+        for _ in range(4):
+            page.click("#gNext")
+        expect(page.locator("#guide .g-ask")).to_contain_text("Write the introduction of my paper")
+        page.context.route("https://claude.ai/**", lambda r: r.fulfill(body="claude"))
+        with page.context.expect_page() as chat:
+            page.click("#gAsk")
+        assert chat.value.url.startswith("https://claude.ai/new?q=Write%20the%20introduction")
+        chat.value.close()
+        expect(page.locator("#guide")).to_be_hidden()
+        with page.context.expect_page() as chat:  # connected now: straight to the chat
+            tip.locator("button", has_text="Ask Claude").click()
+        chat.value.close()
+        expect(page.locator("#guide")).to_be_hidden()
         page.keyboard.press("Escape")
         expect(tip).to_have_count(0)
 
@@ -780,7 +796,7 @@ def test_full_texts_correct_wrong_dois_first(browser_name, tmp_path):
             window.postMessage({citrelloExt: 'hello', version: 'test'}, location.origin); }""")
         tab(page, "papers")
         expect(page.locator("#ftVerify")).to_be_checked()
-        page.click("#ftExt")
+        page.click("#ftGet")
         page.wait_for_function("window.sent !== null", timeout=180000)
         sent = page.evaluate("window.sent")
         assert sent[0]["doi"] == "10.1016/j.renene.2016.10.066", sent  # corrected before fetching
