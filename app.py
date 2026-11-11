@@ -1009,7 +1009,9 @@ class Handler(BaseHTTPRequestHandler):
                 data = library.load()
                 existing, _ = library.find_duplicate(data, rec["csl"]) if rec["csl"].get("title") else (None, None)
                 return self.send(200, {"rec": {k: rec.get(k) for k in ("csl", "checks", "reliability", "source", "raw")},
-                                       "existing": existing["key"] if existing else None, "projects": data["projects"]})
+                                       "existing": existing["key"] if existing else None,
+                                       "existing_fulltext": bool(existing and existing.get("fulltext")),  # in the library, text or not
+                                       "projects": data["projects"]})
             if path == "/api/clip/add":  # browser button: the user clicked "Add"
                 b = self.json_body()
                 rec = b.get("rec") or {}

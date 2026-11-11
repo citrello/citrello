@@ -553,6 +553,21 @@ def test_10_browser_button_popup(page, app):
     pop.close()
     tab(page, "library")
     expect(page.locator('#libRows .ref[data-sel="Lee2020"]')).to_be_visible()
+    # the same paper again: it's in the library without its text, so the window encourages adding it
+    pop = page.context.new_page()
+    pop.goto(URL + "clip#" + urllib.request.quote(json.dumps(data)))
+    expect(pop.locator("#existing")).to_contain_text("doesn't have its text yet", timeout=30000)
+    expect(pop.locator("#existing")).to_contain_text("check every sentence where you cite it")
+    text = "Blade recycling routes for wind turbines. " + "Most decommissioned blades are landfilled today. " * 60
+    pop.evaluate("(text) => window.postMessage({citrello: 'fulltext', text}, '*')", text)  # what the paper's page sends
+    expect(pop.locator("#add")).to_have_text("Add its full text now")
+    pop.click("#add")
+    expect(pop.locator("#doneMsg")).to_contain_text("Full text added to [@Lee2020]", timeout=20000)
+    pop.close()
+    pop = page.context.new_page()  # and once it has its text, it says so
+    pop.goto(URL + "clip#" + urllib.request.quote(json.dumps(data)))
+    expect(pop.locator("#existing")).to_contain_text("with its full text", timeout=30000)
+    pop.close()
 
 
 def test_11_settings_codex_and_claude(page, env):

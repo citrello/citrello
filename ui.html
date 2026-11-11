@@ -220,7 +220,10 @@
   dialog.small-dlg .field input { font-size: 15px; }
   .pro-list { padding-left: 20px; margin: 10px 0; } .pro-list li { margin: 6px 0; }
   .src-cite { font-weight: 700; color: var(--cobalt); background: var(--sky); border-radius: 6px; padding: 1px 7px; min-width: 34px; text-align: center; }
-  .src-line .src-actions { display: inline-flex; gap: 6px; align-items: center; margin-left: auto; flex-wrap: wrap; }
+  .src-name { font-weight: 600; color: var(--ink); }
+  .src-line .src-actions { display: contents; font-size: 13px; }
+  .src-line .src-actions .link { font-size: 13px; }
+  .src-line .src-find { display: inline-flex; gap: 6px; align-items: center; color: var(--muted); margin-left: auto; font-size: 13px; }
   .src-line .src-actions button:not(.link) { padding: 3px 10px; font-size: 12.5px; border-radius: 99px; }
   .src-locked { all: unset; cursor: pointer; display: inline-flex; gap: 8px; align-items: center; font-size: 12.5px; }
   .src-locked .blur { filter: blur(4px); user-select: none; background: var(--sky); border-radius: 99px; padding: 2px 10px; font-weight: 700; }
@@ -2165,12 +2168,13 @@ function sourcesPanel(c, r, newOnes) {
   return h;
 }
 function paperRow(x, i, p, j) {  // one citation: how it looks in the paper, Claude's decision, and three buttons
-  const id = `${i}.${j}`, open = srcOpen.has(id), cite = `<span class="src-cite" title="${esc(p.label + ": " + p.title)}">${esc(p.cite || p.label)}</span>`;
+  const id = `${i}.${j}`, open = srcOpen.has(id);
+  const cite = `<span class="src-cite">${esc(p.cite || p.label)}</span>${p.cite && p.cite !== p.label ? `<span class="src-name" title="${esc(p.title)}">${esc(p.label)}</span>` : ""}`;
   let tag = "", actions = "", details = "";
   if (DECIDED(p)) {
     tag = `<span class="tag ${VERDICT[p.status][0]}">${VERDICT[p.status][1]}</span>`;
-    actions = `<button data-src-find="library" data-id="${id}">In my library</button><button data-src-find="web" data-id="${id}">From the web</button>
-      <button class="link" data-src-more="${id}">${open ? "Hide details" : "More details"}</button>`;
+    actions = `<button class="link" data-src-more="${id}">${open ? "Hide details" : "More details"}</button>
+      <span class="src-find">Find another reference from <button data-src-find="library" data-id="${id}">My library</button><button data-src-find="web" data-id="${id}">Web</button></span>`;
   } else if (p.status === "checking") tag = `<span class="tag">Claude is reading…</span>`;
   else if (p.status === "locked") tag = `<button class="src-locked" data-pro="1" title="Citrello Pro"><span class="blur">${["✓ Supports this", "Partly supports this", "Doesn't clearly say this"][(i + j) % 3]}</span><b>Get Pro</b></button>`;
   else if (p.status === "no_text") { tag = `<span class="tag">No text yet</span>`;

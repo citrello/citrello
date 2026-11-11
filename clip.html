@@ -91,6 +91,7 @@ let clip = null, rec = null, key = null;
 // The paper's text, from the page the button was clicked on (the article shown there, or its PDF, read with the
 // person's own access). Only the text is kept, so ChatGPT and Claude can read the paper later.
 let paper = null, paperDone = false;
+let needsText = false;  // the paper is in the library, but not its text: adding it is what matters
 function showPaper() {
   const line = $("ftLine"); if (!line) return;
   line.className = "ftline " + (paper ? "ok" : paperDone ? "none" : "");
@@ -106,6 +107,7 @@ window.addEventListener("message", (e) => {
   paper = found;
   paperDone = true;
   showPaper();
+  if (needsText && paper) $("add").textContent = "Add its full text now";
 });
 try { if (window.opener) window.opener.postMessage({citrello: "ready"}, "*"); } catch (e) {}
 setTimeout(() => { if (!paperDone) { paperDone = true; showPaper(); } }, 15000);
@@ -139,9 +141,11 @@ async function start() {
     $("projects").innerHTML = (r.projects || []).map((p) => `<option value="${esc(p)}">`).join("");
     try { $("project").value = localStorage.getItem("citrello-last-project") || ""; } catch (e) {}
     if (r.existing) {
-      $("existing").innerHTML = `Already in your library as <code>[@${esc(r.existing)}]</code>. Adding again only puts it into the project.`;
+      needsText = !r.existing_fulltext;
+      $("existing").className = "notice " + (needsText ? "warn" : "ok");
+      $("existing").innerHTML = needsText ? `This paper is already in your library as <code>[@${esc(r.existing)}]</code>, but Citrello doesn't have its text yet. <b>Add it now</b>, and Citrello can check every sentence where you cite it against what the paper really says.` : `Already in your library as <code>[@${esc(r.existing)}]</code>, with its full text ✓`;
       show("existing");
-      $("add").textContent = "Add to project";
+      $("add").textContent = needsText && paper ? "Add its full text now" : "Add to project";
     }
     $("add").focus();
   } catch (e) { fail(e.message); }
@@ -163,8 +167,10 @@ $("add").onclick = async () => {
       } catch (e) {}
     }
     show("found", false); show("done");
-    $("doneMsg").innerHTML = `${r.created ? "Added" : "Already in your library"}: <code>[@${esc(key)}]</code>${project ? " · project " + esc(project) : ""}` +
-      (withText ? "<br>With its full text: ChatGPT and Claude can read it." : "");
+    $("doneMsg").innerHTML = needsText && withText
+      ? `Full text added to <code>[@${esc(key)}]</code>. Citrello can now check your citations of this paper against what it really says.`
+      : `${r.created ? "Added" : "Already in your library"}: <code>[@${esc(key)}]</code>${project ? " · project " + esc(project) : ""}` +
+        (withText ? "<br>With its full text: ChatGPT and Claude can read it." : "");
     $("copy").focus();
   } catch (e) { $("add").disabled = false; fail(e.message); }
 };

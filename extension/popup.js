@@ -7,6 +7,7 @@ const show = (id, on = true) => $(id).classList.toggle("hidden", !on);
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 const params = new URLSearchParams(location.search);  // ?tab=<id>: the tests open this page in a tab of its own
 let tabId = null, rec = null, key = null, paper = null, grabbing = null, grabbed = null;
+let needsText = false;  // the paper is in the library, but not its text: adding it is what matters
 
 function fail(msg) { show("loading", false); $("error").textContent = msg; show("error"); }
 
@@ -20,6 +21,7 @@ async function call(path, body, headers = {}, pdf = "") {
 
 function showText() {
   const ft = $("ft");
+  if (needsText) $("add").textContent = paper ? "Add its full text now" : "Add to project";
   ft.className = "ft " + (paper ? "ok" : "");
   if (paper) { ft.textContent = "Full text found: ChatGPT and Claude will be able to read this paper."; return; }
   if (!grabbed) { ft.textContent = "Full text: looking on the page…"; return; }
@@ -122,7 +124,9 @@ async function start() {
   const { lastProject } = await chrome.storage.local.get("lastProject");
   $("project").value = lastProject || "";
   if (r.existing) {
-    $("existing").innerHTML = `Already in your library as <code>[@${esc(r.existing)}]</code>.` + (paper ? "" : " Adding again puts it into the project.");
+    needsText = !r.existing_fulltext;
+    $("existing").className = "notice " + (needsText ? "warn" : "ok");
+    $("existing").innerHTML = needsText ? `This paper is already in your library as <code>[@${esc(r.existing)}]</code>, but Citrello doesn't have its text yet. <b>Add it now</b>, and Citrello can check every sentence where you cite it against what the paper really says.` : `Already in your library as <code>[@${esc(r.existing)}]</code>, with its full text ✓`;
     show("existing");
     $("add").textContent = "Add to project";
   }
@@ -148,8 +152,10 @@ $("add").onclick = async () => {
       } catch (e) { /* the reference is added; the text can be added later */ }
     }
     show("found", false); show("done");
-    $("doneMsg").innerHTML = `${r.created ? "Added" : "Already in your library"}: <code>[@${esc(key)}]</code>` +
-      (project ? ` · ${esc(project)}` : "") + (withText ? "<br>With its full text: ChatGPT and Claude can read it." : "");
+    $("doneMsg").innerHTML = needsText && withText
+      ? `Full text added to <code>[@${esc(key)}]</code>. Citrello can now check your citations of this paper against what it really says.`
+      : `${r.created ? "Added" : "Already in your library"}: <code>[@${esc(key)}]</code>` +
+        (project ? ` · ${esc(project)}` : "") + (withText ? "<br>With its full text: ChatGPT and Claude can read it." : "");
     chrome.runtime.sendMessage({ action: "badge", tabId });
     $("copy").focus();
   } catch (e) {
