@@ -19,13 +19,16 @@ concurrency: site-deploy
 jobs:
   test:
     runs-on: ubuntu-latest
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
       - run: pip install python-docx citeproc-py pypdf pybtex pytest playwright Pillow
-      - run: python -m playwright install --with-deps chromium webkit
+      - run: python -m playwright install chromium webkit
+      - name: System libraries for the browsers (optional; Ubuntu's mirrors are sometimes unreachable from GitHub)
+        run: timeout 300 python -m playwright install-deps chromium webkit || echo "::warning::Couldn't install the browsers' system libraries; trying with what the machine has."
       - name: Build the in-browser checker
         run: python packaging/build_web_check.py
         env:
