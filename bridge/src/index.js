@@ -750,6 +750,7 @@ async function route(request, env, ctx) {
   if (path === "/api/ai/judge" && m === "POST") return aiCall(request, env, async (d) => ai.judge(env, d.user_id, await readBody(request)));
   if (path === "/api/ai/find-web" && m === "POST") return aiCall(request, env, async (d) => ai.findOnWeb(env, d.user_id, await readBody(request)));
   if (path === "/admin/pro" && m === "POST") return adminPro(request, env);
+  if (path === "/api/cloud/available" && m === "GET") return json({ ready: !!env.CLOUD });  // is the cloud copy switched on?
   if (path === "/api/cloud" && m === "GET") return cloudCall(request, env, (d) => cloud.info(env, d.user_id));
   if (path === "/api/cloud" && m === "PUT") return cloudCall(request, env, (d) => cloud.save(env, d.user_id, request));
   if (path === "/api/cloud" && m === "DELETE") return cloudCall(request, env, async (d) => { await cloud.remove(env, d.user_id); return { ok: true }; });

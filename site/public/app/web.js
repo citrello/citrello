@@ -231,7 +231,9 @@
     const nag = document.getElementById("webBackupNag");
     if (nag) {
       const session = await (await fetch("/api/ai/session")).json().catch(() => ({}));
-      const signedIn = !!session.signed_in, off = cloudOff();
+      const ready = await cloudAvailable(session.bridge);
+      // without the cloud copy switched on, signing in keeps nothing: then it's the backup reminder, as before
+      const signedIn = !ready || !!session.signed_in, off = !ready || cloudOff();
       const old = !s.last_backup || Date.now() / 1000 - s.last_backup > 7 * DAY;
       const grown = s.items - (s.backup_count || 0) >= 10;
       // signed out: sign in, and the cloud copy keeps the library safe; signed in with the cloud copy off: backups
@@ -253,6 +255,12 @@
   // A few seconds after each change and once a minute. In a new browser it comes back by itself; when this browser
   // and the cloud copy both changed, the person chooses. Stored in the EU; turned off (and deleted) in Settings.
   const cloudOff = () => { try { return localStorage.getItem("citrelloCloudOff") === "1"; } catch { return false; } };
+  let cloudReady = null;  // is the cloud copy switched on at Citrello's server? (asked once per visit)
+  async function cloudAvailable(bridge) {
+    if (cloudReady !== null || !bridge) return !!cloudReady;
+    try { cloudReady = !!(await (await realFetch(bridge + "/api/cloud/available")).json()).ready; } catch { return false; }
+    return cloudReady;
+  }
   let cloudBusy = false, cloudTimer = null, cloudLast = null;
   async function cloudSession() {
     const s = await (await fetch("/api/ai/session")).json().catch(() => ({}));

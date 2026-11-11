@@ -89,10 +89,15 @@ def test_web_app(browser_name, tmp_path):
         page.fill("#q", "10.1016/j.renene.2016.10.066")
         page.click("#qAddBtn")
         expect(page.locator("#libRows")).to_contain_text("Sustainable decommissioning", timeout=90000)
-        expect(page.locator("#webBackupNag")).to_contain_text("Sign in so you don't lose it")  # the cloud copy
-        page.click("#webNagSignIn")
-        expect(page.locator("#signinDlg")).to_be_visible()  # signing in happens in a window, here
-        page.click("#siClose")
+        # the reminder: sign in for the cloud copy when Citrello's server has it switched on, else a backup file
+        expect(page.locator("#webBackupNag")).to_be_visible()
+        if "Sign in" in page.locator("#webBackupNag").inner_text():
+            expect(page.locator("#webBackupNag")).to_contain_text("Sign in so you don't lose it")
+            page.click("#webNagSignIn")
+            expect(page.locator("#signinDlg")).to_be_visible()  # signing in happens in a window, here
+            page.click("#siClose")
+        else:
+            expect(page.locator("#webBackupNag")).to_contain_text("Save a backup file")
         shot(page, "library")
 
         # export BibTeX: a download made in the browser
