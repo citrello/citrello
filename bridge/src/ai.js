@@ -19,29 +19,35 @@ function client(env) {
   return new Anthropic({ apiKey: env.ANTHROPIC_API_KEY, ...(env.ANTHROPIC_BASE_URL ? { baseURL: env.ANTHROPIC_BASE_URL } : {}),
                          maxRetries: 2, timeout: 120000 });
 }
-const model = (env) => env.AI_MODEL || "claude-opus-5-5";
+const model = (env) => env.AI_MODEL || "claude-opus-5-5";            // verdicts and library checks
+const webModel = (env) => env.AI_WEB_MODEL || model(env);              // web checks (needs web search: not Haiku)
 
+// Monthly allowances: checks (a verdict, or a library check, counts 1) and web checks, free and pro.
 export async function quota(env, userId) {
   const u = await env.DB.prepare("SELECT pro FROM users WHERE id = ?").bind(userId).first();
-  const row = await env.DB.prepare("SELECT units FROM ai_usage WHERE user_id = ? AND month = ?").bind(userId, month()).first();
+  const row = await env.DB.prepare("SELECT units, web FROM ai_usage WHERE user_id = ? AND month = ?").bind(userId, month()).first();
   const pro = !!(u && u.pro);
-  const limit = Number(pro ? env.AI_PRO_MONTHLY || 3000 : env.AI_FREE_MONTHLY || 30);
-  return { pro, used: row ? row.units : 0, limit, month: month(), ready: !!env.ANTHROPIC_API_KEY };
+  return { pro, month: month(), ready: !!env.ANTHROPIC_API_KEY,
+           used: row ? row.units : 0, limit: Number(pro ? env.AI_PRO_MONTHLY || 3000 : env.AI_FREE_MONTHLY || 30),
+           web_used: row ? row.web : 0, web_limit: Number(pro ? env.AI_PRO_WEB || 100 : env.AI_FREE_WEB || 3) };
 }
 
-async function spend(env, userId, units) {
+async function spend(env, userId, units, kind = "units") {
   const q = await quota(env, userId);
-  if (q.used + units > q.limit) {
+  const web = kind === "web", used = web ? q.web_used : q.used, limit = web ? q.web_limit : q.limit;
+  const what = web ? "web checks" : "Claude checks";
+  if (used + units > limit) {
     throw new AiError(402, "ai_limit", q.pro
-      ? `You've used this month's ${q.limit} Claude checks. They start again next month.`
-      : `Free accounts get ${q.limit} Claude checks a month, and they're used up. Citrello Pro gives you many more.`);
+      ? `You've used this month's ${limit} ${what}. They start again next month.`
+      : `Free accounts get ${limit} ${what} a month, and they're used up. Citrello Pro gives you many more.`);
   }
-  return async () => env.DB.prepare(`INSERT INTO ai_usage (user_id, month, units) VALUES (?, ?, ?)
-      ON CONFLICT(user_id, month) DO UPDATE SET units = units + ?`).bind(userId, month(), units, units).run();
+  const col = web ? "web" : "units";
+  return async () => env.DB.prepare(`INSERT INTO ai_usage (user_id, month, ${col}) VALUES (?, ?, ?)
+      ON CONFLICT(user_id, month) DO UPDATE SET ${col} = ${col} + ?`).bind(userId, month(), units, units).run();
 }
 
 // Claude Opus refuses some topics on safety grounds; "default" falls back to a model that can answer.
-const FALLBACK = { betas: ["server-side-fallback-2026-07-01"], fallbacks: "default" };
+const fallback = (m) => (/opus|sonnet|fable/.test(m) ? { betas: ["server-side-fallback-2026-07-01"], fallbacks: "default" } : {});
 
 const JUDGE_SYSTEM = `You help researchers check their citations. For each item you get a sentence from their manuscript
 (the claim) and one or more cited papers, each with numbered passages taken from the paper's full text (or abstract).
@@ -75,13 +81,14 @@ export async function judge(env, userId, body) {
       passages: (Array.isArray(p.passages) ? p.passages : []).slice(0, 8).map((x) => clip(x, 1500)) })),
   })).filter((it) => it.claim && it.papers.length);
   if (!items.length) throw new AiError(400, "invalid_request", "Nothing to check.");
-  const units = items.reduce((a, it) => a + it.papers.length, 0);
+  // a verdict = one sentence against one paper; a library check (several candidate papers for one sentence) counts 1
+  const units = body.kind === "library" ? items.length : items.reduce((a, it) => a + it.papers.length, 0);
   const done = await spend(env, userId, units);
   const prompt = items.map((it) => `<item id="${it.id}">\n<claim>${it.claim}</claim>\n` + it.papers.map((p) =>
     `<paper ref="${p.ref}" title="${p.title.replace(/"/g, "'")}">\n` + p.passages.map((x, i) => `<passage n="${i + 1}">${x}</passage>`).join("\n") + "\n</paper>").join("\n")
     + "\n</item>").join("\n\n");
   const msg = await client(env).beta.messages.create({
-    model: model(env), max_tokens: 16000, ...FALLBACK,
+    model: model(env), max_tokens: 16000, ...fallback(model(env)),
     output_config: { effort: "low", format: { type: "json_schema", schema: JUDGE_SCHEMA } },
     system: JUDGE_SYSTEM,
     messages: [{ role: "user", content: `${prompt}\n\nGive one result per paper of every item (paper = its ref).` }],
@@ -110,10 +117,10 @@ export async function findOnWeb(env, userId, body) {
   const claim = clip(body.claim, 1200);
   if (!claim) throw new AiError(400, "invalid_request", "Nothing to look for.");
   const exclude = (Array.isArray(body.exclude) ? body.exclude : []).slice(0, 50).map((d) => clip(d, 200).toLowerCase());
-  const done = await spend(env, userId, 5);
+  const done = await spend(env, userId, 1, "web");
   const params = {
-    model: model(env), max_tokens: 16000, ...FALLBACK, output_config: { effort: "medium" }, system: WEB_SYSTEM,
-    tools: [{ type: "web_search_20260209", name: "web_search", max_uses: 6 }],
+    model: webModel(env), max_tokens: 16000, ...fallback(webModel(env)), output_config: { effort: "medium" }, system: WEB_SYSTEM,
+    tools: [{ type: /haiku/.test(webModel(env)) ? "web_search_20250305" : "web_search_20260209", name: "web_search", max_uses: 6 }],
     messages: [{ role: "user", content: `The sentence: <claim>${claim}</claim>` +
       (body.context ? `\nThe paragraph around it: <context>${clip(body.context, 2000)}</context>` : "") +
       (exclude.length ? `\nAlready cited (don't list): ${exclude.join(", ")}` : "") }],

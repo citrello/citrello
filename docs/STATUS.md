@@ -148,8 +148,11 @@ server-side fallback "default") for supports / partly / contradicts / not found 
 Verdicts cached in the browser (IndexedDB) so checking again never pays twice. Per citation: "More details" (the
 quote highlighted in its passage, the reason) and, when not supported, "Find support: in my library"
 (`sources.library_candidates` + Claude) or "on the web" (Claude web search, max 6 searches; "Add to my library").
-Monthly allowance per account (`ai_usage`; AI_FREE_MONTHLY 30, AI_PRO_MONTHLY 3000; web search = 5); Pro switched
-on by `/admin/pro` until payments exist. Consent asked once ("sends each cited sentence and a few passages").
+Monthly allowances per account (`ai_usage`), decided by Armin 12 Nov: free = 30 checks (a verdict or a library check
+counts 1) + 3 web checks; Pro = 3000 + 100 (placeholders). Pro switched on by `/admin/pro` until payments exist.
+Estimated cost per action (Opus / Sonnet / Haiku): verdict ~1.2 / 0.6 / <0.1 cents; library check ~3 / 1.6 / 0.1
+cents; web check ~20–30 / 12–18 cents (Haiku can't use the newer web search). Model not chosen yet (AI_MODEL,
+AI_WEB_MODEL). Consent asked once ("sends each cited sentence and a few passages").
 Tested with a pretend Claude API (tests/anthropic_mock.py) end to end in Chromium and WebKit; **not yet tested with
 the real Claude API** (waiting for Armin's ANTHROPIC_API_KEY GitHub secret). Cost note for Armin: Opus is $4/$20 per
 million tokens; one sentence-and-paper is about 2–3k tokens in, so roughly 1–2 cents each with Opus, about 40 times less

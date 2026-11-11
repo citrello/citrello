@@ -2161,7 +2161,8 @@ const aiConsent = () => { try { return localStorage.getItem("citrelloAiOk") === 
 function aiLine(s) {
   const a = s.ai || {};
   if (a.state === "busy") return `<p class="small muted">Claude is reading the papers: ${a.done} of ${a.total} sentences…</p>`;
-  if (a.state === "done") return `<p class="small muted">Verdicts by Claude, from the passages of each paper's full text. Open “More details” to read the exact words.${a.quota ? ` Claude checks this month: ${a.quota.used} of ${a.quota.limit}.` : ""}</p>`;
+  if (a.state === "done") return `<p class="small muted">Verdicts by Claude, from the passages of each paper's full text. Open “More details” to read the exact words.${a.quota
+    ? ` This month: ${a.quota.used} of ${a.quota.limit} Claude checks, ${a.quota.web_used} of ${a.quota.web_limit} web checks${a.quota.pro ? " (Pro)" : ""}.` : ""}</p>`;
   if (a.state === "signin") return `<div class="notice warn src-act"><span><b>Get Claude's verdict for each citation</b> (Citrello Pro): sign in to your Citrello account first. Until then you see the passages that match by words.</span>
       <button data-go="settings">Sign in</button></div>`;
   if (a.state === "consent") return `<div class="notice src-act"><span><b>Ask Claude for a verdict on each citation?</b> Citrello sends each cited sentence and a few short passages of the paper (not your whole document, not the PDFs) to Claude through Citrello's server. Nothing is kept there.</span>
@@ -2247,14 +2248,14 @@ async function srcFind(kind, id) {  // supporting papers for one citation: from 
   const [i, j] = id.split(".").map(Number), x = chk.sources.sentences[i], p = x.papers[j];
   const claim = x.sentence.replace(CITE_RE, " ").replace(/\s+/g, " ").replace(/\s+([.,;:!?])/g, "$1").trim();
   const st = await aiReadyState();
-  if (!st.ok) { chk.sources.ai = {state: st.why, error: st.why === "limit" ? `You've used this month's ${st.quota.limit} Claude checks.` : st.error}; return renderCheck(); }
+  if (!st.ok && st.why !== "limit") { chk.sources.ai = {state: st.why, error: st.error}; return renderCheck(); }  // used up: the server says so, here
   srcFinds[id] = {kind, state: "busy", papers: []}; renderCheck();
   try {
     const cited = x.papers.map((q) => q.key).filter(Boolean);
     if (kind === "library") {
       const {papers} = await post("/api/sources/library-candidates", {claim, exclude: cited});
       if (!papers.length) { srcFinds[id] = {kind, papers: []}; return renderCheck(); }
-      const r = await aiFetch("POST", "/api/ai/judge", {items: [{id: "lib", claim, papers: papers.map(({ref, title, passages}) => ({ref, title, passages}))}]});
+      const r = await aiFetch("POST", "/api/ai/judge", {kind: "library", items: [{id: "lib", claim, papers: papers.map(({ref, title, passages}) => ({ref, title, passages}))}]});
       chk.sources.ai = Object.assign(chk.sources.ai || {}, {quota: r.quota});
       const good = r.results.filter((res) => res.verdict === "supports" || res.verdict === "partly")
         .sort((a, b) => (a.verdict === "supports" ? 0 : 1) - (b.verdict === "supports" ? 0 : 1)).slice(0, 3);

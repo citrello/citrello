@@ -102,10 +102,12 @@ PDF (up to four locations, 40 MB max, must start with `%PDF-`) and returns it; n
 "What your sources say" asks Claude, through here, whether each cited paper supports the sentence (`/api/ai/judge`:
 the sentence plus a few passages of the paper's text picked by the app; structured JSON answer), and can look for
 supporting papers on the web (`/api/ai/find-web`, Claude's web search tool). Signed-in accounts only; nothing is
-stored except a monthly count per account (`ai_usage`, one unit per sentence-and-paper, 5 per web search).
+stored except monthly counts per account (`ai_usage`: checks, and web checks).
 - Secret: `ANTHROPIC_API_KEY` (GitHub secret of the same name; the deploy workflow passes it on). Without it the
   endpoints answer "Claude checks aren't switched on yet" and the app keeps showing word matches.
-- Variables (optional, in `wrangler.toml` `[vars]`): `AI_MODEL` (default `claude-opus-5-5`), `AI_FREE_MONTHLY`
-  (default 30), `AI_PRO_MONTHLY` (default 3000). `ANTHROPIC_BASE_URL` points the tests at a pretend Claude.
+- Variables (optional, in `wrangler.toml` `[vars]`): `AI_MODEL` for verdicts and library checks (default
+  `claude-opus-5-5`), `AI_WEB_MODEL` for web checks (default the same; Haiku gets the older web search tool),
+  `AI_FREE_MONTHLY` / `AI_PRO_MONTHLY` checks (30 / 3000; a verdict or a library check counts 1), `AI_FREE_WEB` /
+  `AI_PRO_WEB` web checks (3 / 100). `ANTHROPIC_BASE_URL` points the tests at a pretend Claude.
 - Pro, until payments exist: `curl -X POST -H "Authorization: Bearer ADMIN_TOKEN" -H "Content-Type: application/json"
   -d '{"email":"someone@example.com","pro":true}' https://mcp.citrello.app/admin/pro`

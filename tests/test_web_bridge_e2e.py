@@ -230,7 +230,7 @@ def test_claude_checks_what_my_sources_say(browser_name, tmp_path):
             expect(src.nth(0)).to_contain_text("Supports this", timeout=60000)
             expect(src.nth(1)).to_contain_text("Seems to contradict this")
             expect(src.nth(0).locator(".cite")).to_have_text("[@topham2017]")  # the citation, in colour
-            expect(page.locator("#srcAi")).to_contain_text("Claude checks this month")
+            expect(page.locator("#srcAi")).to_contain_text("This month: 2 of 3 Claude checks, 0 of 3 web checks")
             # More details: Claude's reason and the exact words, highlighted in their passage
             src.nth(1).locator("[data-src-more]").click()
             expect(src.nth(1).locator("mark")).to_contain_text("halved that cost")
@@ -240,17 +240,20 @@ def test_claude_checks_what_my_sources_say(browser_name, tmp_path):
             expect(src.nth(1).locator(".src-found")).to_contain_text("Found in your library", timeout=60000)
             expect(src.nth(1).locator(".src-found")).to_contain_text("Export cable recovery costs")
             expect(src.nth(1).locator('.src-found button[data-copy="[@lee2021]"]')).to_be_visible()
-            # and on the web: a search costs 5 checks, more than this free account has left: said plainly
+            # and on the web: Claude's search, then the paper goes to the library
             src.nth(1).locator('[data-src-find="web"]').click()
             found = src.nth(1).locator(".src-found")
-            expect(found).to_contain_text("Free accounts get 6 Claude checks a month", timeout=60000)
-            # with Citrello Pro (switched on by the admin for now): Claude's search, then the paper goes to the library
-            assert B.call("POST", "/admin/pro", {"email": email, "pro": True}, headers={"Authorization": "Bearer testadmin"})[0] == 200
-            src.nth(1).locator('[data-src-find="web"]').click()
             expect(found).to_contain_text("Found on the web", timeout=60000)
             expect(found).to_contain_text("Cable recovery dominates offshore wind decommissioning costs")
             found.locator("[data-src-addweb]").click()
             expect(found.locator("button[data-copy]")).to_be_visible(timeout=60000)
+            expect(page.locator("#srcAi")).to_contain_text("1 of 3 web checks")
+            # this test's free accounts get 3 checks: the 4th says so plainly; Pro (switched on by the admin for now) goes on
+            src.nth(1).locator('[data-src-find="library"]').click()
+            expect(src.nth(1).locator(".src-found")).to_contain_text("Free accounts get 3 Claude checks a month", timeout=60000)
+            assert B.call("POST", "/admin/pro", {"email": email, "pro": True}, headers={"Authorization": "Bearer testadmin"})[0] == 200
+            src.nth(1).locator('[data-src-find="library"]').click()
+            expect(src.nth(1).locator(".src-found")).to_contain_text("Found in your library", timeout=60000)
             page.locator("#chkSrcPanel").scroll_into_view_if_needed()
             page.screenshot(path=os.path.join(os.environ.get("CITRELLO_E2E_SHOTS") or str(tmp_path), f"web-bridge-{browser_name}-claude.png"))
             # checking again doesn't ask (or pay) Claude twice: the verdicts come from this browser
