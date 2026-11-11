@@ -1,0 +1,38 @@
+name: Real test of Claude checks
+
+# Run by hand (Actions -> "Real test of Claude checks" -> Run workflow). Starts a local copy of the bridge with the
+# real ANTHROPIC_API_KEY secret and sends it real cases: what Claude answered, how long it took and what it cost
+# (a few cents). Nothing is deployed.
+on:
+  workflow_dispatch:
+
+jobs:
+  real:
+    runs-on: ubuntu-latest
+    env:
+      ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install python-docx citeproc-py pypdf pybtex pytest
+      - name: Check the key is there
+        run: |
+          if [ -z "$ANTHROPIC_API_KEY" ]; then echo "::error::Add the ANTHROPIC_API_KEY secret first."; exit 1; fi
+      - name: Start a local copy of the bridge with the real key
+        working-directory: bridge
+        run: |
+          npm ci
+          npx wrangler d1 migrations apply citrello --local
+          printf 'ANTHROPIC_API_KEY=%s\n' "$ANTHROPIC_API_KEY" > .dev.vars
+          npx wrangler dev --port 8787 --var DEV_RETURN_CODES:1 --var ADMIN_TOKEN:testadmin --var PUBLIC_URL:http://localhost:8787 > wrangler.log 2>&1 &
+          for i in $(seq 60); do curl -sf http://localhost:8787/ > /dev/null && break; sleep 1; done
+      - name: Real cases
+        run: CITRELLO_BRIDGE=http://localhost:8787 CITRELLO_BRIDGE_E2E=1 python tests/ai_real_check.py || { tail -50 bridge/wrangler.log; exit 1; }
+      - name: Remove the key file
+        if: always()
+        run: rm -f bridge/.dev.vars

@@ -50,7 +50,7 @@ def test_claude_checks(claude):
     assert r["results"] == [dict(r["results"][0], id="0", paper="0", verdict="contradicts", passage=1)]
     assert "halved that cost" in r["results"][0]["quote"] and r["quota"]["used"] == 1
     sent = claude[-1]
-    assert sent["key"] == "test-key" and sent["body"]["model"] == "claude-opus-5-5"
+    assert sent["key"] == "test-key" and sent["body"]["model"] == "claude-sonnet-5-5"
     assert sent["body"]["output_config"]["format"]["type"] == "json_schema"  # a structured answer
     assert sent["body"]["fallbacks"] == "default"
 

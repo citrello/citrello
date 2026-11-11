@@ -19,7 +19,7 @@ function client(env) {
   return new Anthropic({ apiKey: env.ANTHROPIC_API_KEY, ...(env.ANTHROPIC_BASE_URL ? { baseURL: env.ANTHROPIC_BASE_URL } : {}),
                          maxRetries: 2, timeout: 120000 });
 }
-const model = (env) => env.AI_MODEL || "claude-opus-5-5";            // verdicts and library checks
+const model = (env) => env.AI_MODEL || "claude-sonnet-5-5";          // verdicts and library checks
 const webModel = (env) => env.AI_WEB_MODEL || model(env);              // web checks (needs web search: not Haiku)
 
 // Monthly allowances: checks (a verdict, or a library check, counts 1) and web checks, free and pro.
@@ -68,6 +68,10 @@ const JUDGE_SCHEMA = {
                   passage: { type: "integer" }, quote: { type: "string" }, reason: { type: "string" } } } } },
 };
 
+// what a request used (for measuring the cost): tokens in and out, and web searches
+const usageOf = (msg, searches) => ({ model: msg.model, input_tokens: msg.usage.input_tokens, output_tokens: msg.usage.output_tokens,
+  ...(searches !== undefined ? { web_searches: searches } : {}) });
+
 function textOf(msg) {
   return msg.content.filter((b) => b.type === "text").map((b) => b.text).join("");
 }
@@ -100,7 +104,7 @@ export async function judge(env, userId, body) {
   const results = (out.results || []).filter((r) => VERDICTS.includes(r.verdict)).map((r) => ({
     id: clip(r.id, 40), paper: clip(r.paper, 80), verdict: r.verdict, passage: Number(r.passage) || 0,
     quote: clip(r.quote, 400), reason: clip(r.reason, 400) }));
-  return { results, quota: await quota(env, userId) };
+  return { results, usage: usageOf(msg), quota: await quota(env, userId) };
 }
 
 const WEB_SYSTEM = `You help researchers find published sources for a sentence in their manuscript. Search the web
@@ -126,9 +130,13 @@ export async function findOnWeb(env, userId, body) {
       (exclude.length ? `\nAlready cited (don't list): ${exclude.join(", ")}` : "") }],
   };
   let msg = await client(env).beta.messages.create(params);
+  let searches = (msg.usage.server_tool_use && msg.usage.server_tool_use.web_search_requests) || 0;
+  let tin = msg.usage.input_tokens, tout = msg.usage.output_tokens;
   for (let i = 0; msg.stop_reason === "pause_turn" && i < 3; i++) {  // a long search: let the server continue it
     params.messages = [...params.messages, { role: "assistant", content: msg.content }];
     msg = await client(env).beta.messages.create(params);
+    searches += (msg.usage.server_tool_use && msg.usage.server_tool_use.web_search_requests) || 0;
+    tin += msg.usage.input_tokens; tout += msg.usage.output_tokens;
   }
   if (msg.stop_reason === "refusal") throw new AiError(422, "ai_refused", "Claude couldn't search for this sentence.");
   const text = textOf(msg), a = text.indexOf("{"), b = text.lastIndexOf("}");
@@ -140,5 +148,5 @@ export async function findOnWeb(env, userId, body) {
     doi: clip(String(p.doi || "").replace(/^https?:\/\/(dx\.)?doi\.org\//i, ""), 200), url: clip(p.url, 500),
     verdict: p.verdict === "partly" ? "partly" : "supports", quote: clip(p.quote, 600), reason: clip(p.reason, 400) }))
     .filter((p) => p.title && !exclude.includes(p.doi.toLowerCase()));
-  return { papers, quota: await quota(env, userId) };
+  return { papers, usage: { ...usageOf(msg, searches), input_tokens: tin, output_tokens: tout }, quota: await quota(env, userId) };
 }

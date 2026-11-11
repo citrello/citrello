@@ -151,8 +151,8 @@ quote highlighted in its passage, the reason) and, when not supported, "Find sup
 Monthly allowances per account (`ai_usage`), decided by Armin 12 Nov: free = 30 checks (a verdict or a library check
 counts 1) + 3 web checks; Pro = 3000 + 100 (placeholders). Pro switched on by `/admin/pro` until payments exist.
 Estimated cost per action (Opus / Sonnet / Haiku): verdict ~1.2 / 0.6 / <0.1 cents; library check ~3 / 1.6 / 0.1
-cents; web check ~20–30 / 12–18 cents (Haiku can't use the newer web search). Model not chosen yet (AI_MODEL,
-AI_WEB_MODEL). Consent asked once ("sends each cited sentence and a few passages").
+cents; web check ~20–30 / 12–18 cents (Haiku can't use the newer web search). Model: Sonnet 5.5 for both (Armin, 12 Nov; `AI_MODEL`, `AI_WEB_MODEL` in bridge/wrangler.toml). A real test runs
+by hand: workflow "Real test of Claude checks" (tests/ai_real_check.py, real key, prints verdicts, time, cost). Consent asked once ("sends each cited sentence and a few passages").
 Tested with a pretend Claude API (tests/anthropic_mock.py) end to end in Chromium and WebKit; **not yet tested with
 the real Claude API** (waiting for Armin's ANTHROPIC_API_KEY GitHub secret). Cost note for Armin: Opus is $4/$20 per
 million tokens; one sentence-and-paper is about 2–3k tokens in, so roughly 1–2 cents each with Opus, about 40 times less
