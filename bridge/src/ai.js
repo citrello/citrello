@@ -139,7 +139,7 @@ export async function findOnWeb(env, userId, body) {
     tin += msg.usage.input_tokens; tout += msg.usage.output_tokens;
   }
   if (msg.stop_reason === "refusal") throw new AiError(422, "ai_refused", "Claude couldn't search for this sentence.");
-  const text = textOf(msg), a = text.indexOf("{"), b = text.lastIndexOf("}");
+  const text = textOf(msg), last = text.lastIndexOf('{"papers"'), a = last >= 0 ? last : text.indexOf("{"), b = text.lastIndexOf("}");
   let out;
   try { out = JSON.parse(text.slice(a, b + 1)); } catch { throw new AiError(502, "ai_bad_answer", "Claude's answer couldn't be read. Please try again."); }
   await done();
@@ -148,5 +148,6 @@ export async function findOnWeb(env, userId, body) {
     doi: clip(String(p.doi || "").replace(/^https?:\/\/(dx\.)?doi\.org\//i, ""), 200), url: clip(p.url, 500),
     verdict: p.verdict === "partly" ? "partly" : "supports", quote: clip(p.quote, 600), reason: clip(p.reason, 400) }))
     .filter((p) => p.title && !exclude.includes(p.doi.toLowerCase()));
-  return { papers, usage: { ...usageOf(msg, searches), input_tokens: tin, output_tokens: tout }, quota: await quota(env, userId) };
+  return { papers, usage: { ...usageOf(msg, searches), input_tokens: tin, output_tokens: tout }, quota: await quota(env, userId),
+           ...(env.DEV_RETURN_CODES && !papers.length ? { raw: text.slice(-3000), stop: msg.stop_reason } : {}) };  // test copies only: why nothing came back
 }

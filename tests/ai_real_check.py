@@ -95,6 +95,8 @@ def main():
     print(f"\n== Web check: {took:.1f} s, {r.get('usage')}")
     if st != 200:
         print("   failed:", st, raw)
+    if r.get("raw"):
+        print("   no papers; Claude's answer ended with (stop:", r.get("stop"), "):\n", r["raw"])
     for p in r.get("papers", []):
         print(f"   {p['verdict']:<9} {p['authors']} ({p['year']}) {p['title']} doi:{p['doi']}\n             {p['quote']!r}")
     if st == 200:
