@@ -258,8 +258,11 @@
     const s = await (await fetch("/api/ai/session")).json().catch(() => ({}));
     return s.signed_in ? s : null;
   }
+  // leaving the page cancels what's in flight (the next visit saves again), instead of a cut-off request
+  const cloudAbort = new AbortController();
+  window.addEventListener("pagehide", () => cloudAbort.abort());
   const cloudCall = (sess, method, path, opts = {}) => realFetch(sess.bridge + path,
-    { method, body: opts.body, headers: { "Authorization": "Bearer " + sess.token, ...(opts.headers || {}) } });
+    { method, body: opts.body, signal: cloudAbort.signal, headers: { "Authorization": "Bearer " + sess.token, ...(opts.headers || {}) } });
   function cloudSay(text, kind) {
     const el = document.getElementById("webCloudMsg");
     if (el) { el.className = "notice " + (kind || "ok"); el.textContent = text; el.classList.toggle("hidden", !text); }

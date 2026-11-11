@@ -89,7 +89,10 @@ def test_web_app(browser_name, tmp_path):
         page.fill("#q", "10.1016/j.renene.2016.10.066")
         page.click("#qAddBtn")
         expect(page.locator("#libRows")).to_contain_text("Sustainable decommissioning", timeout=90000)
-        expect(page.locator("#webBackupNag")).to_be_visible()
+        expect(page.locator("#webBackupNag")).to_contain_text("Sign in so you don't lose it")  # the cloud copy
+        page.click("#webNagSignIn")
+        expect(page.locator("#signinDlg")).to_be_visible()  # signing in happens in a window, here
+        page.click("#siClose")
         shot(page, "library")
 
         # export BibTeX: a download made in the browser
@@ -101,14 +104,15 @@ def test_web_app(browser_name, tmp_path):
         text = open(dl.value.path(), encoding="utf-8").read()
         assert "Topham2017" in text and "Vetters2024" in text
 
-        # back up, delete everything, restore
+        # back up (a file, in Settings), delete everything, restore
+        tab(page, "settings")
         with page.expect_download() as dl:
-            page.click("#webBackupNag a.btn")
+            page.click("#webBackup")
+        tab(page, "library")
         backup = tmp_path / dl.value.suggested_filename
         dl.value.save_as(str(backup))
         assert backup.name.startswith("citrello-library-")
         assert {it["key"] for it in json.loads(backup.read_text(encoding="utf-8"))["items"]} == {"Topham2017", "Vetters2024"}
-        expect(page.locator("#webBackupNag")).to_be_hidden()
         page.check("#selAll")
         page.click("#selDelete")
         expect(page.locator("#libEmpty")).to_be_visible()

@@ -56,7 +56,9 @@ def test_browser_tab_is_the_device(browser_name, tmp_path):
         ctx = b.new_context(viewport={"width": 1280, "height": 900}, accept_downloads=True)
         page = ctx.new_page()
         errors = []
-        page.on("pageerror", lambda e: errors.append(str(e)))
+        # WebKit reports a cloud-copy request cut off by the reload below as "access control checks" (it never reached
+        # the server, which answers every request with the right headers): only that is ignored
+        page.on("pageerror", lambda e: None if "/api/cloud due to access control checks" in str(e) else errors.append(str(e)))
         page.on("dialog", lambda d: d.accept())
         page.goto(f"{BASE}/app/?bridge={urllib.parse.quote(B.bc.BRIDGE)}")
         page.wait_for_selector("#webCover", state="detached", timeout=LOAD)
