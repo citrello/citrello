@@ -130,7 +130,15 @@ extension: it reads open-access and subscribed papers; without: free copies now 
 the university library first) and "PDFs you already have". "Ask Claude / ChatGPT" opens the connector guide the
 first time with the question waiting at its end (remembered per browser once done). Regular users: "Show
 step-by-step guides" on Home (off → tiles go straight to the screen, the button flashes; "Don't show guides" in the
-bubble), finished tours say "Show me again". Next: an optional AI verdict with a cheap
+bubble), finished tours say "Show me again". 11 Nov, the journey without dead ends (Armin: "103 papers without
+text and no button"): the sources panel adds the document's references to the library in one click (project named
+after the document) and shows them; papers without text get "Get their full texts with my access" (extension, just
+those papers), or "Get the free ones now" + get the extension, or "I have the PDFs" / "add its PDF" per paper; the
+sentences refresh by themselves as texts arrive; long papers get filters (passages found / no clear match / without
+text / not in library) and 20 sentences at a time; PDFs say it works on Word for now. Also: an unreadable document
+offers the sample and "tell us"; "See them" after adding references; imports end with "Next: check them online ·
+get the papers' full texts"; Verify's problems have "Show only these"; "Still needs you" says what to do.
+Next: an optional AI verdict with a cheap
 model paid by Citrello within a free monthly allowance for signed-in users (about 1–2 cents per paper); "find
 references" (OpenAlex + stronger model, ~5–10 cents per paragraph) later, possibly paid credits.
 

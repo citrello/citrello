@@ -576,7 +576,21 @@ def test_web_app_home_and_tours(browser_name, tmp_path):
         page.click("#chkSources", timeout=120000)
         expect(page.locator("#chkSrc")).to_contain_text("42% of the total decommissioning cost", timeout=60000)
         expect(page.locator("#chkSrc")).to_contain_text("No text for this paper yet")
+        expect(page.locator("#srcFetch")).to_have_text("Get the free ones now")  # no extension yet
         shot(page, "sources")
+        # with the extension: it's asked for exactly the papers without text, and their sentences fill in
+        page.evaluate("""() => { window.sent = null;
+            window.addEventListener('message', (e) => { if (e.data && e.data.citrelloExt === 'fetch') window.sent = e.data.papers; });
+            window.postMessage({citrelloExt: 'hello', version: 'test'}, location.origin); }""")
+        expect(page.locator("#srcFetch")).to_have_text("Get their full texts with my access")
+        page.click("#srcFetch")
+        page.wait_for_function("window.sent !== null")
+        assert [(x["key"], x["doi"]) for x in page.evaluate("window.sent")] == [("vetters2024", "10.1016/j.rser.2024.114486")]
+        text = "Sailing through end-of-life challenges.\n\n" + " ".join(
+            f"Part {i}. Reviews compare the end-of-life options for offshore wind: repowering, life extension and full removal." for i in range(20))
+        page.evaluate("(text) => window.postMessage({citrelloExt: 'fulltext', key: 'vetters2024', text, id: 1}, location.origin)", text)
+        expect(page.locator("#chkSrc")).to_contain_text("repowering, life extension and full removal", timeout=60000)
+        expect(page.locator("#srcGet")).to_have_count(0)
         assert not errors, errors
         b.close()
 

@@ -116,6 +116,10 @@
   .src-p .src-who { font-weight: 700; color: var(--cobalt); }
   blockquote.src-q { margin: 6px 0; padding: 8px 12px; background: var(--bg); border-left: 3px solid var(--leaf); border-radius: 8px; }
   blockquote.src-q .small { display: block; margin-top: 2px; }
+  .src-get { background: var(--sky); border-radius: 12px; padding: 12px 14px; margin: 0 0 12px; font-size: 14px; }
+  .src-act { display: flex; gap: 12px; align-items: center; justify-content: space-between; flex-wrap: wrap; }
+  .src-filter .chip { cursor: pointer; } .src-filter .chip.on { background: var(--cobalt); color: #fff; }
+  label.link { color: var(--accent); text-decoration: underline; cursor: pointer; }
   mark { background: var(--lemon-soft); color: inherit; padding: 0 1px; border-radius: 3px; }
   /* Home: what you can do, each with a guided tour on the real screen */
   .home { max-width: 1100px; }
@@ -1588,11 +1592,14 @@ $("verifyBtn").onclick = async () => {
       $("verifyBar").style.width = "100%";
       let html = r.stopped ? `<div class="notice err">${esc(r.stopped)}</div>` : "";
       if (r.repaired) html += `<div class="notice ok">${r.repaired} reference${r.repaired > 1 ? "s" : ""} had details restored that an earlier version removed (article numbers, page ranges, journal names).</div>`;
-      if (r.problems.length) html += `<div class="notice err"><strong>Problems</strong><ul class="issues">${r.problems.map((p) =>
-          `<li class="problem"><code class="key">${esc(p.key)}</code> ${esc((p.issues || [p.error]).join("; "))}</li>`).join("")}</ul></div>`;
+      if (r.problems.length) html += `<div class="notice err"><strong>Problems</strong> <button class="link" id="verifyShowProblems">Show only these in the list</button>
+          <ul class="issues">${r.problems.map((p) =>
+          `<li class="problem"><code class="key">${esc(p.key)}</code> ${esc((p.issues || [p.error]).join("; "))}</li>`).join("")}</ul>
+          <p class="small" style="margin:6px 0 0">Click a reference in the list to see what's wrong and correct it, or delete it if it shouldn't be cited.</p></div>`;
       if (r.changed.length) html += `<details open><summary>${r.changed.length} reference${r.changed.length > 1 ? "s" : ""} corrected from the publisher record</summary>
           <ul class="small">${r.changed.map((c) => `<li><code class="key">${esc(c.key)}</code> ${esc(c.changes.join(" · "))}</li>`).join("")}</ul></details>`;
       $("verifyResult").innerHTML = html;
+      if ($("verifyShowProblems")) $("verifyShowProblems").onclick = () => { relFilter.clear(); relFilter.add("problem"); loadLibrary(); };
     };
     tick();
   } catch (e) { $("verifyBtn").disabled = false; notice("verifyResult", "err", esc(e.message)); }
@@ -1625,18 +1632,20 @@ async function importFile(f) {
   try {
     const r = await api("/api/library/import", {method: "POST", body: await f.arrayBuffer(),
       headers: {"X-Filename": encodeURIComponent(f.name), "X-Project": encodeURIComponent(impProject())}});
-    impNote("ok", `${r.added} added, ${r.skipped} skipped (already in the library or incomplete).`); loadLibrary();
+    impNote("ok", `${r.added} added, ${r.skipped} skipped (already in the library or incomplete).` + (r.added ? IMPORT_NEXT : "")); loadLibrary();
   } catch (e) { impNote("err", esc(e.message)); }
 }
+const IMPORT_NEXT = ` <span class="imp-next">Next: <button class="link" data-go="verify">check them online</button> ·
+  <button class="link" data-go="papers">get the papers' full texts</button></span>`;
 const zoteroDone = (r) => {
   impNote("ok", `${r.added} added, ${r.skipped} already in your library` +
     (r.collections ? `. Your ${r.collections} Zotero collection${r.collections > 1 ? "s are" : " is"} now in Projects.` : ".") +
-    (r.from_backup ? " (Read from Zotero's latest automatic backup: close Zotero and import again to include today's changes.)" : ""));
+    (r.from_backup ? " (Read from Zotero's latest automatic backup: close Zotero and import again to include today's changes.)" : "") + (r.added ? IMPORT_NEXT : ""));
   loadLibrary();
 };
 async function accountImport(path, body = {}) {
   impNote("warn", "Importing… (large libraries take a while)");
-  try { const r = await post(path, {project: impProject(), ...body}); impNote("ok", `${r.added} added, ${r.skipped} already in your library.`); loadLibrary(); }
+  try { const r = await post(path, {project: impProject(), ...body}); impNote("ok", `${r.added} added, ${r.skipped} already in your library.` + (r.added ? IMPORT_NEXT : "")); loadLibrary(); }
   catch (e) { impNote("err", esc(e.message)); }
 }
 const IMPORT_ACTIONS = {
@@ -1764,6 +1773,8 @@ window.addEventListener("message", async (e) => {
   if (m.citrelloExt === "hello") { extVersion = m.version; loadPapers(); }
   if (m.citrelloExt === "fetch-started") impNote("ok", `The extension is fetching ${m.n} paper${m.n === 1 ? "" : "s"} in its own tab. The texts appear here as they come in.`);
   if (m.citrelloExt === "fetch-failed") impNote("err", esc(m.error || "The extension didn't start."));
+  if (m.citrelloExt === "fetch-failed" && srcPending) { srcPending = false; srcSay("err", esc(m.error || "The extension didn't start.")); if ($("srcFetch")) $("srcFetch").disabled = false; }
+  if (m.citrelloExt === "hello" && chk && chk.sources && $("chkSrcPanel")) renderCheck();  // the extension arrived: its button
   if (m.citrelloExt === "fulltext") {  // one paper's text, fetched by the extension with the person's access
     let ok = false, error = "";
     try {
@@ -1772,7 +1783,7 @@ window.addEventListener("message", async (e) => {
       ok = r.ok; if (!ok) error = (await r.json().catch(() => ({}))).error || r.statusText;
     } catch (err) { error = err.message; }
     window.postMessage({citrelloExt: "saved", id: m.id, ok, error}, location.origin);
-    if (ok) reloadSoon();
+    if (ok) { reloadSoon(); srcRefreshSoon(); }
   }
 });
 // the extension's toolbar panel: look a paper up, add it, keep its text (only "Add to Citrello" requests)
@@ -1893,6 +1904,7 @@ async function useSample() {  // the sample paper: six typical mistakes planted 
 }
 async function checkFile(file) {
   $("chkResult").innerHTML = ""; $("texResult").innerHTML = ""; texJob = null;
+  srcFilter = "all"; srcShown = 20; srcNote = null;
   if (/\.(tex|ltx|zip|bib)$/i.test(file.name)) return texUpload(file);
   if (!/\.(docx|pdf)$/i.test(file.name)) return notice("chkResult", "err", "Please choose a Word document (.docx), a PDF, or a LaTeX .tex or .zip file.");
   $("chkDropText").innerHTML = `<strong>${esc(file.name)}</strong> · choose another file to check it`;
@@ -1913,7 +1925,10 @@ function pollCheck() {
 }
 function renderCheck() {
   const c = chk, id = c.id;
-  if (c.state === "error") return notice("chkResult", "err", esc(c.error));
+  if (c.state === "error") return $("chkResult").innerHTML = `<div class="notice err">${esc(c.error)}</div>
+    <div class="row"><button id="chkTrySample">Try the sample paper instead</button>
+    <a class="btn" href="https://github.com/citrello/citrello/issues/new" target="_blank" rel="noopener">Tell us about this document</a></div>`,
+    $("chkTrySample").onclick = useSample;
   if (c.state === "checking") {
     $("chkResult").innerHTML = `<p class="muted small" style="margin:12px 0 0">${esc(c.step)}${c.n ? `: ${c.i} of ${c.n}` : "…"}</p>
       <div class="bar"><div style="width:${c.n ? Math.round(100 * c.i / c.n) : 3}%"></div></div>`;
@@ -1941,7 +1956,8 @@ function renderCheck() {
         <td>${relTag(x.reliability)}</td><td class="hide-sm">${x.in_library ? '<span class="tag ok">In library</span>' : '<span class="tag new">New</span>'}</td></tr>`).join("")}
       </tbody></table></div></details>`;
   h += `<div class="row" style="margin-top:14px">
-      ${c.added !== null ? `<div class="notice ok" style="margin:0">${c.added} added to your library${c.added < r.references ? "; the rest were already there" : ""}.</div>`
+      ${c.added !== null ? `<div class="notice ok" style="margin:0">${c.added} added to your library${c.added < r.references ? "; the rest were already there" : ""}.
+          <button class="link" data-open-project="${esc(name)}">See them</button></div>`
         : `<input type="text" id="chkProject" list="projectList" value="${esc(name)}" placeholder="Project">
            <button class="primary" id="chkAdd" ${newOnes ? "" : "disabled"}>${newOnes ? `Add ${newOnes} new reference${newOnes > 1 ? "s" : ""} to my library` : "All are in your library"}</button>`}
       <a class="btn" href="/api/doccheck/${id}/report.csv">Download the report (.csv)</a></div>`;
@@ -1956,7 +1972,8 @@ function renderCheck() {
       if (f.corrected.length) h += `<h3>Corrected from the publisher's record</h3>` + li(f.corrected.map((x) => `<li class="ok">[${x.number}] ${esc(x.title)}: ${x.changes.map(esc).join(", ")}</li>`));
       if (f.merged.length) h += `<h3>Duplicates merged</h3>` + li(f.merged.map((x) => `<li class="ok">${esc(x)}</li>`));
       if (f.dropped_uncited.length) h += `<h3>Removed from the list (never cited)</h3>` + li([`<li class="check">${f.dropped_uncited.map((n) => `[${n}]`).join(", ")}</li>`]);
-      if (f.still_problems.length || f.unfixable.length) h += `<h3>Still needs you</h3>` + li([
+      if (f.still_problems.length || f.unfixable.length) h += `<h3>Still needs you</h3>
+        <p class="small muted" style="margin:0">Citrello can't fix these by itself: a retracted paper or a DOI that doesn't exist needs a different source or a corrected reference. Change them in your Word file (or in your library), then check the document again.</p>` + li([
           ...f.still_problems.map((x) => `<li class="problem">${esc(x.title)}: ${esc(x.text)}</li>`),
           ...f.unfixable.map((t) => `<li class="problem">${esc(t)}</li>`)]);
     } else {
@@ -1971,13 +1988,7 @@ function renderCheck() {
   }
   h += sourcesPanel(c, r, newOnes);
   $("chkResult").innerHTML = h;
-  if ($("chkSources")) $("chkSources").onclick = async () => {
-    $("chkSources").disabled = true; $("chkSources").textContent = "Reading…";
-    try { chk = await post(`/api/doccheck/${id}/sources`, {}); chk.id = id; renderCheck(); }
-    catch (e) { toast(e.message); $("chkSources").disabled = false; $("chkSources").textContent = "Show what my sources say"; }
-  };
-  document.querySelectorAll("[data-go-papers]").forEach((b) => b.onclick = () => goTab("papers"));
-  document.querySelectorAll("[data-src-ai]").forEach((b) => b.onclick = () => AI_LINKS(SOURCES_PROMPT)[+b.dataset.srcAi].run());
+  bindSources();
   if ($("chkStyle")) { const def = $("defStyle").value; if (def) $("chkStyle").value = def;
     stylePicker($("chkFind"), $("chkFindList"), $("chkFindMsg"), async (sid) => {
       const info = await post("/api/styles/add", {id: sid, default: false}); const keep = $("defStyle").value;
@@ -2005,34 +2016,130 @@ function markWords(passage, sentence) {  // highlight the sentence's words in th
   const safe = esc(passage);
   return words.length ? safe.replace(new RegExp(`\\b(${words.join("|")})[\\w\\-]*`, "gi"), "<mark>$&</mark>") : safe;
 }
+// The panel answers every "what now?": references not in the library (add them and show, one click), papers without
+// text (get them here: with the extension, as free copies, or from PDFs dropped in), texts that arrive later (the
+// sentences update by themselves), long papers (filters, 20 sentences at a time), PDFs (not yet: says so).
+let srcFilter = "all", srcShown = 20, srcNote = null, srcTimer = null;
+const SRC_FILTERS = [["all", "All"], ["found", "Passages found"], ["no_match", "No clear match"], ["no_text", "Without text"], ["not_in_library", "Not in your library"]];
 function sourcesPanel(c, r, newOnes) {
-  if (r.source === "pdf") return "";
   const head = `<div class="panel" id="chkSrcPanel" style="margin-top:16px"><strong>What your sources say</strong>
     <p class="small muted" style="margin:4px 0 8px">Each sentence that cites a paper, next to the passages of that paper that match it best, so you can see whether it supports what you wrote. Citrello uses the papers' text it has (Full texts); nothing leaves your computer.</p>`;
+  if (r.source === "pdf") return head + `<p class="small">This works on Word documents for now: check the Word version of this paper to see what your sources say.</p></div>`;
   const s = c.sources;
-  if (!s) return head + (newOnes ? `<p class="small">Add the references to your library first (button above): Citrello looks for their text there.</p>` : "") +
-    `<button class="primary" id="chkSources">Show what my sources say</button></div>`;
-  const n = s.counts;
+  if (!s) return head + (newOnes && c.added === null
+    ? `<button class="primary" id="chkSources" data-add="1">Add the ${newOnes} new reference${newOnes > 1 ? "s" : ""} to my library and show what they say</button>
+       <p class="small muted" style="margin:6px 0 0">Citrello looks for the papers' text in your library, so they need to be there (in the project “${esc(c.name.replace(/\.docx$/i, ""))}”).</p>`
+    : `<button class="primary" id="chkSources">Show what my sources say</button>`) + `</div>`;
+  const n = s.counts, missing = srcMissing(s);
   let h = head + `<div class="chips" id="chkSrcChips"><span class="chip">${n.sentences} cited sentence${n.sentences === 1 ? "" : "s"}</span>
       ${n.with_text ? `<span class="chip ok">${n.with_text} with the paper's text</span>` : ""}
-      ${n.no_text ? `<span class="chip warn">${n.no_text} without text yet</span>` : ""}
+      ${missing.length ? `<span class="chip warn">${missing.length} paper${missing.length === 1 ? "" : "s"} without text yet</span>` : ""}
       ${n.not_in_library ? `<span class="chip bad">${n.not_in_library} not in your library</span>` : ""}</div>`;
-  if (!n.sentences) h += `<div class="notice warn">No sentence with a citation was found.</div>`;
-  if (n.no_text) h += `<div class="notice warn" style="display:flex;gap:12px;align-items:center;justify-content:space-between;flex-wrap:wrap">
-      <span>Citrello doesn't have the text of every paper yet. Add it, then click Show again.</span><button data-go-papers>Get the papers' text</button></div>`;
-  h += `<div id="chkSrc">` + s.sentences.map((x) => `<div class="src"><p class="src-s">${esc(x.sentence)}</p>${x.papers.map((p) => {
+  if (!n.sentences) h += `<div class="notice warn">No sentence with a citation was found in this document.</div>`;
+  if (n.not_in_library && c.added === null) h += `<div class="notice warn src-act"><span>Some cited papers aren't in your library, so Citrello can't look for their text.</span>
+      <button id="srcAddRefs">Add them to my library</button></div>`;
+  if (missing.length) h += `<div class="src-get" id="srcGet"><b>${missing.length} cited paper${missing.length === 1 ? " has" : "s have"} no text yet.</b> Get ${missing.length === 1 ? "it" : "them"} here, and the sentences below fill in as the texts arrive.
+      <div class="row" style="margin-top:8px">${extVersion
+        ? `<button class="primary" id="srcFetch">Get their full texts with my access</button>`
+        : `<button class="primary" id="srcFetch">Get the free ones now</button><a class="btn" href="https://citrello.app/extension" target="_blank" rel="noopener">Get the extension for the rest</a>`}
+        <label class="btn" for="srcPdfs">I have the PDFs…</label><input type="file" id="srcPdfs" accept=".pdf" multiple hidden></div>
+      <p class="small muted" style="margin:6px 0 0">${extVersion ? `The extension opens each paper in a background tab with your login, about one every 15 seconds${missing.length > 3 ? ` (about ${Math.ceil(missing.length * 15 / 60)} minutes)` : ""}. Keep working meanwhile.`
+        : "Without the browser extension, Citrello can only get legal free copies; the extension opens the others with your university login."}
+        Tip: sign in to your university library in this browser first.</p>
+      <div id="srcFetchMsg">${srcNote ? `<div class="notice ${srcNote[0]}">${srcNote[1]}</div>` : ""}</div></div>`;
+  else if (srcNote) h += `<div id="srcFetchMsg"><div class="notice ${srcNote[0]}">${srcNote[1]}</div></div>`;
+  if (n.sentences > 5) h += `<div class="chips src-filter" role="group" aria-label="Show">${SRC_FILTERS.map(([k, label]) => {
+      const cnt = k === "all" ? n.sentences : s.sentences.filter((x) => x.papers.some((p) => p.status === k)).length;
+      return cnt || k === "all" ? `<button class="chip ${srcFilter === k ? "on" : ""}" data-src-filter="${k}">${label} · ${cnt}</button>` : "";
+    }).join("")}</div>`;
+  const list = s.sentences.filter((x) => srcFilter === "all" || x.papers.some((p) => p.status === srcFilter));
+  h += `<div id="chkSrc">` + list.slice(0, srcShown).map((x) => `<div class="src"><p class="src-s">${esc(x.sentence)}</p>${x.papers.map((p) => {
       const who = `<span class="src-who">${esc(p.label)}</span> <span class="muted">${esc(p.title.slice(0, 90))}</span>`;
       if (p.status === "found") return `<div class="src-p">${who}${p.passages.map((q) =>
         `<blockquote class="src-q">${markWords(q.text, x.sentence)}<span class="small muted">${q.at < 5 ? "Near the start of the paper" : q.at > 90 ? "Near the end of the paper" : `About ${q.at}% into the paper`}</span></blockquote>`).join("")}</div>`;
       if (p.status === "no_match") return `<div class="src-p">${who}<div class="small" style="color:var(--warn)">No passage of this paper clearly matches the sentence: worth a look.
         <a href="/api/fulltext/text?key=${encodeURIComponent(p.key)}">Open its text</a></div></div>`;
-      if (p.status === "no_text") return `<div class="src-p">${who}<div class="small muted">No text for this paper yet.</div></div>`;
+      if (p.status === "no_text") return `<div class="src-p">${who}<div class="small muted">No text for this paper yet.
+        ${p.doi || p.url ? `<a href="${esc(p.doi ? "https://doi.org/" + p.doi : p.url)}" target="_blank" rel="noopener">Open the paper</a> ·` : ""}
+        <label class="link" for="srcPdf-${esc(p.key)}">add its PDF</label><input type="file" id="srcPdf-${esc(p.key)}" data-src-pdf="${esc(p.key)}" accept=".pdf" hidden></div></div>`;
       return `<div class="src-p">${who}<div class="small" style="color:var(--err)">Not in your library.</div></div>`;
     }).join("")}</div>`).join("") + `</div>`;
-  if (s.limited) h += `<p class="small muted">Showing the first ${s.sentences.length} sentences.</p>`;
+  if (list.length > srcShown) h += `<div class="row"><button id="srcMore">Show ${Math.min(20, list.length - srcShown)} more</button><span class="small muted">${list.length - srcShown} more sentences</span></div>`;
+  if (s.limited) h += `<p class="small muted">The first ${s.sentences.length} cited sentences are shown.</p>`;
   h += `<div class="row" style="margin-top:10px"><button id="chkSources">Show again</button>
       <span class="small muted">Want a verdict on each sentence? Ask</span><button data-src-ai="0">Claude</button><button data-src-ai="1">ChatGPT</button></div></div>`;
   return h;
+}
+function srcMissing(s) {  // the cited papers in the library without text, once each
+  const seen = new Map();
+  for (const x of s.sentences) for (const p of x.papers) if (p.status === "no_text" && p.key && !seen.has(p.key)) seen.set(p.key, p);
+  return [...seen.values()];
+}
+async function runSources(add, quiet) {
+  const id = chk.id;
+  if (!quiet && $("chkSources")) { $("chkSources").disabled = true; $("chkSources").textContent = "Reading…"; }
+  try { chk = await post(`/api/doccheck/${id}/sources`, {add: !!add, project: chk.name.replace(/\.docx$/i, "")}); chk.id = id; renderCheck(); if (add) loadLibrary(); }
+  catch (e) { if (!quiet) toast(e.message); if ($("chkSources")) { $("chkSources").disabled = false; $("chkSources").textContent = "Show what my sources say"; } }
+}
+function srcRefreshSoon() {  // a paper's text arrived: show it under its sentences (only while the results are on screen)
+  if (!chk || !chk.sources || !$("chkSrcPanel")) return;
+  clearTimeout(srcTimer); srcTimer = setTimeout(() => runSources(false, true), 2500);
+}
+const srcSay = (kind, html) => { srcNote = [kind, html]; if ($("srcFetchMsg")) $("srcFetchMsg").innerHTML = `<div class="notice ${kind}">${html}</div>`; };
+async function srcFetchTexts() {
+  const missing = srcMissing(chk.sources);
+  $("srcFetch").disabled = true;
+  if (extVersion) {
+    const papers = missing.filter((p) => p.doi || p.url).map((p) => ({key: p.key, doi: p.doi, url: p.url, title: p.title, type: p.type}));
+    if (!papers.length) return srcSay("warn", "These papers have no DOI or link to open. Add their PDFs instead.");
+    srcPending = true;
+    window.postMessage({citrelloExt: "fetch", papers, fast: !!window.CITRELLO_TEST_FAST}, location.origin);
+    return srcSay("ok", `The extension is opening ${papers.length} paper${papers.length === 1 ? "" : "s"} in its own tab. The sentences below fill in as the texts arrive.`);
+  }
+  try {
+    const {id, n} = await post("/api/fulltext/find-free", {keys: missing.map((p) => p.key)});
+    srcSay("warn", `Looking for free copies of ${n} paper${n === 1 ? "" : "s"}…`);
+    for (;;) {
+      const st = await api(`/api/fulltext/find-free/${id}`);
+      if (st.done) {
+        if (st.error) return srcSay("err", esc(st.error));
+        const r = st.result;
+        srcNote = [r.found ? "ok" : "warn", `Free full text found for ${r.found} of ${r.checked}.` +
+          (r.missing ? ` ${r.missing} need your university access: get the <a href="https://citrello.app/extension" target="_blank" rel="noopener">Citrello extension</a>, or add their PDFs.` : "")];
+        loadLibrary();
+        return runSources(false, true);
+      }
+      srcSay("warn", `Looking for free copies: ${st.i} of ${st.n}…`);
+      await new Promise((res) => setTimeout(res, 700));
+    }
+  } catch (e) { srcSay("err", esc(e.message)); if ($("srcFetch")) $("srcFetch").disabled = false; }
+}
+async function srcAddPdfs(files, key) {
+  files = [...files].filter((f) => /\.pdf$/i.test(f.name));
+  let ok = 0, missed = [];
+  for (const [i, f] of files.entries()) {
+    srcSay("warn", `Reading ${i + 1} of ${files.length}: ${esc(f.name)}`);
+    try {
+      const r = await api("/api/fulltext/attach", {method: "POST", body: await f.arrayBuffer(),
+        headers: {"X-Filename": encodeURIComponent(f.name), "X-Add-Missing": "0", ...(key ? {"X-Key": encodeURIComponent(key)} : {})}});
+      if (r.unmatched) missed.push(f.name); else ok++;
+    } catch (e) { missed.push(f.name + " (" + e.message + ")"); }
+  }
+  srcNote = [missed.length ? "warn" : "ok", `Text added for ${ok} paper${ok === 1 ? "" : "s"}.` +
+    (missed.length ? ` Not matched to a cited paper: ${missed.map(esc).join(", ")}. Use “add its PDF” next to the right paper instead.` : "")];
+  loadLibrary();
+  runSources(false, true);
+}
+let srcPending = false;
+function bindSources() {
+  if ($("chkSources")) $("chkSources").onclick = () => runSources($("chkSources").dataset.add === "1");
+  if ($("srcAddRefs")) $("srcAddRefs").onclick = () => runSources(true);
+  if ($("srcFetch")) $("srcFetch").onclick = srcFetchTexts;
+  if ($("srcPdfs")) $("srcPdfs").onchange = (e) => { const f = [...e.target.files]; e.target.value = ""; srcAddPdfs(f); };
+  document.querySelectorAll("[data-src-pdf]").forEach((inp) => inp.onchange = (e) => { const f = [...e.target.files]; e.target.value = ""; srcAddPdfs(f, inp.dataset.srcPdf); });
+  document.querySelectorAll("[data-src-filter]").forEach((b) => b.onclick = () => { srcFilter = b.dataset.srcFilter; srcShown = 20; renderCheck(); });
+  if ($("srcMore")) $("srcMore").onclick = () => { srcShown += 20; renderCheck(); };
+  document.querySelectorAll("[data-src-ai]").forEach((b) => b.onclick = () => AI_LINKS(SOURCES_PROMPT)[+b.dataset.srcAi].run());
 }
 
 // ---------- documents: LaTeX ----------
@@ -2272,7 +2379,10 @@ const TOURS = {
      text: "<p>To show what a paper says, Citrello needs its text: from the web (free copies, and with the browser extension the papers your university gives you), or from PDFs you have. Only the text is kept, never the PDF.</p><p>Already done? Click Next.</p>"},
     STEP_DOC("your Word document", false), STEP_WAIT,
     {el: "#chkSrcPanel", title: "Show what your sources say", done: () => !!(chk && chk.sources),
-     text: "<p>Click <b>Show what my sources say</b>. If the references aren't in your library yet, add them first with the button above.</p>"},
+     text: "<p>Click the button. If the references aren't in your library yet, Citrello adds them first (that's where it keeps the papers' text).</p>"},
+    {el: "#srcGet", title: "Get the texts that are missing",
+     text: "<p>Papers without text can be fetched right here: with the browser extension (your university access), as free copies, or from PDFs you have. The sentences fill in as the texts arrive.</p>",
+     missing: "<p>Every cited paper has its text: nothing to fetch.</p>"},
     {el: "#chkSrc", title: "Read them side by side",
      text: "<p>Under each sentence: the passages of the cited paper that match it best, with the shared words highlighted. If the paper doesn't say what you wrote, change the sentence or the citation.</p>",
      missing: "<p>No passages to show yet: add the papers' text (Full texts), then click <b>Show again</b>.</p>"},
@@ -2356,7 +2466,13 @@ function goStraight(key) {  // the screen where the task starts, with what to cl
 }
 document.querySelectorAll(".home-tile[data-tour]").forEach((b) => b.onclick = () => (guidesOn() ? startTour(b.dataset.tour) : goStraight(b.dataset.tour)));
 renderTiles();
-document.querySelectorAll("[data-go]").forEach((b) => b.onclick = () => goTab(b.dataset.go));
+document.addEventListener("click", (e) => {  // "next step" links anywhere: go to that screen (closing a guide window first)
+  const b = e.target.closest("[data-go], [data-open-project]"); if (!b) return;
+  if ($("guide").open) $("guide").close();
+  if (b.dataset.openProject !== undefined) { $("projectFilter").value = b.dataset.openProject; return goTab("library"); }
+  if (b.dataset.go === "verify") { goTab("library"); return $("verifyBtn").click(); }
+  goTab(b.dataset.go);
+});
 
 function tourEls() {
   let spot = $("tourSpot"), tip = $("tourTip");

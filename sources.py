@@ -277,6 +277,8 @@ def check(path):
                     continue
                 seen.add(ident)
                 entry = {"label": _label(csl), "title": csl.get("title", ""), "key": it["key"] if it else None}
+                if it:  # what the browser extension needs to fetch the paper
+                    entry.update(doi=it["csl"].get("DOI", ""), url=it["csl"].get("URL", ""), type=it["csl"].get("type", ""))
                 if not it:
                     entry["status"] = "not_in_library"
                 else:

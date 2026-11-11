@@ -1032,7 +1032,11 @@ class Handler(BaseHTTPRequestHandler):
                 b = self.json_body()
                 data = library.load()
                 project = b.get("project") or ""
-                items = library.search(data, b.get("q", ""), None if project in ("", "*", "-") else project)
+                if b.get("keys"):  # just these (e.g. the papers a document cites)
+                    wanted = set(map(str, b["keys"]))
+                    items = [it for it in data["items"] if it["key"] in wanted]
+                else:
+                    items = library.search(data, b.get("q", ""), None if project in ("", "*", "-") else project)
                 keys = [it["key"] for it in items if not it.get("fulltext") and it["csl"].get("DOI")]
                 if not keys:
                     return self.send(400, {"error": "Every reference shown with a DOI already has its full text."})
@@ -1258,6 +1262,11 @@ class Handler(BaseHTTPRequestHandler):
         m = re.fullmatch(r"/api/doccheck/(\w+)/sources", path)
         if m and m.group(1) in CHECKS and CHECKS[m.group(1)].get("report"):  # each cited sentence and its paper's text
             c = CHECKS[m.group(1)]
+            b = self.json_body()
+            if b.get("add") and c.get("added") is None:  # the document's references go to the library first
+                before = len(library.load()["items"])
+                library.add_records([r for r in c["report"]["refs"] if r["csl"].get("title")], (b.get("project") or "").strip() or None)
+                c["added"] = len(library.load()["items"]) - before
             try:
                 c["sources"] = sources.check(c["path"])
             except ValueError as e:

@@ -388,8 +388,60 @@ def test_07b2_what_my_sources_say(page, env):
     expect(page.locator("#chkSrc mark").first).to_be_visible()  # the shared words are highlighted
     expect(page.locator("#chkSrc")).to_contain_text("No text for this paper yet")  # Vetters has no text
     expect(page.locator("#chkSrcChips")).to_contain_text("2 cited sentences")
+    # the paper without text can be fixed right here: its PDF, then the sentence fills in by itself
+    expect(page.locator("#srcGet")).to_contain_text("1 cited paper has no text yet")
     page.locator("#chkSrcPanel").scroll_into_view_if_needed()
     shot(page, "sources")
+    from test_doccheck import make_pdf
+    pdf = os.path.join(env["_TMP"], "vetters.pdf")
+    make_pdf(pdf, [["Sailing through end-of-life challenges: A comprehensive review for offshore wind", "Jan Vetters"] +
+                   [f"Part {i}. Reviews compare the end-of-life options for offshore wind farms: repowering, life "
+                    f"extension and full removal, each with different costs." for i in range(14)]])
+    page.set_input_files("#srcPdfs", pdf)
+    expect(page.locator("#chkSrc")).to_contain_text("repowering, life extension and full removal", timeout=30000)
+    expect(page.locator("#srcGet")).to_have_count(0)  # nothing missing any more
+    expect(page.locator("#srcFetchMsg")).to_contain_text("Text added for 1 paper")
+    # a long paper isn't one wall of text: filters, and 20 sentences at a time
+    d = docx.Document()
+    d.add_paragraph(" ".join(f"Point {i}: the export cables dominate the decommissioning cost [@topham2017]." for i in range(22)) +
+                    " Something nobody has written about [@burton2011].")
+    long_path = os.path.join(env["_TMP"], "long.docx")
+    d.save(long_path)
+    page.set_input_files("#chkFile", long_path)
+    page.click("#chkSources", timeout=60000)
+    expect(page.locator("#chkSrc .src")).to_have_count(20, timeout=30000)
+    page.click("#srcMore")
+    expect(page.locator("#chkSrc .src")).to_have_count(23)
+    page.click('[data-src-filter="no_text"]')
+    expect(page.locator("#chkSrc .src")).to_have_count(1)
+    expect(page.locator("#chkSrc")).to_contain_text("Something nobody has written about")
+
+
+def test_07b3_a_document_without_references_offers_a_way_forward(page, env):
+    import docx
+    d = docx.Document()
+    d.add_paragraph("Just some notes, no references at all.")
+    path = os.path.join(env["_TMP"], "notes.docx")
+    d.save(path)
+    tab(page, "documents")
+    page.set_input_files("#chkFile", path)
+    expect(page.locator("#chkResult")).to_contain_text("No references found", timeout=30000)
+    expect(page.locator("#chkTrySample")).to_be_visible()
+
+
+def test_07b4_sources_add_the_references_first(page):
+    """References not in the library: one click adds them (in a project named after the document) and shows the
+    sentences; papers without text then offer ways to get it."""
+    tab(page, "documents")
+    page.evaluate("useSample()")
+    expect(page.locator('#chkSources[data-add="1"]')).to_contain_text("Add the", timeout=60000)
+    page.click("#chkSources")
+    expect(page.locator("#chkSrcChips")).to_contain_text("cited sentences", timeout=30000)
+    expect(page.locator("#chkResult")).to_contain_text("added to your library")
+    expect(page.locator("#srcGet")).to_contain_text("have no text yet")
+    page.click('#chkResult [data-open-project]')  # "See them": the document's project in the library
+    expect(page.locator("#libTitle")).to_have_text("Citrello sample paper")
+    page.click('#projNav [data-proj-nav="*"]')  # back to all references for the next tests
 
 
 def test_07c_check_a_pdf(page, env):
