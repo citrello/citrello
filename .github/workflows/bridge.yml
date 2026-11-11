@@ -35,7 +35,10 @@ jobs:
       - run: pip install python-docx citeproc-py pypdf pybtex pytest playwright
       - run: python -m playwright install chromium webkit
       - name: System libraries for the browsers (optional; Ubuntu's mirrors are sometimes unreachable from GitHub)
-        run: timeout 300 python -m playwright install-deps chromium webkit || echo "::warning::Couldn't install the browsers' system libraries; trying with what the machine has."
+        run: |
+          timeout 300 python -m playwright install-deps chromium webkit || {
+            echo "::warning::Couldn't install the browsers' system libraries (Ubuntu's mirrors unreachable?): testing in Chromium only this time."
+            echo "CITRELLO_WEB_BROWSERS=chromium" >> "$GITHUB_ENV"; }
       - name: Build the web app (the browser tab is a device too)
         run: python packaging/build_web_check.py
         working-directory: .
