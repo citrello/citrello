@@ -28,7 +28,7 @@
     </Sets>
   </Requirements>
   <DefaultSettings>
-    <SourceLocation DefaultValue="https://citrello.app/word/taskpane.html"/>
+    <SourceLocation DefaultValue="https://citrello.app/word/taskpane"/>
   </DefaultSettings>
   <Permissions>ReadWriteDocument</Permissions>
   <VersionOverrides xmlns="http://schemas.microsoft.com/office/taskpaneappversionoverrides" xsi:type="VersionOverridesV1_0">
@@ -79,7 +79,7 @@
       </bt:Images>
       <bt:Urls>
         <bt:Url id="GetStarted.LearnMoreUrl" DefaultValue="https://citrello.app/word/"/>
-        <bt:Url id="Pane.Url" DefaultValue="https://citrello.app/word/taskpane.html"/>
+        <bt:Url id="Pane.Url" DefaultValue="https://citrello.app/word/taskpane"/>
       </bt:Urls>
       <bt:ShortStrings>
         <bt:String id="GetStarted.Title" DefaultValue="Citrello is ready"/>

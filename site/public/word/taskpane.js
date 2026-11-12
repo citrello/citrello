@@ -1,4 +1,4 @@
-// Citrello for Word: the add-in's panel (citrello.app/word/taskpane.html).
+// Citrello for Word: the add-in's panel (citrello.app/word/taskpane).
 // Citrello's own Python runs here (the web app's engine, /app/worker.js?mode=word, with its own storage), so
 // formatting citations in any of ~10,900 styles works exactly as in the app. The library comes from the person's
 // Citrello cloud copy (signed in); the add-in only reads it.

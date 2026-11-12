@@ -175,7 +175,7 @@ references" (OpenAlex + stronger model, ~5–10 cents per paragraph) later, poss
 ## Current focus: Citrello for Word (started 12 Nov 2026)
 Armin's priority. An Office add-in (Office.js), so it works in Word for Windows, Mac and the web, and can go in
 Microsoft's add-in store (AppSource, through Partner Center; Armin makes the free account). Everything happens in
-Word: the panel at **citrello.app/word/taskpane.html** runs Citrello's own engine (`/app/worker.js?mode=word`, its
+Word: the panel at **citrello.app/word/taskpane** runs Citrello's own engine (`/app/worker.js?mode=word`, its
 own browser storage `/home/word`, no connector socket). Install page: **citrello.app/word** (sideload steps);
 manifest: `site/public/word/manifest.xml` (id ef6ca1ae-67cf-48fb-89a7-189c074612ae).
 - **First version (built, tested with a stand-in for Word):** sign in with the email code in the panel; the library
