@@ -5,7 +5,9 @@
 const PYODIDE = "https://cdn.jsdelivr.net/pyodide/v0.27.7/full/";
 importScripts(PYODIDE + "pyodide.js");
 
-const DATA = "/home/web";
+// The Word add-in (citrello.app/word) runs this same engine with its own storage, and isn't the connector's device
+const WORD = new URLSearchParams(self.location.search).get("mode") === "word";
+const DATA = WORD ? "/home/word" : "/home/web";
 // The bridge ChatGPT and Claude reach this tab through. A local test bridge only for a locally served copy.
 const LOCAL = ["localhost", "127.0.0.1"].includes(self.location.hostname);
 const BRIDGE = (LOCAL && new URLSearchParams(self.location.search).get("bridge")) || "https://mcp.citrello.app";
@@ -17,7 +19,7 @@ function browserName() {
     : /Safari\//.test(ua) ? "Safari" : "Browser";
   const os = /iPhone|iPad/.test(ua) ? "iPhone or iPad" : /Android/.test(ua) ? "Android" : /Mac OS X/.test(ua) ? "Mac"
     : /Windows/.test(ua) ? "Windows" : /Linux|CrOS/.test(ua) ? "Linux" : "";
-  return `${b}${os ? " on " + os : ""} (web app)`;
+  return WORD ? `Word add-in${os ? " on " + os : ""}` : `${b}${os ? " on " + os : ""} (web app)`;
 }
 let py = null, handle = null, hasPending = null, runPending = null, webapp = null;
 const post = (m, transfer) => self.postMessage(m, transfer || []);
@@ -137,7 +139,7 @@ function setState(state, error) {
 }
 
 function planConnection() {
-  if (!webapp) return;
+  if (!webapp || WORD) return;
   const plan = JSON.parse(webapp.CONNECTION.plan());
   if (plan.generation === wsGeneration && plan.token === wsToken && (ws || retryTimer || !plan.token)) return;
   const fresh = plan.generation !== wsGeneration || plan.token !== wsToken;

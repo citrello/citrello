@@ -1,0 +1,113 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Citrello for Word</title>
+<meta name="description" content="Cite from your Citrello library inside Word: type an author's name and Citrello suggests their papers. Any citation style, a reference list that keeps itself up to date.">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Gloock&family=Figtree:wght@400;500;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/site.css">
+<style>
+.w-hero{padding:40px 0 16px}.w-hero h1{font-size:clamp(40px,5.5vw,64px);margin-bottom:12px}
+.w-hero p{font-size:19px;max-width:38em;margin:0}
+.steps{display:grid;grid-template-columns:repeat(2,1fr);gap:24px;padding:24px 0 64px}
+.steps article{border:2px solid var(--line);border-radius:24px;padding:24px;background:#fff}
+.steps h2{font-size:28px;margin-bottom:6px}.steps ol{padding-left:22px;margin:8px 0}.steps li{margin:6px 0}
+.steps .note{font-size:15px;color:var(--muted)}
+.what{padding:0 0 48px}.what ul{font-size:17px;max-width:42em}.what li{margin:8px 0}
+@media (max-width:900px){.steps{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+<div class="tiles" aria-hidden="true"></div>
+<header class="wrap nav">
+  <a class="logo" href="/" aria-label="Citrello home">citr<span>ello</span></a>
+  <nav aria-label="Main">
+    <a href="/app/">Web app</a>
+    <a href="/#problems">What it fixes</a>
+    <a href="https://github.com/citrello/citrello">GitHub</a>
+    <a class="nav-cta" href="/download">Download</a>
+  </nav>
+</header>
+<main id="main">
+<section class="wrap w-hero">
+  <h1>Citrello for Word</h1>
+  <p>Cite from your Citrello library without leaving Word. Type “Wang et al.” and Citrello offers Wang's papers.
+    Click a citation to see the papers in it, add more or take one out. Any citation style, and a reference list
+    that keeps itself up to date.</p>
+</section>
+<section class="wrap what">
+  <ul>
+    <li><b>Your library comes with you.</b> Sign in with your Citrello email: the add-in uses your Citrello cloud copy
+      (turn it on by signing in to <a href="/app/">the web app</a>).</li>
+    <li><b>Documents travel.</b> Each citation keeps its paper's details inside the document, so it still works on a
+      co-author's computer, and Citrello's “Check and fix” reads it.</li>
+    <li><b>Coming next:</b> “Find me a new paper” and “Check this citation” with Claude (Citrello Pro), and the
+      add-in in Microsoft's add-in store.</li>
+  </ul>
+</section>
+<section class="wrap steps" id="install">
+  <article>
+    <h2>Word on the web</h2>
+    <p class="note">Works with any Microsoft account, on any computer.</p>
+    <ol>
+      <li><a href="/word/manifest.xml" download="citrello-word-addin.xml">Download Citrello's add-in file</a>.</li>
+      <li>Open a document in Word on the web (office.com).</li>
+      <li>On the <b>Home</b> tab, click <b>Add-ins</b>, then <b>More Add-ins</b>.</li>
+      <li>Click <b>My Add-ins</b>, then <b>Upload My Add-in</b> (top right), choose the file and click <b>Upload</b>.</li>
+      <li>Citrello's lemon appears on the Home tab. Click it to open the panel.</li>
+    </ol>
+  </article>
+  <article>
+    <h2>Word on a Mac</h2>
+    <ol>
+      <li><a href="/word/manifest.xml" download="citrello-word-addin.xml">Download Citrello's add-in file</a>.</li>
+      <li>Quit Word.</li>
+      <li>In Finder, press <b>Shift + Command + G</b>, paste
+        <code>~/Library/Containers/com.microsoft.Word/Data/Documents/wef</code> and press Return (create the
+        <code>wef</code> folder if it isn't there).</li>
+      <li>Move the downloaded file into that folder.</li>
+      <li>Open Word, then <b>Home</b> tab → <b>Add-ins</b> (or <b>Insert → My Add-ins</b>) and pick <b>Citrello</b>.</li>
+    </ol>
+  </article>
+  <article>
+    <h2>Word on Windows</h2>
+    <ol>
+      <li><a href="/word/manifest.xml" download="citrello-word-addin.xml">Download Citrello's add-in file</a>.</li>
+      <li>In Word, <b>Home</b> tab → <b>Add-ins</b> → <b>More Add-ins</b> → <b>My Add-ins</b>.</li>
+      <li>If you see <b>Upload My Add-in</b>, choose the file. If you don't (some versions hide it), use Word on the
+        web until Citrello is in Microsoft's store, or the Citrello tab that comes with
+        <a href="/download">Citrello for Windows</a>.</li>
+    </ol>
+  </article>
+  <article>
+    <h2>First time</h2>
+    <ol>
+      <li>The panel takes 10–30 seconds to open the first time (Citrello's engine loads in Word).</li>
+      <li>Sign in with the email you use in Citrello and type the code we send you.</li>
+      <li>Pick your citation style at the top. Put the cursor where the citation goes and press <b>Cite</b>.</li>
+      <li>Press <b>Insert the reference list</b> where your references go. It updates as you cite.</li>
+    </ol>
+  </article>
+</section>
+</main>
+<footer>
+  <div class="tiles" aria-hidden="true"></div>
+  <div class="wrap foot">
+    <a class="logo" href="/">citr<span>ello</span></a>
+    <p>References, the sweet part.</p>
+    <nav aria-label="Footer">
+      <a href="/check">Check a paper</a>
+      <a href="https://github.com/citrello/citrello">GitHub</a>
+      <a href="/privacy">Privacy</a>
+      <a href="https://github.com/citrello/citrello/blob/main/LICENSE">Licence (AGPL)</a>
+    </nav>
+    <p class="small">© 2026 Armin Hosseinghorbani. Citrello™ is a trademark of Armin Hosseinghorbani.</p>
+  </div>
+</footer>
+</body>
+</html>

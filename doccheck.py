@@ -23,7 +23,7 @@ from docx.oxml.ns import qn
 import citeformat
 import citrello_core as core
 
-MANAGERS = {"citrello": "Citrello [@Key] markers", "zotero": "Zotero", "mendeley": "Mendeley Desktop or Citrello", "mendeley_cite": "Mendeley Cite", "endnote": "EndNote", "word": "Word's own citations",
+MANAGERS = {"citrello": "Citrello [@Key] markers", "zotero": "Zotero", "mendeley": "Mendeley Desktop or Citrello", "mendeley_cite": "Mendeley Cite", "citrello_word": "Citrello for Word", "endnote": "EndNote", "word": "Word's own citations",
             "typed": "typed by hand", "pdf": "PDF", "other": "another reference manager"}
 
 
@@ -168,18 +168,19 @@ def _b64json(text):
 
 def content_controls(body):
     """Mendeley Cite keeps each citation in a content control tagged MENDELEY_CITATION_v3_<base64 JSON> and the
-    reference list in one tagged MENDELEY_BIBLIOGRAPHY. -> [(sdt element, "citation" | "bibliography", payload)]"""
+    reference list in one tagged MENDELEY_BIBLIOGRAPHY; Citrello for Word does the same with CITRELLO_CITATION_v1_
+    and CITRELLO_BIBLIOGRAPHY. -> [(sdt element, "citation" | "bibliography", payload)]"""
     out = []
     for sdt in body.iter(qn("w:sdt")):
         tag = sdt.find(qn("w:sdtPr") + "/" + qn("w:tag"))
         val = tag.get(qn("w:val")) if tag is not None else ""
         if not val:
             continue
-        if val.upper().startswith("MENDELEY_CITATION"):
-            payload = _b64json(re.sub(r"^MENDELEY_CITATION(?:_v\d+)?_", "", val, flags=re.I))
+        if val.upper().startswith(("MENDELEY_CITATION", "CITRELLO_CITATION")):  # Citrello for Word: the same layout
+            payload = _b64json(re.sub(r"^(?:MENDELEY|CITRELLO)_CITATION(?:_v\d+)?_", "", val, flags=re.I))
             if payload:
                 out.append((sdt, "citation", payload))
-        elif val.upper().startswith("MENDELEY_BIBLIOGRAPHY"):
+        elif val.upper().startswith(("MENDELEY_BIBLIOGRAPHY", "CITRELLO_BIBLIOGRAPHY")):
             out.append((sdt, "bibliography", None))
     return out
 
@@ -229,8 +230,9 @@ def read_citations(path):
             managers.add("other")
         if group:
             citations.append(group)
-    for sdt, kind, payload in content_controls(document.element.body):  # Mendeley Cite (the newer add-in)
-        managers.add("mendeley_cite")
+    for sdt, kind, payload in content_controls(document.element.body):  # Mendeley Cite, Citrello for Word
+        tag = sdt.find(qn("w:sdtPr") + "/" + qn("w:tag"))
+        managers.add("citrello_word" if tag.get(qn("w:val"), "").upper().startswith("CITRELLO") else "mendeley_cite")
         if kind == "bibliography":
             bib_field = True
             continue

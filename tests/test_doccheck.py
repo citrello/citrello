@@ -353,3 +353,36 @@ def test_online_lookups_count_for_typed_lists(tmp_path, monkeypatch):
     assert any("Year differs: you wrote 2023" in c["text"] for c in refs[2]["checks"])
     assert any("RETRACTED" in c["text"] for c in refs[3]["checks"])
     assert any("does not exist" in c["text"] for c in refs[4]["checks"]) and refs[4]["reliability"] == "problem"
+
+
+def test_citrello_word_addin_document(tmp_path, monkeypatch):
+    """Citrello for Word's citations (content controls tagged CITRELLO_CITATION_v1_) are read and fixed."""
+    import base64 as b64
+    import library
+    monkeypatch.setattr(library, "HOME", str(tmp_path / "lib"))
+
+    def cc(items, shown):
+        payload = {"citationID": "abc", "properties": {"noteIndex": 0},
+                   "citationItems": [{"id": c["id"], "itemData": c} for c in items]}
+        tag = "CITRELLO_CITATION_v1_" + b64.b64encode(json.dumps(payload).encode()).decode()
+        return parse_xml(f'<w:sdt {nsdecls("w")}><w:sdtPr><w:tag w:val="{tag}"/></w:sdtPr>'
+                         f'<w:sdtContent><w:r><w:t>{escape(shown)}</w:t></w:r></w:sdtContent></w:sdt>')
+    d = docx.Document()
+    p = d.add_paragraph("Decommissioning is costly ")
+    p._p.append(cc([TOPHAM], "(Topham, 2017)"))
+    p.add_run(" and reviewed ")
+    p._p.append(cc([VETTERS], "(Vetters, 2024)"))
+    d.add_heading("References", level=1)
+    bib = parse_xml(f'<w:sdt {nsdecls("w")}><w:sdtPr><w:tag w:val="CITRELLO_BIBLIOGRAPHY"/></w:sdtPr><w:sdtContent>'
+                    '<w:p><w:r><w:t>Topham, E. (2017). Sustainable decommissioning of an offshore wind farm.</w:t></w:r></w:p>'
+                    '<w:p><w:r><w:t>Vetters, J. (2024). Sailing through end-of-life challenges.</w:t></w:r></w:p>'
+                    '</w:sdtContent></w:sdt>')
+    d.element.body.insert(len(d.element.body) - 1, bib)
+    path, out = str(tmp_path / "cw.docx"), str(tmp_path / "cw_fixed.docx")
+    d.save(path)
+    rep = doccheck.check(path, offline=True)
+    assert rep["source"] == "citrello_word" and rep["manager"] == "Citrello for Word" and rep["references"] == 2
+    assert "No reference list" not in " ".join(i["text"] for i in rep["citation_issues"])
+    res = doccheck.fix(path, rep, out, "apa")
+    assert res["entries"] == 2
+    assert "CITRELLO_CITATION" not in docx.Document(out).element.xml

@@ -1,4 +1,4 @@
-# Citrello status (updated 6 November 2026)
+# Citrello status (updated 12 November 2026)
 
 ## Released
 - **Citrello 1.0.1** is the latest GitHub release (Windows `Citrello-windows.zip`, Mac beta `Citrello-mac.zip`,
@@ -172,6 +172,30 @@ Next: an optional AI verdict with a cheap
 model paid by Citrello within a free monthly allowance for signed-in users (about 1–2 cents per paper); "find
 references" (OpenAlex + stronger model, ~5–10 cents per paragraph) later, possibly paid credits.
 
+## Current focus: Citrello for Word (started 12 Nov 2026)
+Armin's priority. An Office add-in (Office.js), so it works in Word for Windows, Mac and the web, and can go in
+Microsoft's add-in store (AppSource, through Partner Center; Armin makes the free account). Everything happens in
+Word: the panel at **citrello.app/word/taskpane.html** runs Citrello's own engine (`/app/worker.js?mode=word`, its
+own browser storage `/home/word`, no connector socket). Install page: **citrello.app/word** (sideload steps);
+manifest: `site/public/word/manifest.xml` (id ef6ca1ae-67cf-48fb-89a7-189c074612ae).
+- **First version (built, tested with a stand-in for Word):** sign in with the email code in the panel; the library
+  comes from the cloud copy (read only; refreshed every 5 min); search and Cite; typing "Wang et al." / "Wang and Li"
+  / "Wang (" suggests library papers by that first author (`/api/word-addin/suggest`), Cite gives "Wang et al. (2020)"
+  (author left out) or replaces the typed "(…"; clicking in a citation shows its papers with details, Remove, add
+  from search, page number and "leave the author out"; reference list as a content control that updates itself; style
+  menu (11 bundled + search of all ~10,900) kept in the document's settings.
+- **In the document:** citations are content controls tagged `CITRELLO_CITATION_v1_<base64 JSON>` (Mendeley Cite's
+  layout: citationItems with itemData), the list is tagged `CITRELLO_BIBLIOGRAPHY`. "Check and fix" reads both
+  (manager "Citrello for Word"). Formatting: `/api/word-addin/render` (app.py `word_render`); text is written in runs
+  (italic/bold/superscript) so it keeps the document's font.
+- **Tests:** `tests/test_word_addin_e2e.py` (Chromium, local bridge, `tests/office_mock.js` plays Word), unit tests in
+  test_webapp.py and test_doccheck.py. **Not yet tried in real Word.**
+- **Next:** Armin tries it in Word on the web (citrello.app/word steps); Pro "Find me a new paper" and "Check this
+  citation" (Claude, through the bridge); adding papers to the library from Word (needs the cloud copy to be saved
+  back); desktop app's cloud copy (desktop-only users have no library in the add-in yet); Partner Center submission
+  (store name idea: "Citrello – citations checked by AI"; needs privacy page, support URL, screenshots, a test
+  account for Microsoft's reviewers).
+
 ## The web app
 **Progress:** steps 1 and 2 are live at citrello.app/app and tested in Chromium and WebKit: library in the browser,
 import/export, backup/restore, check and fix Word/PDF/LaTeX, arXiv .zip, style search, progress bars. Step 3 too:
@@ -192,7 +216,7 @@ Decisions for Armin are in its section 3.
    what breaks; then launch posts (r/PhD, Hacker News...) led by the free checker ("find fake and retracted
    references in your paper"); a 30–60 s demo video. Armin wants to launch "very soon".
 2. **Overleaf live .bib link** through the bridge (private URL Overleaf can refresh), caching the last copy.
-3. **Word tab for Mac** as an Office add-in (would also work in Word on the web).
+3. **Word tab for Mac**: done as Citrello for Word (see above).
 4. **One program instead of two** (app + connector) to halve the download size.
 5. **Research job positions** in Citrello (software side is covered by the trademark; job ads = class 35 later),
    linking to Refmee for applications.

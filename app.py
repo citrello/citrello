@@ -363,6 +363,55 @@ def convert(job, push, styles, style_id=None, project=None):
     job.state, job.message = "done", ""
 
 
+def word_suggest(first, second="", year=""):
+    """Library papers whose first author is `first` (and second author `second`, when given): what the Word
+    add-in offers when the writer types "Wang et al." or "Wang and Li (2020)". Best matches first."""
+    first, second, year = core.norm(first), core.norm(second), str(year or "").strip()
+    if not first:
+        return []
+    fam = lambda a: core.norm(a.get("family") or a.get("literal") or "")  # noqa: E731
+    out = []
+    for it in library.load()["items"]:
+        c = it["csl"]
+        authors = c.get("author") or c.get("editor") or []
+        if not authors or fam(authors[0]) != first:
+            continue
+        if second and (len(authors) < 2 or fam(authors[1]) != second):
+            continue
+        y = core.year_of(c)
+        out.append((0 if year and y == year else 1, -(int(y) if y.isdigit() else 0), it))
+    out.sort(key=lambda t: (t[0], t[1]))
+    return [item_public(t[2]) for t in out[:20]]
+
+
+def word_render(style_id, citations):
+    """The Word add-in's citations, in document order, formatted in one style: each citation's text and the
+    reference list (HTML: italics kept). A citation's papers come from the library by key, or from the details
+    stored in the document (a document from someone else's library still formats)."""
+    data = library.load()
+    items, groups = {}, []
+    for c in citations[:2000]:
+        group = []
+        for it in (c.get("items") or [])[:50]:
+            key = str(it.get("key") or "").strip()
+            if not key:
+                continue
+            lib = library.get(data, key)
+            csl = (lib or {}).get("csl") or it.get("csl")
+            if not isinstance(csl, dict):
+                continue
+            items[key] = csl
+            group.append({"key": key, "suppress": bool(it.get("suppress")), "locator": it.get("locator") or "",
+                          "label": it.get("label") or "page"})
+        groups.append(group)
+    if not items:
+        return {"citations": ["" for _ in groups], "bibliography": [], "style": citeformat.style_info(citeformat.style_path(style_id))}
+    r = citeformat.Renderer(style_id, items)
+    idx = [r.add(g) if g else None for g in groups]
+    return {"citations": [r.render(i) if i is not None else "" for i in idx], "bibliography": r.bibliography(),
+            "style": r.info}
+
+
 def item_public(it):
     c = it["csl"]
     return {"key": it["key"], "id": it["id"], "title": c.get("title", ""), "authors": short_authors(c),
@@ -901,6 +950,9 @@ class Handler(BaseHTTPRequestHandler):
             name = re.sub(r"[^\w\-. ]", "_", name)
             return self.send(200, body, "application/octet-stream",
                              {"Content-Disposition": "attachment; filename*=UTF-8''" + urllib.parse.quote(name)})
+        if path == "/api/word-addin/suggest":  # the Word add-in: papers by the author the writer just typed
+            return self.send(200, {"items": word_suggest(qs.get("first", [""])[0], qs.get("second", [""])[0],
+                                                         qs.get("year", [""])[0])})
         if path == "/api/ai/session":  # the page calls Citrello's server for Claude checks with this account's token
             a = bridge_client.load_account()
             return self.send(200, {"signed_in": bool(a), "token": a and a.get("token"), "email": a and a.get("email"),
@@ -1265,6 +1317,21 @@ class Handler(BaseHTTPRequestHandler):
             except ValueError as e:
                 return self.send(400, {"error": str(e)})
             return self.send(200, check_public(m.group(1)))
+        if path == "/api/word-addin/items":  # the Word add-in: what a citation stores about each paper
+            data = library.load()
+            out = []
+            for k in [str(k) for k in self.json_body().get("keys", [])][:50]:
+                it = library.get(data, k)
+                if it:
+                    out.append({"key": it["key"], "csl": it["csl"]})
+            return self.send(200, {"items": out})
+        if path == "/api/word-addin/render":  # the Word add-in: every citation in the document, and its reference list
+            b = self.json_body()
+            try:
+                return self.send(200, word_render(str(b.get("style") or load_config().get("style") or "apa"),
+                                                  b.get("citations") or []))
+            except ValueError as e:
+                return self.send(400, {"error": str(e)})
         if path == "/api/sources/library-candidates":  # papers in the library that may support a sentence
             b = self.json_body()
             return self.send(200, {"papers": sources.library_candidates(str(b.get("claim", ""))[:1200], [str(k) for k in b.get("exclude", [])])})

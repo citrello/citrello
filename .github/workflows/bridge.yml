@@ -10,7 +10,9 @@ on:
     branches: [main]
     paths: ["bridge/**", ".github/workflows/bridge.yml", "tests/test_bridge_e2e.py", "tests/test_web_bridge_e2e.py",
             # Claude checks: the bridge's AI endpoints and the screen that uses them
-            "tests/test_bridge_ai_e2e.py", "tests/anthropic_mock.py", "ui.html", "sources.py"]
+            "tests/test_bridge_ai_e2e.py", "tests/anthropic_mock.py", "ui.html", "sources.py",
+            # Citrello for Word: its panel, the stand-in for Word and the engine's endpoints
+            "site/public/word/**", "tests/test_word_addin_e2e.py", "tests/office_mock.js", "app.py"]
   workflow_dispatch:
 
 concurrency: bridge-deploy
@@ -52,7 +54,7 @@ jobs:
           (cd ../site/public && python -m http.server 8099 > /dev/null 2>&1 &)
           sleep 1
           cd .. && CITRELLO_BRIDGE_E2E=1 CITRELLO_BRIDGE=http://localhost:8787 CITRELLO_WEB_CHECK=http://localhost:8099 \
-            pytest -q tests/test_bridge_e2e.py tests/test_bridge_ai_e2e.py tests/test_web_bridge_e2e.py || { cat bridge/wrangler.log; exit 1; }
+            pytest -q tests/test_bridge_e2e.py tests/test_bridge_ai_e2e.py tests/test_web_bridge_e2e.py tests/test_word_addin_e2e.py || { cat bridge/wrangler.log; exit 1; }
 
   deploy:
     needs: check

@@ -1,0 +1,98 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Citrello for Word</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Gloock&family=Figtree:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js"></script>
+<style>
+  :root { --cobalt: #1d3f8f; --lemon: #f6d646; --lemon-soft: #fbeeb0; --leaf: #3e7b4f; --bg: #f6f8fd; --card: #fff; --ink: #14213d;
+          --muted: #4a5774; --line: #d5def0; --sky: #eaf0fb; --ok: #2f6b40; --ok-soft: #e1f0e5; --warn: #8a5a00; --warn-soft: #fff1c7;
+          --err: #b3261e; --err-soft: #fde3e1; --serif: Gloock, Georgia, serif; }
+  @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --bg: #0f1730; --card: #17213f; --ink: #e8edf8; --muted: #a9b5d3;
+    --line: #2b3a63; --sky: #1e2c52; --cobalt: #8fb0ff; --ok: #7fd09a; --ok-soft: #173326; --warn: #f0c45a; --warn-soft: #3a2e10;
+    --err: #ff8a80; --err-soft: #3d1c1a; --lemon-soft: #3a3416; } }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink); font: 14px/1.45 Figtree, system-ui, "Segoe UI", sans-serif; }
+  .hidden { display: none !important; }
+  header { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 10px 12px; background: var(--cobalt); color: #fff; }
+  @media (prefers-color-scheme: dark) { header { background: #0b1226; } }
+  .logo { font: 22px var(--serif); } .logo span { color: var(--lemon); }
+  main { padding: 12px; }
+  h2 { font: 400 18px/1.2 var(--serif); color: var(--cobalt); margin: 0 0 6px; }
+  p { margin: 6px 0; } .muted { color: var(--muted); } .small { font-size: 12.5px; }
+  input, select, button { font: inherit; color: inherit; }
+  input[type=text], input[type=email], input[type=search], select { width: 100%; padding: 8px 10px; border: 1px solid var(--line); border-radius: 10px; background: var(--card); }
+  button { cursor: pointer; border: 1px solid var(--line); background: var(--card); border-radius: 99px; padding: 6px 14px; font-weight: 600; }
+  button.primary { background: var(--cobalt); border-color: var(--cobalt); color: #fff; }
+  @media (prefers-color-scheme: dark) { button.primary { color: #0f1730; } }
+  button:disabled { opacity: .55; cursor: default; }
+  button.link { border: 0; background: none; padding: 0; color: var(--cobalt); text-decoration: underline; font-weight: 500; }
+  .row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-top: 8px; }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 12px; margin-bottom: 10px; }
+  .notice { padding: 8px 10px; border-radius: 10px; font-size: 13px; margin: 8px 0; background: var(--sky); }
+  .notice.ok { background: var(--ok-soft); color: var(--ok); } .notice.warn { background: var(--warn-soft); color: var(--warn); }
+  .notice.err { background: var(--err-soft); color: var(--err); }
+  .style-pick { display: flex; gap: 6px; align-items: center; color: #fff; font-size: 12px; }
+  .style-pick select { width: 150px; padding: 4px 6px; font-size: 12px; border-radius: 8px; color: var(--ink); }
+  .results { list-style: none; margin: 8px 0 0; padding: 0; }
+  .results li { display: flex; gap: 8px; align-items: flex-start; justify-content: space-between; padding: 8px 2px; border-bottom: 1px solid var(--line); }
+  .results li:last-child { border-bottom: 0; }
+  .results .who { font-weight: 700; } .results .t { color: var(--muted); font-size: 12.5px; display: block; }
+  .results button { flex: none; padding: 3px 12px; font-size: 12.5px; }
+  .bar { position: sticky; bottom: 0; background: var(--bg); padding: 10px 0 4px; border-top: 1px solid var(--line); margin-top: 10px; }
+  .bar .row { margin-top: 0; }
+  #status { min-height: 18px; }
+  .sug { background: var(--lemon-soft); border-color: var(--lemon); }
+  .sug p { margin: 0 0 2px; font-weight: 600; }
+  details summary { cursor: pointer; color: var(--cobalt); font-size: 12.5px; margin-top: 2px; }
+  details .small { margin-top: 4px; } details input[type=text] { padding: 3px 6px; border-radius: 6px; }
+  a { color: var(--cobalt); }
+  .chk { display: flex; gap: 6px; align-items: flex-start; margin-top: 8px; } .chk input { margin-top: 3px; flex: none; }
+  .spinner { display: inline-block; width: 14px; height: 14px; border: 2px solid var(--line); border-top-color: var(--cobalt); border-radius: 50%; animation: spin .8s linear infinite; vertical-align: -2px; margin-right: 6px; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+</style>
+</head>
+<body>
+<header><div class="logo">citr<span>ello</span></div>
+  <label class="style-pick hidden" id="stylePick">Style <select id="style" aria-label="Citation style for this document"></select></label></header>
+<main>
+  <div id="loading" class="card"><span class="spinner"></span><span id="loadingText">Opening Citrello… (the first time takes 10–30 seconds)</span></div>
+
+  <div id="signin" class="card hidden">
+    <h2>Cite from your Citrello library</h2>
+    <p class="muted">Sign in with the email you use in Citrello. Your library comes from your Citrello cloud copy.</p>
+    <div id="siStep1"><input type="email" id="siEmail" placeholder="you@university.edu" autocomplete="email" aria-label="Your email">
+      <div class="row"><button class="primary" id="siSend">Email me a code</button></div></div>
+    <div id="siStep2" class="hidden"><p id="siSent" class="small"></p>
+      <input type="text" id="siCode" inputmode="numeric" maxlength="8" placeholder="6-digit code" aria-label="The code">
+      <div class="row"><button class="primary" id="siVerify">Sign in</button><button class="link" id="siBack">Use a different email</button></div></div>
+    <div id="siMsg"></div>
+    <p class="small muted">New to Citrello? <a href="https://citrello.app/app" target="_blank" rel="noopener">Open Citrello</a>, sign in there and add your references; they appear here.</p>
+  </div>
+
+  <div id="main" class="hidden">
+    <div id="suggest" class="card sug hidden" aria-live="polite">
+      <p class="small" id="sugTitle"></p>
+      <ul class="results" id="sugList" aria-label="Suggested papers"></ul>
+    </div>
+    <div id="current" class="card hidden">
+      <h2>This citation</h2>
+      <ul class="results" id="curList" aria-label="Papers in this citation"></ul>
+      <p class="small muted">To add a paper, search below and press Add. <button class="link" id="curDelete">Delete this citation</button></p>
+    </div>
+    <input type="search" id="q" placeholder="Search your library (author, title, year…)" aria-label="Search your library" autocomplete="off">
+    <ul class="results" id="results" aria-label="References"></ul>
+    <p class="small muted" id="empty"></p>
+    <div class="bar">
+      <div class="row"><button id="bib">Insert the reference list</button><button id="refresh">Update citations</button></div>
+      <p class="small muted" id="status" role="status"></p>
+      <p class="small muted" id="libInfo"></p>
+    </div>
+  </div>
+</main>
+<script src="taskpane.js"></script>
+</body>
+</html>

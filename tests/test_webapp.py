@@ -285,3 +285,42 @@ def test_cloud_copy_bundle_and_restore(web):
     it = library.get(library.load(), "Topham2017")
     assert it and "largest cost" in fulltext.read(it)
     assert call(web, "POST", "/api/web/cloud-restore", b"not gzip")[0] == 400
+
+
+WANG = b"""@article{Wang2020,
+  author = {Wang, Li and Chen, Hao and Zhou, Mei}, title = {Blade recycling at scale},
+  journal = {Wind Energy}, year = {2020}}
+@article{Wang2018,
+  author = {Wang, Li and Li, Qiang}, title = {Composite waste from wind turbines},
+  journal = {Waste Management}, year = {2018}}
+@article{Li2019,
+  author = {Li, Qiang and Wang, Li}, title = {Not by Wang first}, journal = {Energy}, year = {2019}}
+"""
+
+
+def test_word_addin_suggest_items_and_render(web):
+    """The Word add-in: papers by the first author typed, a citation's stored details, formatted citations."""
+    call(web, "POST", "/api/library/import", BIB + WANG, {"X-Filename": "refs.bib"})
+    _, d, _ = call(web, "GET", "/api/word-addin/suggest?first=Wang")
+    assert [it["title"] for it in d["items"]] == ["Blade recycling at scale", "Composite waste from wind turbines"]
+    _, d, _ = call(web, "GET", "/api/word-addin/suggest?first=wang&second=Li")           # "Wang and Li"
+    assert [it["year"] for it in d["items"]] == ["2018"]
+    _, d, _ = call(web, "GET", "/api/word-addin/suggest?first=Wang&year=2018")          # the year typed comes first
+    assert d["items"][0]["year"] == "2018"
+    assert call(web, "GET", "/api/word-addin/suggest?first=Nobody")[1]["items"] == []
+
+    keys = {it["title"][:5]: it["key"] for it in call(web, "GET", "/api/library?project=*")[1]["items"]}
+    _, d, _ = call(web, "POST", "/api/word-addin/items", {"keys": [keys["Blade"], "missing"]})
+    assert len(d["items"]) == 1 and d["items"][0]["csl"]["title"] == "Blade recycling at scale"
+    csl = d["items"][0]["csl"]
+
+    cits = [{"items": [{"key": keys["Susta"]}]},
+            {"items": [{"key": keys["Susta"]}, {"key": keys["Blade"], "csl": csl}]},
+            {"items": [{"key": keys["Blade"], "suppress": True}]},                   # "Wang et al. (2020)"
+            {"items": [{"key": "gone-from-library", "csl": dict(csl, id="x", title="Kept in the document")}]}]
+    _, d, _ = call(web, "POST", "/api/word-addin/render", {"style": "apa", "citations": cits})
+    assert d["citations"][0] == "(Topham &amp; McMillan, 2017)"
+    assert "Wang et al., 2020" in d["citations"][1] and d["citations"][2] == "(2020)"
+    assert len(d["bibliography"]) == 3 and any("Kept in the document" in b for b in d["bibliography"])
+    _, d, _ = call(web, "POST", "/api/word-addin/render", {"style": "ieee", "citations": cits})
+    assert d["citations"][:2] == ["[1]", "[1], [2]"]
