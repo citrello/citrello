@@ -156,3 +156,29 @@ def test_word_addin_checks_the_citation_clicked(tmp_path, monkeypatch):
     assert [p["ref"] for p in item["papers"]] == ["Topham2017", "Vetters2024"]          # "Nope" has no text
     assert any("42%" in x for x in item["papers"][0]["passages"])
     assert sources.word_claim_item(para, at, ["Nope"])["item"] is None
+
+
+def test_papers_found_on_the_web_go_to_the_library(tmp_path, monkeypatch):
+    _library(tmp_path, monkeypatch)
+    seen = []
+
+    def add_reference(text, project=None, offline=False, email=None):  # Crossref knows the first DOI only
+        seen.append((text, project))
+        if text != "doi:10.1/real":
+            raise ValueError("not found")
+        with library.editing() as data:
+            it, created, how = library.add_csl(data, {"type": "article-journal", "title": "Official title", "DOI": "10.1/real",
+                                                      "author": [{"family": "Lee", "given": "Ann"}], "issued": {"date-parts": [[2021]]}}, project)
+            return it, created, how
+    monkeypatch.setattr(library, "add_reference", add_reference)
+    out = sources.add_found([
+        {"title": "Claude's title", "authors": "Lee et al.", "year": "2021", "doi": "https://doi.org/10.1/REAL"},
+        {"title": "Unconfirmed paper", "authors": "Kim & Park", "year": "2019", "doi": "10.1/fake", "url": "https://x.org/a"},
+        {"title": "", "doi": ""}])
+    assert seen[0] == ("doi:10.1/real", "Found by Claude")
+    assert out[0]["confirmed"] and out[1]["confirmed"] is False and out[2] is None
+    data = library.load()
+    first, second = library.get(data, out[0]["key"]), library.get(data, out[1]["key"])
+    assert first["csl"]["title"] == "Official title" and "Found by Claude" in first["projects"]
+    assert [a["family"] for a in second["csl"]["author"]] == ["Kim", "Park"] and second["csl"]["DOI"] == "10.1/fake"
+    assert second["reliability"] == "check" and "Found by Claude" in data["projects"]

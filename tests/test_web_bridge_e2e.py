@@ -260,8 +260,10 @@ def test_claude_checks_what_my_sources_say(browser_name, tmp_path):
             found = src.nth(1).locator(".src-found")
             expect(found).to_contain_text("Found on the web", timeout=60000)
             expect(found).to_contain_text("Cable recovery dominates offshore wind decommissioning costs")
-            found.locator("[data-src-addweb]").click()
+            # added to the library at once; no free copy of its full text, so it says the verdict rests on the abstract
             expect(found.locator("button[data-copy]")).to_be_visible(timeout=60000)
+            expect(found).to_contain_text("no free copy, so its verdict rests on the abstract only", timeout=60000)
+            expect(found).to_contain_text("From the abstract")
             # checking again: the blurred citation is checked now (Pro), the others come from this browser
             n = len(anthropic_mock.SEEN)
             page.click("#chkSources")

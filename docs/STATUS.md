@@ -216,6 +216,13 @@ manifest: `site/public/word/manifest.xml` (id ef6ca1ae-67cf-48fb-89a7-189c074612
   needed, pulls the cloud copy, asks for the extension if it's missing, has the extension fetch just those papers,
   then saves the cloud copy and says "Go back to Word". Word polls the cloud copy every 8 s (up to 20 min) and
   checks the claim again by itself. Tested end to end with a stand-in extension.
+- **"Find another reference → On the web" (reworked 13 Nov 2026, Word and the web app):** Claude picks up to 5
+  papers from their abstracts (web search + opening each page); all go to the library at once in the project
+  "Found by Claude" (`sources.add_found`: Crossref details by DOI, or Claude's details marked "check" when the DOI
+  can't be confirmed), shown straight away marked "From the abstract"; then each paper's free full text is fetched
+  one at a time, Claude reads the full texts (judge kind "library", 1 unit) and each verdict is replaced by the
+  exact sentence from the body ("From the full text"). Papers with no free copy: "Get them with my access" (Word:
+  the browser journey; web app: the extension directly), then they're read automatically.
 - Windows install when "More Add-ins" is greyed out (university accounts): the PowerShell line on citrello.app/word
   registers the manifest under HKCU\Software\Microsoft\Office\16.0\WEF\Developer (worked for Armin).
 - **Next:** Armin tries it in Word on the web (citrello.app/word steps); Pro "Find me a new paper" and "Check this

@@ -655,7 +655,6 @@
     if ($("getAccess")) $("getAccess").onclick = () => getWithAccess().catch(claimFail);
     $("claimOut").querySelectorAll("[data-pdf]").forEach((b) => { b.onclick = () => pickPdf(b.dataset.pdf); });
     $("claimOut").querySelectorAll("[data-add]").forEach((b) => { b.onclick = () => useFound(b.dataset.add, b.dataset.how === "replace"); });
-    $("claimOut").querySelectorAll("[data-addweb]").forEach((b) => { b.onclick = () => useWeb(+b.dataset.addweb, b.dataset.how === "replace"); });
   }
 
   $("claimCheck").onclick = () => checkClaim().catch((e) => { claimBusy = false; claimFail(e); });
@@ -701,10 +700,15 @@
   // papers behind a paywall: the web app, in the person's own browser, opens them with the Citrello extension and
   // their access; the texts come back through the cloud copy, and the check carries on here by itself
   let waiting = null;
-  async function getWithAccess() {
+  async function getWithAccess() {  // the papers of the citation clicked
     const cit = current, r = claimShown;
     if (!cit || !r) return;
     const keys = r.papers.filter((p) => p.status !== "text").map((p) => p.key);
+    await viaBrowser(keys, cit, () => { claimShown = null; return checkClaim(); });
+  }
+  // Open the web app in the person's browser for `keys`; when all their texts have come back through the cloud copy,
+  // run `then` (only if the writer is still in citation `cit`). Shows the waiting message meanwhile.
+  async function viaBrowser(keys, cit, then) {
     claimSay(spin("Saving the papers to your cloud copy…"));
     libChanged = true;
     await pushLibrary();  // the web app finds the papers in the cloud copy
@@ -713,28 +717,23 @@
       if (Office.context.ui && Office.context.ui.openBrowserWindow) Office.context.ui.openBrowserWindow(url);
       else window.open(url, "_blank", "noopener");
     } catch { window.open(url, "_blank", "noopener"); }
-    const started = Date.now();
-    waiting = { id: cit.payload.citationID, keys, items: cit.payload.citationItems };
+    const started = Date.now(), here = () => current && current.payload.citationID === cit.payload.citationID;
+    const me = waiting = { id: cit.payload.citationID, keys: [...keys] };
     const tick = async () => {
-      if (!waiting || waiting.id !== cit.payload.citationID) return;
-      const left = waiting.keys.length;
-      if (current && current.payload.citationID === cit.payload.citationID) claimSay(spin(`Waiting for ${left === 1 ? "the paper" : `${left} papers`} from your browser…`) +
+      if (waiting !== me) return;
+      const left = me.keys.length;
+      if (here()) claimSay(spin(`Waiting for ${left === 1 ? "1 paper" : `${left} papers`} from your browser…`) +
         `<p class="small muted">Citrello opened the web app in your browser: follow it there (sign in, the extension). This carries on by itself.` +
         ` <a href="${esc(url)}" target="_blank" rel="noopener">Open it again</a> · <button class="link" id="stopWait">Stop waiting</button></p>`);
       if ($("stopWait")) $("stopWait").onclick = () => { waiting = null; claimFor = null; renderClaim(); };
       await pullLibrary(true);
       const got = [];
-      for (const key of waiting.keys) {
-        const ci = waiting.items.find((x) => x.id === key) || {};
-        const t = await post("/api/word-addin/paper-text", { key, csl: ci.itemData, search: false });
+      for (const key of me.keys) {
+        const t = await post("/api/word-addin/paper-text", { key, csl: {}, search: false });
         if (t.status === "text") got.push(key);
       }
-      waiting.keys = waiting.keys.filter((k) => !got.includes(k));
-      if (!waiting.keys.length) {  // all here: check the claim again
-        waiting = null;
-        if (current && current.payload.citationID === cit.payload.citationID) { claimShown = null; await checkClaim(); }
-        return;
-      }
+      me.keys = me.keys.filter((k) => !got.includes(k));
+      if (!me.keys.length) { waiting = null; if (here()) await then(); return; }
       if (Date.now() - started > 20 * 60 * 1000) { waiting = null; claimFor = null; renderClaim(); return; }
       setTimeout(() => tick().catch(() => {}), 8000);
     };
@@ -784,30 +783,82 @@
       `${r.quote ? `<q>${esc(r.quote)}</q>` : ""}<div class="row"><button data-add="${esc(r.cand.key)}">Add to this citation</button><button data-add="${esc(r.cand.key)}" data-how="replace">Use instead</button></div></div>`).join(""));
     wireClaim();
   }
+  // On the web: Claude picks up to 5 papers from their abstracts; they go to the library ("Found by Claude") and are
+  // shown at once; then each one's full text is fetched (free copies by themselves, the rest with the person's access)
+  // and Claude reads it, so each verdict ends up resting on a sentence from the body of the paper.
+  let webRun = null;  // {cit, claim, papers: [{...claude's, key, confirmed, stage, status}]}
   async function findOnWeb() {
+    const cit = current;
     claimSay(spin("Claude is searching published papers (about a minute)…"));
     const claim = await claimOfCurrent();
-    const res = await bridgeAi("POST", "/api/ai/find-web", { claim, context: current.paragraph.slice(0, 2000),
-      exclude: current.payload.citationItems.map((c) => (c.itemData || {}).DOI).filter(Boolean) });
-    found.web = res.papers || [];
-    if (!found.web.length) return claimSay('<div class="notice">Claude didn\'t find a published paper that clearly says this.</div>');
-    claimSay(found.web.map((p, i) => `<div class="verdict ${p.verdict}"><b>${esc(p.authors)}${p.year ? " (" + esc(p.year) + ")" : ""}: ${VERDICT[p.verdict]}</b>${esc(p.title)}<br>${esc(p.reason)}` +
-      `${p.quote ? `<q>${esc(p.quote)}</q>` : ""}${p.doi ? `<a class="small" href="https://doi.org/${esc(p.doi)}" target="_blank" rel="noopener">doi.org/${esc(p.doi)}</a>` : ""}` +
-      `<div class="row"><button data-addweb="${i}">Add to this citation</button><button data-addweb="${i}" data-how="replace">Use instead</button></div></div>`).join(""));
+    const res = await bridgeAi("POST", "/api/ai/find-web", { claim, context: cit.paragraph.slice(0, 2000),
+      exclude: cit.payload.citationItems.map((c) => (c.itemData || {}).DOI).filter(Boolean) });
+    if (!(res.papers || []).length) return claimSay('<div class="notice">Claude didn\'t find a published paper that clearly says this.</div>');
+    claimSay(spin(`Claude found ${res.papers.length} paper${res.papers.length === 1 ? "" : "s"}. Adding them to your library…`));
+    const added = (await post("/api/word-addin/add-found", { papers: res.papers })).added;
+    const inCitation = new Set(cit.payload.citationItems.map((c) => c.id));
+    const papers = res.papers.map((p, i) => added[i] && { ...p, key: added[i].key, confirmed: added[i].confirmed, stage: "abstract", status: "looking" })
+      .filter((p) => p && !inCitation.has(p.key));
+    if (!papers.length) return claimSay('<div class="notice">Claude only found papers that are already in this citation.</div>');
+    libChanged = true;
+    const run = webRun = { cit, claim, papers };
+    found.web = papers;
+    showWeb(run, `Getting the full text of each paper, to find the exact sentence…`);
+    for (let i = 0; i < papers.length; i++) {  // free copies, one paper at a time
+      if (webRun !== run) return;
+      const t = await post("/api/word-addin/paper-text", { key: papers[i].key, csl: {}, search: true });
+      papers[i].status = t.status === "text" ? "text" : "needs_access";
+      papers[i].hasLink = !!(t.doi || papers[i].url);
+      showWeb(run, `Getting the full text of each paper (${i + 1} of ${papers.length})…`);
+    }
+    await verifyWeb(run);
+    pushLibrary().catch(() => {});
+  }
+  async function verifyWeb(run) {  // Claude reads the full text of the papers that have it
+    const ready = run.papers.filter((p) => p.status === "text" && p.stage !== "fulltext");
+    if (ready.length) {
+      showWeb(run, `Claude is reading the full text of ${ready.length} paper${ready.length === 1 ? "" : "s"}…`);
+      const ci = await post("/api/word-addin/claim-item", { paragraph: run.cit.paragraph, at: run.cit.at, keys: ready.map((p) => p.key) });
+      if (ci.item) {
+        const res = await bridgeAi("POST", "/api/ai/judge", { kind: "library", items: [ci.item] });
+        for (const r of res.results) {
+          const p = run.papers.find((x) => x.key === r.paper);
+          if (p) Object.assign(p, { stage: "fulltext", verdict: r.verdict, quote: r.quote, reason: r.reason });
+        }
+      }
+    }
+    showWeb(run);
+  }
+  const FT_VERDICT = { supports: "✓ The full text supports it", partly: "≈ The full text partly supports it",
+                       contradicts: "✗ The full text says something different", not_found: "? The full text doesn't seem to say it" };
+  function showWeb(run, busy) {
+    if (webRun !== run || !current || current.payload.citationID !== run.cit.payload.citationID) return;
+    const rank = (p) => (p.stage === "fulltext" ? 0 : 1) * 10 + ({ supports: 0, partly: 1, not_found: 2, contradicts: 3 }[p.verdict] ?? 2);
+    const order = run.papers.map((p, i) => [p, i]).sort((a, b) => rank(a[0]) - rank(b[0]));
+    const needAccess = run.papers.filter((p) => p.status === "needs_access" && p.hasLink);
+    const head = busy ? spin(busy) : needAccess.length
+      ? `<div class="notice">${needAccess.length === 1 ? "One paper has" : `${needAccess.length} papers have`} no free copy, so ${needAccess.length === 1 ? "its verdict rests" : "their verdicts rest"} on the abstract only.` +
+        `<div class="row"><button class="primary" id="webAccess">Get ${needAccess.length === 1 ? "it" : "them"} with my access</button></div></div>`
+      : `<p class="small muted">Every verdict below comes from the paper's full text.</p>`;
+    claimSay(head + order.map(([p, i]) => {
+      const ft = p.stage === "fulltext";
+      const where = ft ? "From the full text." : p.status === "looking" ? "From the abstract · getting the full text…"
+        : p.status === "needs_access" ? "From the abstract · no free copy of the full text." : "From the abstract.";
+      return `<div class="verdict ${esc(p.verdict)}"><b>${esc(p.authors)}${p.year ? " (" + esc(p.year) + ")" : ""}: ${ft ? FT_VERDICT[p.verdict] : VERDICT[p.verdict]}</b>${esc(p.title)}<br>${esc(p.reason)}` +
+        `${p.quote ? `<q>${esc(p.quote)}</q>` : ""}<span class="small muted">${where}${p.confirmed ? "" : " Its details couldn't be confirmed on Crossref: check them."}</span>` +
+        `${p.doi ? ` <a class="small" href="https://doi.org/${esc(p.doi)}" target="_blank" rel="noopener">doi.org/${esc(p.doi)}</a>` : ""}` +
+        `<div class="row"><button data-add="${esc(p.key)}">Add to this citation</button><button data-add="${esc(p.key)}" data-how="replace">Use instead</button></div></div>`;
+    }).join("") + '<p class="small muted">They\'re in your library, in the project “Found by Claude”.</p>');
     wireClaim();
+    if ($("webAccess")) $("webAccess").onclick = () => viaBrowser(needAccess.map((p) => p.key), run.cit, async () => {
+      needAccess.forEach((p) => { p.status = "text"; });
+      webRun = run;
+      await verifyWeb(run);
+    }).catch(claimFail);
   }
   async function useFound(key, replace) {
     if (replace) await editCurrent((p) => { p.citationItems.length = 0; });
     await citeHere([key], replace);
-  }
-  async function useWeb(i, replace) {
-    const p = found.web[i];
-    claimSay(spin("Adding it to your library…"));
-    const r = (await post("/api/library/add", { text: p.doi ? "doi:" + p.doi : p.title })).results[0];
-    if (!r || !r.ok) return claimSay(`<div class="notice err">${esc((r && r.error) || "It couldn't be added.")}</div>`);
-    libChanged = true;
-    pushLibrary().catch(() => {});
-    await useFound(r.item.key, replace);
   }
   // add papers to the citation the cursor is in (or, when it was emptied to replace, a new one in its place)
   async function citeHere(keys) {

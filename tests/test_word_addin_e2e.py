@@ -321,6 +321,22 @@ def test_word_addin_checks_a_claim_and_finds_another(tmp_path):
             page.wait_for_function("__doc.controls()[0].text.includes('Lee')", timeout=30000)
             expect(page.locator("#curList li")).to_have_count(2)
             expect(page.locator("#quotaLine")).to_contain_text("Citrello Pro")
+
+            # with Pro, on the web: Claude picks papers from their abstracts, they go to the library, then Claude reads
+            # their full text (here the paper is already in the library with its text) for the exact sentence
+            page.locator("#curList li", has_text="Lee").locator("button[data-rm]").click()  # Claude's paper isn't cited yet
+            expect(page.locator("#curList li")).to_have_count(1, timeout=30000)
+            page.click("#findAnother")
+            page.click("#findWeb")
+            web = page.locator("#claimOut .verdict", has_text="Cable recovery dominates")
+            expect(web).to_contain_text("The full text supports it", timeout=120000)
+            expect(web).to_contain_text("From the full text.")
+            expect(web).not_to_contain_text("couldn't be confirmed")                    # it was already in the library
+            expect(page.locator("#claimOut")).to_contain_text("Every verdict below comes from the paper's full text")
+            expect(page.locator("#claimOut")).to_contain_text("in the project “Found by Claude”")
+            kinds = [m["body"]["messages"][0]["content"] for m in anthropic_mock.SEEN[-2:]]
+            assert "The sentence:" in kinds[0] and "<passage" in kinds[1]               # web search, then full-text check
+            page.screenshot(path=os.path.join(shots, "word-find-web.png"))
             assert not errors, errors
             b.close()
     finally:
@@ -385,7 +401,7 @@ def test_word_addin_gets_paywalled_papers_through_the_web_app(tmp_path):
             word.wait_for_function("__doc.opened.length === 1", timeout=60000)
             url = word.evaluate("__doc.opened[0]")
             assert "/app/?word_fetch=wang2020" in url
-            expect(word.locator("#claimOut")).to_contain_text("Waiting for the paper from your browser", timeout=30000)
+            expect(word.locator("#claimOut")).to_contain_text("Waiting for 1 paper from your browser", timeout=30000)
 
             # the browser: the web app, with the extension
             web = ctx.new_page()
