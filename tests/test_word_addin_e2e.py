@@ -41,15 +41,15 @@ LIBRARY = {"projects": [], "items": [
 ]}
 
 
-def save_cloud_copy(email):
-    """Sign in like another device would and save a cloud copy holding LIBRARY."""
+def save_cloud_copy(email, lib=None, texts=None):
+    """Sign in like another device would and save a cloud copy holding LIBRARY (and papers' text)."""
     B.bc.api("POST", "/api/auth/start", {"email": email})
     code = B.bc.start_sign_in(email)["dev_code"]
     res = B.bc.api("POST", "/api/auth/verify", {"email": email, "code": code, "device_name": "Test", "platform": "test",
                                                 "app_version": "test"})
-    body = gzip.compress(json.dumps({"citrello_cloud": 1, "library": LIBRARY, "fulltext": {}}).encode())
+    body = gzip.compress(json.dumps({"citrello_cloud": 1, "library": lib or LIBRARY, "fulltext": texts or {}}).encode())
     req = urllib.request.Request(B.bc.BRIDGE + "/api/cloud", data=body, method="PUT", headers={
-        "Authorization": "Bearer " + res["token"], "Content-Type": "application/gzip", "X-Items": "3", "X-Texts": "0",
+        "Authorization": "Bearer " + res["token"], "Content-Type": "application/gzip", "X-Items": "3", "X-Texts": str(len(texts or {})),
         "X-Device": "test-device"})
     with urllib.request.urlopen(req) as r:
         assert r.status == 200
@@ -231,3 +231,99 @@ def test_word_addin_cites_suggests_and_keeps_the_list(tmp_path):
         page.screenshot(path=os.path.join(shots, "word-panel.png"), full_page=True)
         assert not errors, errors
         b.close()
+
+
+def test_word_addin_checks_a_claim_and_finds_another(tmp_path):
+    """Click a citation: Check the claim (free: the allowance goes down), a paper without text gets its PDF added,
+    Find another reference is Pro (the Pro card for free accounts; with Pro, a better paper from the library)."""
+    import anthropic_mock
+    import fulltext
+    from playwright.sync_api import expect, sync_playwright
+    from test_doccheck import make_pdf
+    from test_sources import PAPER
+    srv = anthropic_mock.start()
+    anthropic_mock.SEEN.clear()
+    email = f"wordclaim-{int(time.time())}@example.com"
+    shots = os.environ.get("CITRELLO_E2E_SHOTS") or str(tmp_path)
+    lib = {"projects": [], "items": [dict(i) for i in LIBRARY["items"]] + [
+        item("lee2021", "Cable recovery dominates offshore wind decommissioning costs", [("Lee", "Ann")], 2021, "Energy Policy")]}
+    for it in lib["items"]:
+        if it["key"] in ("topham2017", "lee2021"):
+            it["fulltext"] = {"words": len(PAPER.split()), "source": "pdf", "added": "2026-11-01"}
+    save_cloud_copy(email, lib, {"topham2017.txt": PAPER, "lee2021.txt": PAPER.replace("42%", "45%")})
+    pdf = tmp_path / "wang.pdf"
+    make_pdf(str(pdf), [["Blade recycling at scale"] + [l for l in PAPER.split("\n") if l][:30]])
+    errors = []
+    try:
+        with sync_playwright() as pw:
+            b = pw.chromium.launch()
+            page = b.new_page(viewport={"width": 360, "height": 1000})
+            page.route("https://appsforoffice.microsoft.com/**", lambda r: r.fulfill(path=MOCK, content_type="text/javascript"))
+            page.on("pageerror", lambda e: errors.append(str(e)))
+            doc = lambda js: page.evaluate(js)  # noqa: E731
+            page.goto(f"{BASE}/word/taskpane.html?bridge={urllib.parse.quote(B.bc.BRIDGE)}")
+            page.evaluate("d => __doc.load(d)", word_document(blank_docx(tmp_path)))
+            sign_in(page, email)
+            expect(page.locator("#libInfo")).to_contain_text("4 references", timeout=60000)
+
+            # two citations: one paper with its text in the library, one without (no free copy: no DOI)
+            doc("__doc.type('Removing the subsea export cables accounted for most of the decommissioning cost ')")
+            page.fill("#q", "decommissioning of an offshore")
+            expect(page.locator("#results li")).to_have_count(1)
+            expect(page.locator("#results li")).to_contain_text("Sustainable decommissioning")
+            page.click("#results button:has-text('Cite')")
+            page.wait_for_function("__doc.controls().length === 1 && __doc.controls()[0].text.includes('Topham')", timeout=30000)
+            doc("__doc.type('. Blades are recycled ')")
+            page.fill("#q", "blade recycling")
+            expect(page.locator("#results li")).to_have_count(1)
+            expect(page.locator("#results li")).to_contain_text("Blade recycling")
+            page.click("#results button:has-text('Cite')")
+            page.wait_for_function("__doc.controls().length === 2", timeout=30000)
+
+            # click the first citation: Check the claim (free: 3 a month on this test copy of the server)
+            doc("__doc.clickControl(0)")
+            expect(page.locator("#quotaLine")).to_contain_text("3 of 3 free claim checks left", timeout=30000)
+            page.click("#claimCheck")
+            expect(page.locator("#claimOut .verdict.supports")).to_contain_text("Supports it", timeout=60000)
+            expect(page.locator("#quotaLine")).to_contain_text("2 of 3 free claim checks left")
+            sent = anthropic_mock.SEEN[-1]["body"]["messages"][0]["content"]
+            assert "Removing the subsea export cables accounted for most of the decommissioning cost" in sent and "42%" in sent
+            page.locator("#claimOut summary").first.click()
+            page.screenshot(path=os.path.join(shots, "word-claim-check.png"))
+
+            # Find another reference: Pro only
+            page.click("#findAnother")
+            expect(page.locator("#proCard")).to_be_visible()
+            expect(page.locator("#proLead")).to_contain_text("part of Citrello Pro")
+            page.click("#proLater")
+
+            # the second citation: no text anywhere, so its PDF is added from the computer
+            doc("__doc.clickControl(1)")
+            expect(page.locator("#claimOut")).to_be_empty()
+            page.click("#claimCheck")
+            expect(page.locator("#claimOut .verdict.none")).to_contain_text("No full text found", timeout=60000)
+            expect(page.locator("#quotaLine")).to_contain_text("2 of 3")             # nothing was sent to Claude
+            with page.expect_file_chooser() as fc:
+                page.click("#claimOut button[data-pdf]")
+            fc.value.set_files(str(pdf))
+            expect(page.locator("#claimOut .verdict:not(.none)")).to_have_count(1, timeout=60000)
+            expect(page.locator("#quotaLine")).to_contain_text("1 of 3")
+
+            # with Pro: another reference from the library, added to the citation
+            assert B.call("POST", "/admin/pro", {"email": email, "pro": True}, headers={"Authorization": "Bearer testadmin"})[0] == 200
+            doc("__doc.clickControl(0)")
+            expect(page.locator("#claimOut .verdict.supports")).to_be_visible(timeout=10000)  # checked before: shown again
+            page.click("#findAnother")
+            page.click("#findLib")
+            lee = page.locator("#claimOut .verdict", has_text="Lee 2021")
+            expect(lee).to_contain_text("Supports it", timeout=60000)
+            page.screenshot(path=os.path.join(shots, "word-find-another.png"))
+            lee.locator("button[data-add]:has-text('Add to this citation')").click()
+            page.wait_for_function("__doc.controls()[0].text.includes('Lee')", timeout=30000)
+            expect(page.locator("#curList li")).to_have_count(2)
+            expect(page.locator("#quotaLine")).to_contain_text("Citrello Pro")
+            assert not errors, errors
+            b.close()
+    finally:
+        srv.shutdown()
+        srv.server_close()

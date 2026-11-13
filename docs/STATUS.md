@@ -201,6 +201,15 @@ manifest: `site/public/word/manifest.xml` (id ef6ca1ae-67cf-48fb-89a7-189c074612
   step runs with tracking off), so the visible changes are revisions. Duplicates merge into one key; online-corrected
   details are used. **Untested in real Word**: getOoxml/insertOoxml on a paragraph's content and wrapping
   multi-paragraph lists are the parts most likely to need adjusting.
+- **Claude checks in Word (built 13 Nov 2026):** click a citation → "Check the claim" (free: 10 a month, the
+  panel shows "N of 10 free claim checks left" and it drops with each paper checked; Pro: 3000) and "Find another
+  reference" (Pro: in my library / on the web, then "Add to this citation" or "Use instead"; free → Pro card).
+  Papers' text, one paper at a time: the library's text; else a free copy found online (Europe PMC, Unpaywall through
+  the bridge: `sources.word_paper_text`, the paper is added to the library if it isn't there); else the abstract;
+  else "Add its PDF" (file picker in the panel). The Word panel can't open paywalled pages with the person's access
+  (no browser extension inside Word): that stays in the web app with the extension. Changes to the library made in
+  Word go back to the cloud copy (pushLibrary), so the web app gets them. Verdicts are kept in the panel's
+  localStorage per sentence + papers.
 - Windows install when "More Add-ins" is greyed out (university accounts): the PowerShell line on citrello.app/word
   registers the manifest under HKCU\Software\Microsoft\Office\16.0\WEF\Developer (worked for Armin).
 - **Next:** Armin tries it in Word on the web (citrello.app/word steps); Pro "Find me a new paper" and "Check this

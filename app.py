@@ -1334,6 +1334,13 @@ class Handler(BaseHTTPRequestHandler):
                 return self.send(200, {"ooxml": ooxml, "count": n})
             except ValueError as e:
                 return self.send(400, {"error": str(e)})
+        if path == "/api/word-addin/paper-text":  # the Word add-in: a cited paper's text, found if needed
+            b = self.json_body()
+            return self.send(200, sources.word_paper_text(str(b.get("key", "")), b.get("csl") or {}))
+        if path == "/api/word-addin/claim-item":  # the Word add-in: what Claude reads for the citation clicked
+            b = self.json_body()
+            return self.send(200, sources.word_claim_item(str(b.get("paragraph", ""))[:20000], b.get("at", 0),
+                                                          [str(k) for k in b.get("keys", [])][:20]))
         if path == "/api/word-addin/items":  # the Word add-in: what a citation stores about each paper
             data = library.load()
             out = []

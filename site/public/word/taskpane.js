@@ -54,6 +54,14 @@
     if (m.status >= 400) throw new Error((data && data.error) || `Citrello couldn't do that (${m.status}).`);
     return data;
   }
+  async function apiRaw(method, path) {  // the answer's bytes and headers (the cloud copy)
+    await ready;
+    return new Promise((resolve) => {
+      const id = ++nextId;
+      pending.set(id, resolve);
+      worker.postMessage({ type: "request", id, method, path, headers: {}, body: null });
+    });
+  }
   const get = (path) => api("GET", path);
   const post = (path, body) => api("POST", path, body ?? {});
 
@@ -122,6 +130,7 @@
     await pullLibrary();
     search();
     checkDocument().catch((e) => docSay(e.message, "err"));
+    loadQuota();
     setInterval(() => pullLibrary(true), 5 * 60 * 1000);  // new references added in Citrello arrive by themselves
   }
 
@@ -338,11 +347,13 @@
         inside.load("tag");
         const para = sel.paragraphs.getFirst();
         const before = para.getRange("Start").expandTo(sel.getRange("Start"));
-        before.load("text");
+        before.load("text"); para.load("text");
         await ctx.sync();
         ctxInfo = { tag: inside.isNullObject ? null : inside.tag, before: before.text || "", range: before };
         const p = ctxInfo.tag && payloadOf(ctxInfo.tag);
-        current = p ? { tag: ctxInfo.tag, payload: p } : null;
+        const same = current && p && current.payload.citationID === p.citationID;
+        current = p ? { tag: ctxInfo.tag, payload: p, paragraph: para.text || "", at: (before.text || "").length } : null;
+        if (!same) claimShown = null;
       });
     } catch { current = null; }
     renderCurrent();
@@ -354,6 +365,7 @@
   async function renderCurrent() {
     show("current", !!current);
     if (!current) return;
+    renderClaim();
     const its = current.payload.citationItems;
     $("curList").innerHTML = its.map((ci, i) => {
       const c = ci.itemData || {};
@@ -566,6 +578,207 @@
     docPlan = { ...docPlan, citations: 0, already: (docPlan.already || 0) + done, paragraphs: [], converted: true };
     renderDoc(`Done: ${done} citation${done === 1 ? " is" : "s are"} now Citrello citations` +
       (canTrack && track ? ". The changes are tracked: Review → Accept or Reject." : ".") + notes + lost);
+  }
+
+  // ---------- Claude checks the citation clicked (free: 10 a month), and finds another (Pro) ----------
+  // The papers' text comes from the library; when a paper has none, Citrello looks for a free copy online (it's kept
+  // in the library, and the library goes back to the cloud copy so the web app has it too). Without a free copy the
+  // writer can add the PDF. Claude reads the passages of each paper that matter for the sentence.
+  let quota = null, claimShown = null, claimBusy = false, libChanged = false;
+  const VERDICT = { supports: "✓ Supports it", partly: "≈ Partly supports it", contradicts: "✗ Says something different",
+                    not_found: "? Doesn't seem to say it" };
+  const cacheKey = (claim, keys) => "citrelloClaim:" + claim + "|" + keys.join(",");
+  const cacheGet = (k) => { try { return JSON.parse(localStorage.getItem(k) || "null"); } catch { return null; } };
+  const cacheSet = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} };
+  async function bridgeAi(method, path, body) {
+    if (!session || !session.signed_in) session = await get("/api/ai/session");
+    const r = await fetch(session.bridge + path, { method, headers: { Authorization: "Bearer " + session.token,
+      ...(body ? { "Content-Type": "application/json" } : {}) }, body: body ? JSON.stringify(body) : undefined });
+    const d = await r.json().catch(() => ({}));
+    if (d.quota) { quota = d.quota; showQuota(); }
+    if (!r.ok) { const e = new Error(d.error_description || d.error || "Claude couldn't check this right now."); e.code = d.error; throw e; }
+    return d;
+  }
+  async function loadQuota() { try { quota = await bridgeAi("GET", "/api/ai/quota"); showQuota(); } catch {} }
+  function showQuota() {
+    if (!quota) return;
+    const left = Math.max(0, quota.limit - quota.used);
+    $("quotaLine").innerHTML = quota.pro ? `Citrello Pro · ${left.toLocaleString()} claim checks left this month`
+      : `<b>${left} of ${quota.limit}</b> free claim checks left this month · <button class="link" id="quotaPro">Get Pro</button>`;
+    if ($("quotaPro")) $("quotaPro").onclick = () => showPro();
+  }
+  function showPro(lead) {
+    $("proLead").textContent = lead || "Make sure every source says what you wrote.";
+    show("proCard", true);
+    $("proCard").scrollIntoView({ block: "nearest" });
+  }
+  $("proLater").onclick = () => show("proCard", false);
+  const claimSay = (html) => { $("claimOut").innerHTML = html; };
+  const spin = (t) => `<p class="small"><span class="spinner"></span>${esc(t)}</p>`;
+  const labelOf = (c) => {
+    const a = (c.author || []).map((x) => x.family || x.literal).filter(Boolean);
+    const y = (((c.issued || {})["date-parts"] || [[]])[0] || [])[0] || "";
+    return `${a.length > 2 ? a[0] + " et al." : a.join(" & ") || (c.title || "").slice(0, 40)}${y ? " (" + y + ")" : ""}`;
+  };
+
+  let claimFor = null;  // the citation whose results are on screen (they stay while the cursor stays in it)
+  function renderClaim() {
+    showQuota();
+    if (claimBusy) return;
+    if (claimFor === current.payload.citationID) return;
+    claimFor = current.payload.citationID;
+    if (!claimShown) {  // checked before? (kept in this browser)
+      const keys = current.payload.citationItems.map((ci) => ci.id);
+      const hit = cacheGet(cacheKey(current.paragraph.slice(0, 400) + "@" + current.at, keys));
+      claimShown = hit || null;
+    }
+    claimSay(claimShown ? claimHtml(claimShown) : "");
+    wireClaim();
+  }
+  function claimHtml(r) {
+    return (r.claim ? `<p class="small muted">Checked: “${esc(r.claim)}”</p>` : "") + r.papers.map((p) => {
+      const v = p.result;
+      if (!v) {
+        const why = p.status === "none" ? "No full text found online, so Claude can't check it." : "Not checked.";
+        return `<div class="verdict none"><b>${esc(p.label)}: ${why}</b>` +
+          `<div class="row"><button data-pdf="${esc(p.key)}">Add its PDF</button>${p.doi ? `<a class="small" href="https://doi.org/${esc(p.doi)}" target="_blank" rel="noopener">Open the paper</a>` : ""}</div></div>`;
+      }
+      return `<div class="verdict ${esc(v.verdict)}"><b>${esc(p.label)}: ${VERDICT[v.verdict] || esc(v.verdict)}</b>${esc(v.reason)}` +
+        `${v.quote ? `<details><summary>More details</summary><q>${esc(v.quote)}</q><span class="small muted">From the paper's ${p.status === "abstract" ? "abstract" : "full text"}.</span></details>` : ""}</div>`;
+    }).join("");
+  }
+  function wireClaim() {
+    $("claimOut").querySelectorAll("[data-pdf]").forEach((b) => { b.onclick = () => pickPdf(b.dataset.pdf); });
+    $("claimOut").querySelectorAll("[data-add]").forEach((b) => { b.onclick = () => useFound(b.dataset.add, b.dataset.how === "replace"); });
+    $("claimOut").querySelectorAll("[data-addweb]").forEach((b) => { b.onclick = () => useWeb(+b.dataset.addweb, b.dataset.how === "replace"); });
+  }
+
+  $("claimCheck").onclick = () => checkClaim().catch((e) => { claimBusy = false; claimFail(e); });
+  function claimFail(e) {
+    if (e.code === "ai_limit" || e.code === "pro_only") { claimSay(`<div class="notice warn">${esc(e.message)}</div>`); showPro(e.message); }
+    else claimSay(`<div class="notice err">${esc(e.message)}</div>`);
+  }
+  async function checkClaim() {
+    if (!current || claimBusy) return;
+    claimBusy = true;
+    const cit = current, items = cit.payload.citationItems;
+    if (quota && !quota.pro && quota.used + items.length > quota.limit) {
+      claimBusy = false;
+      return showPro(`Your ${quota.limit} free claim checks this month are used up. Citrello Pro checks every citation.`);
+    }
+    await pullLibrary(true);  // the newest library first (papers' text added elsewhere)
+    const papers = [];
+    for (let i = 0; i < items.length; i++) {  // one paper at a time: its text, found online if needed
+      const ci = items[i], label = labelOf(ci.itemData || {});
+      claimSay(spin(`Getting the text of ${label}${items.length > 1 ? ` (${i + 1} of ${items.length})` : ""}…`));
+      const t = await post("/api/word-addin/paper-text", { key: ci.id, csl: ci.itemData });
+      if (t.changed) libChanged = true;
+      papers.push({ key: t.key, label, status: t.status, doi: t.doi });
+    }
+    const readable = papers.filter((p) => p.status !== "none");
+    let claim = "";
+    if (readable.length) {
+      claimSay(spin("Claude is reading the papers…"));
+      const ci = await post("/api/word-addin/claim-item", { paragraph: cit.paragraph, at: cit.at, keys: readable.map((p) => p.key) });
+      claim = ci.claim;
+      if (ci.item) {
+        const res = await bridgeAi("POST", "/api/ai/judge", { items: [ci.item] });
+        for (const r of res.results) { const p = papers.find((x) => x.key === r.paper); if (p) p.result = r; }
+      }
+    }
+    claimShown = { claim, papers };
+    cacheSet(cacheKey(cit.paragraph.slice(0, 400) + "@" + cit.at, items.map((x) => x.id)), claimShown);
+    claimBusy = false;
+    if (current && current.payload.citationID === cit.payload.citationID) { claimSay(claimHtml(claimShown)); wireClaim(); }
+    if (libChanged) pushLibrary().catch(() => {});
+  }
+
+  // a PDF from the writer's computer, for a paper Citrello couldn't find a free copy of
+  let pdfFor = null;
+  function pickPdf(key) { pdfFor = key; $("pdfPick").value = ""; $("pdfPick").click(); }
+  $("pdfPick").onchange = async () => {
+    const f = $("pdfPick").files[0];
+    if (!f || !pdfFor) return;
+    claimSay(spin("Reading the PDF…"));
+    try {
+      await api("POST", "/api/fulltext/attach", await f.arrayBuffer(), { "X-Key": encodeURIComponent(pdfFor) });
+      libChanged = true;
+      pushLibrary().catch(() => {});
+      claimShown = null;
+      await checkClaim();
+    } catch (e) { claimBusy = false; claimFail(e); }
+  };
+
+  // ----- find another reference (Pro): in the library, or on the web -----
+  let found = { library: [], web: [] };
+  $("findAnother").onclick = async () => {
+    if (!quota || !quota.pro) await loadQuota();  // just switched to Pro?
+    if (!quota || !quota.pro) return showPro("Finding another reference is part of Citrello Pro.");
+    show("proCard", false);
+    claimSay('<p class="small">Find another reference that says this:</p><div class="row"><button id="findLib">In my library</button><button id="findWeb">On the web</button></div>');
+    $("findLib").onclick = () => findInLibrary().catch(claimFail);
+    $("findWeb").onclick = () => findOnWeb().catch(claimFail);
+  };
+  async function claimOfCurrent() {
+    return (await post("/api/word-addin/claim-item", { paragraph: current.paragraph, at: current.at, keys: [] })).claim;
+  }
+  async function findInLibrary() {
+    claimSay(spin("Looking through your library…"));
+    const claim = await claimOfCurrent();
+    const cands = (await post("/api/sources/library-candidates", { claim, exclude: current.payload.citationItems.map((c) => c.id) })).papers;
+    if (!cands.length) return claimSay('<div class="notice">Nothing in your library seems to say this. Try <button class="link" id="findWeb2">the web</button>.</div>'), ($("findWeb2").onclick = () => findOnWeb().catch(claimFail));
+    claimSay(spin(`Claude is reading ${cands.length} papers from your library…`));
+    const res = await bridgeAi("POST", "/api/ai/judge", { kind: "library", items: [{ id: "lib", claim, papers: cands }] });
+    found.library = res.results.filter((r) => r.verdict === "supports" || r.verdict === "partly")
+      .map((r) => ({ ...r, cand: cands.find((c) => c.ref === r.paper) })).filter((r) => r.cand);
+    if (!found.library.length) return claimSay('<div class="notice">None of the papers in your library clearly says this.</div>');
+    claimSay(found.library.map((r) => `<div class="verdict ${r.verdict}"><b>${esc(r.cand.label)}: ${VERDICT[r.verdict]}</b>${esc(r.cand.title)}<br>${esc(r.reason)}` +
+      `${r.quote ? `<q>${esc(r.quote)}</q>` : ""}<div class="row"><button data-add="${esc(r.cand.key)}">Add to this citation</button><button data-add="${esc(r.cand.key)}" data-how="replace">Use instead</button></div></div>`).join(""));
+    wireClaim();
+  }
+  async function findOnWeb() {
+    claimSay(spin("Claude is searching published papers (about a minute)…"));
+    const claim = await claimOfCurrent();
+    const res = await bridgeAi("POST", "/api/ai/find-web", { claim, context: current.paragraph.slice(0, 2000),
+      exclude: current.payload.citationItems.map((c) => (c.itemData || {}).DOI).filter(Boolean) });
+    found.web = res.papers || [];
+    if (!found.web.length) return claimSay('<div class="notice">Claude didn\'t find a published paper that clearly says this.</div>');
+    claimSay(found.web.map((p, i) => `<div class="verdict ${p.verdict}"><b>${esc(p.authors)}${p.year ? " (" + esc(p.year) + ")" : ""}: ${VERDICT[p.verdict]}</b>${esc(p.title)}<br>${esc(p.reason)}` +
+      `${p.quote ? `<q>${esc(p.quote)}</q>` : ""}${p.doi ? `<a class="small" href="https://doi.org/${esc(p.doi)}" target="_blank" rel="noopener">doi.org/${esc(p.doi)}</a>` : ""}` +
+      `<div class="row"><button data-addweb="${i}">Add to this citation</button><button data-addweb="${i}" data-how="replace">Use instead</button></div></div>`).join(""));
+    wireClaim();
+  }
+  async function useFound(key, replace) {
+    if (replace) await editCurrent((p) => { p.citationItems.length = 0; });
+    await citeHere([key], replace);
+  }
+  async function useWeb(i, replace) {
+    const p = found.web[i];
+    claimSay(spin("Adding it to your library…"));
+    const r = (await post("/api/library/add", { text: p.doi ? "doi:" + p.doi : p.title })).results[0];
+    if (!r || !r.ok) return claimSay(`<div class="notice err">${esc((r && r.error) || "It couldn't be added.")}</div>`);
+    libChanged = true;
+    pushLibrary().catch(() => {});
+    await useFound(r.item.key, replace);
+  }
+  // add papers to the citation the cursor is in (or, when it was emptied to replace, a new one in its place)
+  async function citeHere(keys) {
+    await cite(keys);
+    claimShown = null;
+    claimSay('<div class="notice ok">Done. Press Check the claim to check the citation now.</div>');
+  }
+
+  // the library goes back to the cloud copy after the add-in changed it (papers' text, papers added)
+  async function pushLibrary() {
+    if (!libChanged || !session || !session.signed_in) return;
+    libChanged = false;
+    const b = await apiRaw("GET", "/api/web/cloud-bundle");
+    const st = await get("/api/web/state");
+    const r = await fetch(session.bridge + "/api/cloud", { method: "PUT", body: b.body, headers: {
+      Authorization: "Bearer " + session.token, "Content-Type": "application/gzip", "X-Items": b.headers["X-Items"] || "0",
+      "X-Texts": b.headers["X-Texts"] || "0", "X-Device": st.cloud_device } });
+    if (!r.ok) { libChanged = true; return; }
+    await post("/api/web/cloud-saved", { stamp: b.headers["X-Stamp"] });
   }
 
   // ---------- start ----------

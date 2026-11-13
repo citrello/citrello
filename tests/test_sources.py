@@ -117,3 +117,40 @@ def test_each_citation_shows_as_in_the_paper(tmp_path, monkeypatch):
     d.add_paragraph("Removing cables is costly [@Topham2017].")
     d.save(path)
     assert sources.check(path)["sentences"][0]["papers"][0]["cite"] == "[@Topham2017]"
+
+
+def test_word_addin_checks_the_citation_clicked(tmp_path, monkeypatch):
+    """Citrello for Word: the sentence around the citation, the paper's text (found online when missing, the paper
+    added to the library if needed), and what Claude reads."""
+    _library(tmp_path, monkeypatch)
+    para = ("Offshore wind is growing. Removing the export cables is the largest part of the decommissioning cost "
+            "(Topham et al., 2017; Vetters, 2024). Smith et al. found the same.")
+    at = para.index("(Topham")
+    assert sources.sentence_at(para, at).startswith("Removing the export cables")
+    assert sources.clean_claim(sources.sentence_at(para, at)) == \
+        "Removing the export cables is the largest part of the decommissioning cost."
+
+    assert sources.word_paper_text("Topham2017", TOPHAM)["status"] == "text"
+    calls = []
+
+    def find_free(keys=None, progress=None):  # a free copy found online for Vetters
+        calls.append(keys)
+        fulltext.attach(keys[0], PAPER.replace("42%", "40%"), "open access")
+        return {"found": 1}
+    monkeypatch.setattr(fulltext, "find_free", find_free)
+    got = sources.word_paper_text("Vetters2024", VETTERS)
+    assert got == {"key": "Vetters2024", "status": "text", "changed": True, "doi": VETTERS["DOI"], "words": got["words"]}
+    assert calls == [["Vetters2024"]]
+    # not in the library: added (under the citation's key) before its text is looked for
+    new = {"type": "article-journal", "title": "Cable recovery costs", "DOI": "10.1/cables", "issued": {"date-parts": [[2021]]}}
+    got = sources.word_paper_text("Lee2021", new)
+    assert got["key"] == "Lee2021" and got["changed"] and library.get(library.load(), "Lee2021")
+    monkeypatch.setattr(fulltext, "find_free", lambda keys=None, progress=None: {"found": 0})
+    assert sources.word_paper_text("Nope", {"title": "No DOI, no text"})["status"] == "none"
+
+    out = sources.word_claim_item(para, at, ["Topham2017", "Vetters2024", "Nope"])
+    item = out["item"]
+    assert item["claim"] == "Removing the export cables is the largest part of the decommissioning cost."
+    assert [p["ref"] for p in item["papers"]] == ["Topham2017", "Vetters2024"]          # "Nope" has no text
+    assert any("42%" in x for x in item["papers"][0]["passages"])
+    assert sources.word_claim_item(para, at, ["Nope"])["item"] is None

@@ -370,3 +370,82 @@ def library_candidates(claim, exclude=(), n=6):
     scored.sort(key=lambda t: -t[0])
     return [{"ref": it["key"], "key": it["key"], "title": it["csl"].get("title", ""), "label": _label(it["csl"]),
              "passages": passages, "full_text": ft} for score, it, passages, ft in scored[:n] if score >= 0.3]
+
+
+# ---------------------------------------------------------------------------
+# The Word add-in: checking one citation where the writer clicked
+# ---------------------------------------------------------------------------
+
+CITE_RE = re.compile(r"\[@[^\]]*\]|\[\d+(?:[,–\-]\s*\d+)*\]|\([^()]*\d{4}[a-z]?[^()]*\)")
+
+
+def clean_claim(sentence):
+    """The sentence without its citation markers."""
+    return re.sub(r"\s+([.,;:!?])", r"\1", re.sub(r"\s+", " ", CITE_RE.sub(" ", sentence))).strip()
+
+
+def sentence_at(paragraph, at):
+    """The sentence of `paragraph` that holds character `at` (where the citation starts)."""
+    pos, best = 0, paragraph
+    for part in sentences(paragraph):
+        start = paragraph.find(part, pos)
+        if start < 0:
+            continue
+        end = start + len(part)
+        if start <= at <= end:
+            return part
+        if start <= at:
+            best = part
+        pos = end
+    return best
+
+
+def word_paper_text(key, csl):
+    """A cited paper's text for checking: from the library, else a free copy found online (kept in the library;
+    the paper is added to it first if needed). -> {"key", "status": "text"|"abstract"|"none", "changed", "doi"}"""
+    data = library.load()
+    lib = _Library(data)
+    it = lib.by_key.get(key) or lib.find(csl)
+    changed = False
+    if not it:
+        if not isinstance(csl, dict) or not csl.get("title"):
+            return {"key": key, "status": "none", "changed": False, "doi": ""}
+        with library.editing() as d:
+            it, _, _ = library.add_csl(d, dict(csl), source="word", key=key)
+            it = dict(it)
+        changed = True
+    if not it.get("fulltext") and it["csl"].get("DOI"):
+        res = fulltext.find_free([it["key"]])
+        if res["found"]:
+            changed = True
+            it = library.get(library.load(), it["key"])
+    if it.get("fulltext") and fulltext.read(it):
+        status = "text"
+    elif len(it["csl"].get("abstract") or "") >= 200:
+        status = "abstract"
+    else:
+        status = "none"
+    return {"key": it["key"], "status": status, "changed": changed, "doi": it["csl"].get("DOI", ""),
+            "words": (it.get("fulltext") or {}).get("words", 0)}
+
+
+def word_claim_item(paragraph, at, keys):
+    """What Claude reads to judge one citation: the sentence, and each cited paper's best passages (full text, else
+    its abstract). Papers with neither are left out. -> {"item": {...} | None, "sentence", "claim"}"""
+    sentence = sentence_at(paragraph or "", int(at or 0))
+    claim = clean_claim(sentence)
+    lib, papers = _Library(library.load()), []
+    for j, key in enumerate(keys):
+        it = lib.by_key.get(key)
+        if not it:
+            continue
+        text = lib.text(it)
+        if text:
+            passages = _passages_for(it, text, claim)
+        elif len(it["csl"].get("abstract") or "") >= 200:
+            passages = [it["csl"]["abstract"]]
+        else:
+            continue
+        papers.append({"ref": key, "key": key, "title": it["csl"].get("title", ""), "passages": passages})
+    item = {"id": "0", "claim": claim, "papers": papers} if papers and claim else None
+    return {"item": item, "sentence": sentence, "claim": claim}
