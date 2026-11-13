@@ -38,7 +38,7 @@ def build(out, kind, test=False):
     icons(out)
     man = json.load(open(os.path.join(SRC, "manifest.json"), encoding="utf-8"))
     if kind == "firefox":
-        man["background"] = {"scripts": ["grab.js", "background.js"]}
+        man["background"] = {"scripts": ["grab.js", "follow.js", "background.js"]}
         man["browser_specific_settings"] = {"gecko": {"id": "extension@citrello.app", "strict_min_version": "128.0"}}
     if test:
         man["content_scripts"][0]["matches"] += ["http://localhost:8099/*", "http://127.0.0.1:8099/*"]

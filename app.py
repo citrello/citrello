@@ -1054,6 +1054,10 @@ class Handler(BaseHTTPRequestHandler):
                     except Exception as e:
                         results.append({"ok": False, "text": line[:120], "error": str(e)})
                 return self.send(200, {"results": results})
+            if path == "/api/clip/missing":  # the extension: papers without their text, to notice them when opened
+                return self.send(200, {"missing": [{"key": it["key"], "doi": core.norm_doi(it["csl"].get("DOI") or ""),
+                                                    "title": core.norm(it["csl"].get("title") or "")[:120]}
+                                                   for it in library.load()["items"] if not it.get("fulltext")][:20000]})
             if path == "/api/clip/preview":  # browser button: what is this page?
                 b = self.json_body()
                 rec = library.resolve_clip(str(b.get("url", ""))[:2000], str(b.get("title", ""))[:500],

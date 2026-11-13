@@ -30,7 +30,7 @@ def test_store_package(tmp_path, kind):
     assert set(man["permissions"]) == {"activeTab", "scripting", "storage"}
     assert man["content_scripts"][0]["matches"][0] == "https://citrello.app/*"
     if kind == "firefox":
-        assert man["background"] == {"scripts": ["grab.js", "background.js"]}
+        assert man["background"] == {"scripts": ["grab.js", "follow.js", "background.js"]}
         assert man["browser_specific_settings"]["gecko"]["id"] == "extension@citrello.app"
     else:
         assert man["background"] == {"service_worker": "background.js"}

@@ -172,4 +172,17 @@ chrome.commands && chrome.commands.getAll && chrome.commands.getAll().then((cmds
   const c = cmds.find((x) => x.name === "_execute_action");
   if (c && c.shortcut) $("shortcut").textContent = c.shortcut; else $("hint").classList.add("hidden");
 }).catch(() => {});
+// the notice on papers' pages needs the extension to read the pages you open (it's asked here, or when fetching)
+(async () => {
+  const { notice } = await chrome.storage.local.get("notice");
+  if (notice === false || await chrome.permissions.contains({ origins: ["<all_urls>"] })) return;
+  show("noticeOffer");
+  $("noticeOn").onclick = async (e) => {
+    e.preventDefault();
+    if (!(await chrome.permissions.request({ origins: ["<all_urls>"] }))) return;
+    await chrome.storage.local.set({ notice: true });
+    chrome.runtime.sendMessage({ action: "notice-on" });
+    $("noticeOffer").textContent = "On ✓ Citrello will tell you on the paper's page.";
+  };
+})().catch(() => {});
 start();

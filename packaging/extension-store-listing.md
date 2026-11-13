@@ -45,10 +45,14 @@ so their AI assistant can read them.
   and text to add the paper.
 - scripting: run the small script that reads a paper's details and text, on the page the person clicked on or on a
   paper they asked the extension to fetch.
-- storage: remember the list of papers the person asked to fetch (until finished) and whether they use the web or
-  desktop version of Citrello.
-- Host permissions (optional, "<all_urls>"): asked only when the person first fetches papers in bulk, because papers
-  are on many different publishers' websites. Used only to open the papers the person asked for.
+- storage: remember the list of papers the person asked to fetch (until finished), whether they use the web or
+  desktop version of Citrello, and the list of papers in their library that have no full text yet (DOI, title, key).
+- Host permissions (optional, "<all_urls>"): asked only when the person first fetches papers in bulk, or when they
+  turn on "tell me when I open a paper whose full text Citrello doesn't have" (from the toolbar panel or the options),
+  because papers are on many different publishers' websites. Used to open the papers the person asked for, and to
+  compare the citation details of a page the person opens with their own list of papers without text, on the
+  device: on a match the extension shows a badge and a small box offering to add the text. Nothing about the pages
+  visited is sent anywhere; this can be turned off in the options.
 - Host permissions for citrello.app and localhost:8585 (required): to find the person's open Citrello tab (so the
   panel uses it instead of opening another), and to add papers to Citrello for desktop, which runs on the person's
   own computer at localhost:8585. Nothing else is reached.
@@ -59,7 +63,8 @@ so their AI assistant can read them.
 - Collects: "Website content" (the text of papers the person asks for), used only on the person's device for the
   extension's purpose. Not sold, not transferred to third parties, not used for creditworthiness or advertising.
 - No personally identifiable information, health, financial, authentication, personal communications, location,
-  web history or user activity data is collected.
+  web history or user activity data is collected. (The notice compares the page open in a tab with the person's list
+  of papers on the device; pages visited are neither stored nor sent.)
 - Remote code: no (all code is in the package).
 
 ## Firefox: source code

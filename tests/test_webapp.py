@@ -324,3 +324,17 @@ def test_word_addin_suggest_items_and_render(web):
     assert len(d["bibliography"]) == 3 and any("Kept in the document" in b for b in d["bibliography"])
     _, d, _ = call(web, "POST", "/api/word-addin/render", {"style": "ieee", "citations": cits})
     assert d["citations"][:2] == ["[1]", "[1], [2]"]
+
+
+def test_extension_list_of_papers_without_text(web):
+    """The extension notices a paper you open that's in the library without its text: Citrello gives it the list."""
+    import fulltext
+    from test_sources import PAPER
+    call(web, "POST", "/api/library/import", BIB + WANG, {"X-Filename": "refs.bib"})
+    keys = {it["title"][:5]: it["key"] for it in call(web, "GET", "/api/library?project=*")[1]["items"]}
+    fulltext.attach(keys["Blade"], PAPER, "pdf")
+    _, d, _ = call(web, "POST", "/api/clip/missing", {})
+    got = {m["key"]: m for m in d["missing"]}
+    assert keys["Blade"] not in got and keys["Susta"] in got                     # the one with text isn't listed
+    assert got[keys["Susta"]]["doi"] == "10.1016/j.renene.2016.10.066"
+    assert got[keys["Susta"]]["title"] == "sustainable decommissioning of an offshore wind farm"

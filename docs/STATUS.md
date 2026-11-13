@@ -227,6 +227,11 @@ manifest: `site/public/word/manifest.xml` (id ef6ca1ae-67cf-48fb-89a7-189c074612
   fetched page at each step). Armin chose: the search step runs on Haiku 5.5 (`AI_WEB_MODEL`), search results only (no
   web_fetch), at most 3 searches, effort low: expected ~3-5 cents (1 cent per search + cheap tokens). Sonnet still checks
   the papers found against their full text afterwards. Not yet measured with the real API (ai-real-test.yml).
+- **Extension notice (13 Nov 2026):** with page access granted (bulk fetch, or "Turn it on" in the toolbar panel /
+  options), every page that loads is compared on the device with Citrello's list of library papers without text
+  (`/api/clip/missing`, cached 5 min, only from an already-open Citrello tab): DOI from citation tags or the address,
+  else the citation title. Match: orange "+" badge and a box on the page, "Add its text" (grab or linked PDF →
+  `/api/clip/fulltext`). Privacy page and store listing updated. Needs the extension republished to reach people.
 - Windows install when "More Add-ins" is greyed out (university accounts): the PowerShell line on citrello.app/word
   registers the manifest under HKCU\Software\Microsoft\Office\16.0\WEF\Developer (worked for Armin).
 - **Next:** Armin tries it in Word on the web (citrello.app/word steps); Pro "Find me a new paper" and "Check this

@@ -476,3 +476,69 @@ console.log(JSON.stringify([doiUrl(process.argv[2]), doiPdfUrls('10.21236/ada213
                                     capture_output=True, text=True, check=True).stdout)
     assert out[0] == "https://doi.org/10.1002/(sici)1099-159x(199603/04)4%3A2%3C155%3A%3Aaid-pip128%3E3.0.co%3B2-%23"
     assert out[1] == ["https://apps.dtic.mil/sti/pdfs/ADA213404.pdf"] and out[2] == ["https://arxiv.org/pdf/1706.03762"]
+
+
+def test_extension_notices_a_paper_in_the_library_without_its_text(tmp_path):
+    """Opening a paper's page that's in the library without its text: a badge and a box on the page say so by
+    themselves, and "Add its text" keeps the text. Pages Citrello doesn't know (or that have their text) say nothing."""
+    from playwright.sync_api import expect, sync_playwright
+    sys.path.insert(0, os.path.dirname(__file__))
+    import test_doccheck as T
+    from test_web_app import publisher_site
+    pdf = str(tmp_path / "vetters.pdf")
+    T.make_pdf(pdf, [["Sailing through end-of-life challenges"] + [f"Section {i} about offshore wind." for i in range(40)]])
+    site, srv = publisher_site(pdf)
+    ext = str(tmp_path / "ext")
+    subprocess.run([sys.executable, os.path.join(ROOT, "packaging", "build_extension.py"), "--test", ext], check=True)
+    bib = tmp_path / "refs.bib"  # Topham by its DOI (the page names it in its citation tags), LeCun with no link
+    bib.write_text("@article{topham2017, title={Sustainable decommissioning of an offshore wind farm}, year={2017},"
+                   " doi={10.1016/j.renene.2016.10.066}}\n", encoding="utf-8")
+    shots = os.environ.get("CITRELLO_E2E_SHOTS") or str(tmp_path)
+    try:
+        with sync_playwright() as pw:
+            ctx = pw.chromium.launch_persistent_context(str(tmp_path / "profile"), channel="chromium", headless=HEADLESS,
+                                                        viewport={"width": 1280, "height": 800},
+                                                        args=[f"--disable-extensions-except={ext}", f"--load-extension={ext}"])
+            sw = ctx.service_workers[0] if ctx.service_workers else ctx.wait_for_event("serviceworker", timeout=15000)
+            sw.evaluate("base => chrome.storage.local.set({testAppBase: base})", BASE)
+            page = ctx.pages[0] if ctx.pages else ctx.new_page()
+            errors = []
+            page.on("pageerror", lambda e: errors.append(str(e)))
+            page.goto(BASE + "/app/")
+            page.wait_for_selector("#webCover", state="detached", timeout=LOAD)
+            page.click("#wWebStart")
+            page.wait_for_function("typeof extVersion !== 'undefined' && extVersion", timeout=15000)
+            page.click('.side button.navb[data-tab="library"]')
+            page.click("#openImport")
+            page.click('[data-guide="imp-file"]')
+            page.set_input_files("#importFile", str(bib))
+            expect(page.locator("#libRows .ref")).to_have_count(1, timeout=60000)
+            page.keyboard.press("Escape")
+
+            # a page Citrello doesn't know: nothing
+            other = ctx.new_page()
+            other.goto(site + "/nothing.html")
+            other.wait_for_timeout(2500)
+            assert other.locator("#citrello-notice").count() == 0
+            other.close()
+            # the paper's page: the box comes by itself, with a badge on the icon
+            paper = ctx.new_page()
+            paper.goto(site + "/article.html")
+            box = paper.locator("#citrello-notice")
+            expect(box).to_contain_text("in your library, but Citrello doesn't have its full text", timeout=30000)
+            tab_id = sw.evaluate("async (url) => (await chrome.tabs.query({url}))[0].id", site + "/article.html")
+            assert sw.evaluate("async (tabId) => await chrome.action.getBadgeText({tabId})", tab_id) == "+"
+            paper.screenshot(path=os.path.join(shots, "extension-notice.png"))
+            box.locator("#add").click()
+            expect(box).to_contain_text("Full text added", timeout=60000)
+            assert sw.evaluate("async (tabId) => await chrome.action.getBadgeText({tabId})", tab_id) == "✓"
+            page.bring_to_front()
+            expect(page.locator("#libChips")).to_contain_text("1 with full text", timeout=30000)
+            # opened again: it has its text now, so no box
+            paper.reload()
+            paper.wait_for_timeout(2500)
+            assert paper.locator("#citrello-notice").count() == 0
+            assert not errors, errors
+            ctx.close()
+    finally:
+        srv.shutdown()
