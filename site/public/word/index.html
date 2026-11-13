@@ -76,13 +76,16 @@
   </article>
   <article>
     <h2>Word on Windows</h2>
+    <p class="note">Works even when “More Add-ins” is greyed out (common with university accounts).</p>
     <ol>
-      <li><a href="/word/manifest.xml" download="citrello-word-addin.xml">Download Citrello's add-in file</a>.</li>
-      <li>In Word, <b>Home</b> tab → <b>Add-ins</b> → <b>More Add-ins</b> → <b>My Add-ins</b>.</li>
-      <li>If you see <b>Upload My Add-in</b>, choose the file. If you don't (some versions hide it), use Word on the
-        web until Citrello is in Microsoft's store, or the Citrello tab that comes with
-        <a href="/download">Citrello for Windows</a>.</li>
+      <li>Close Word.</li>
+      <li>Click <b>Start</b>, type <b>PowerShell</b> and open <b>Windows PowerShell</b> (no administrator rights needed).</li>
+      <li>Paste this line (right-click pastes) and press <b>Enter</b>. It downloads Citrello's add-in file to your user
+        folder and tells Word where it is; you should see <b>Done</b>.
+        <pre style="white-space:pre-wrap;word-break:break-all;font-size:13px;background:var(--sky);padding:10px;border-radius:10px">$f="$env:USERPROFILE\Citrello-Word-addin.xml"; Invoke-WebRequest https://citrello.app/word/manifest.xml -OutFile $f; New-Item -Path HKCU:\Software\Microsoft\Office\16.0\WEF\Developer -Force | Out-Null; Set-ItemProperty -Path HKCU:\Software\Microsoft\Office\16.0\WEF\Developer -Name Citrello -Value $f; "Done"</pre></li>
+      <li>Open Word: <b>Home → Add-ins</b>, then <b>Citrello</b> under My Add-ins.</li>
     </ol>
+    <p class="note">To remove it: <code>Remove-ItemProperty -Path HKCU:\Software\Microsoft\Office\16.0\WEF\Developer -Name Citrello</code></p>
   </article>
   <article id="greyed">
     <h2>“More Add-ins” is greyed out?</h2>

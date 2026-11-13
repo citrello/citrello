@@ -50,6 +50,10 @@
   details summary { cursor: pointer; color: var(--cobalt); font-size: 12.5px; margin-top: 2px; }
   details .small { margin-top: 4px; } details input[type=text] { padding: 3px 6px; border-radius: 6px; }
   a { color: var(--cobalt); }
+  #doc ul.issues { margin: 6px 0 0; padding-left: 18px; font-size: 13px; } #doc ul.issues li { margin: 4px 0; }
+  #doc .lvl-problem { color: var(--err); } #doc .lvl-check { color: var(--warn); }
+  #doc summary { font-weight: 600; font-size: 13.5px; color: var(--ink); margin-top: 8px; }
+  #doc .big { font-size: 15px; } #doc .chk { font-size: 13px; }
   .chk { display: flex; gap: 6px; align-items: flex-start; margin-top: 8px; } .chk input { margin-top: 3px; flex: none; }
   .spinner { display: inline-block; width: 14px; height: 14px; border: 2px solid var(--line); border-top-color: var(--cobalt); border-radius: 50%; animation: spin .8s linear infinite; vertical-align: -2px; margin-right: 6px; }
   @keyframes spin { to { transform: rotate(360deg); } }
@@ -74,6 +78,10 @@
   </div>
 
   <div id="main" class="hidden">
+    <div id="doc" class="card hidden" aria-live="polite">
+      <h2>This document</h2>
+      <div id="docBody"></div>
+    </div>
     <div id="suggest" class="card sug hidden" aria-live="polite">
       <p class="small" id="sugTitle"></p>
       <ul class="results" id="sugList" aria-label="Suggested papers"></ul>

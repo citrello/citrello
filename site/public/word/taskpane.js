@@ -34,17 +34,19 @@
       else if (m.type === "ready") readyResolve();
       else if (m.type === "error") { $("loadingText").textContent = m.text; readyReject(new Error(m.text)); }
       else if (m.type === "response" && pending.has(m.id)) { pending.get(m.id)(m); pending.delete(m.id); }
+      else if (m.type === "progress" && m.body) onProgress(m.path, m.body);
     };
     worker.onerror = (e) => { $("loadingText").textContent = "Citrello couldn't start: " + (e.message || "unknown error"); readyReject(e); };
   }
-  async function api(method, path, body) {
+  async function api(method, path, body, extraHeaders) {
     await ready;
     const raw = body === undefined ? null : body instanceof ArrayBuffer ? new Uint8Array(body)
       : new TextEncoder().encode(JSON.stringify(body));
     const m = await new Promise((resolve) => {
       const id = ++nextId;
       pending.set(id, resolve);
-      worker.postMessage({ type: "request", id, method, path, headers: raw && !(body instanceof ArrayBuffer) ? { "Content-Type": "application/json" } : {}, body: raw });
+      const headers = raw && !(body instanceof ArrayBuffer) ? { "Content-Type": "application/json" } : {};
+      worker.postMessage({ type: "request", id, method, path, headers: { ...headers, ...(extraHeaders || {}) }, body: raw });
     });
     const text = new TextDecoder().decode(m.body);
     let data = text;
@@ -119,6 +121,7 @@
     await loadStyles();
     await pullLibrary();
     search();
+    checkDocument().catch((e) => docSay(e.message, "err"));
     setInterval(() => pullLibrary(true), 5 * 60 * 1000);  // new references added in Citrello arrive by themselves
   }
 
@@ -414,6 +417,156 @@
 
   let selTimer = null;
   function onSelection() { clearTimeout(selTimer); selTimer = setTimeout(() => updateContext().catch(() => {}), 350); }
+
+  // ---------- this document: other citations become Citrello's, and its references are checked ----------
+  // Word gives the panel a copy of the file; Citrello's "Check and fix" reads every kind of citation in it (Zotero,
+  // Mendeley, EndNote, Word's own, typed, the web app's) and checks the references online. Converting keeps the
+  // text: each citation is wrapped in Citrello's content control (docconvert.py), then the whole document is
+  // formatted in the chosen style with Track Changes on, so every change can be accepted or rejected.
+  let docCheck = null, docPlan = null, docReport = null, docBusy = false;
+  const sigOf = (t) => String(t || "").normalize("NFKD").replace(/[̀-ͯ]/g, "").toLowerCase().replace(/[^0-9a-z]+/g, "");
+  function docSay(html, kind) {
+    show("doc", true);
+    $("docBody").innerHTML = kind ? `<div class="notice ${kind}">${html}</div>` : html;
+  }
+  function onProgress(path, body) {
+    if (!docBusy || path !== "/api/doccheck/" + docCheck) return;
+    try {
+      const st = JSON.parse(body);
+      if (st.step) docSay(`<p class="small"><span class="spinner"></span>${esc(st.step)}${st.n ? ` (${st.i} of ${st.n})` : ""}…</p>`);
+    } catch {}
+  }
+  function readFile() {  // the document as a .docx, from Word
+    return new Promise((resolve, reject) => {
+      Office.context.document.getFileAsync(Office.FileType.Compressed, { sliceSize: 4194304 }, (r) => {
+        if (r.status !== "succeeded") return reject(new Error("Word didn't give Citrello a copy of the document."));
+        const f = r.value, parts = [];
+        const next = (i) => f.getSliceAsync(i, (sl) => {
+          if (sl.status !== "succeeded") { f.closeAsync(); return reject(new Error("Word didn't give Citrello a copy of the document.")); }
+          parts.push(new Uint8Array(sl.value.data));
+          if (i + 1 < f.sliceCount) return next(i + 1);
+          f.closeAsync();
+          const out = new Uint8Array(parts.reduce((n, p) => n + p.length, 0));
+          let at = 0;
+          parts.forEach((p) => { out.set(p, at); at += p.length; });
+          resolve(out.buffer);
+        });
+        next(0);
+      });
+    });
+  }
+  async function checkDocument() {
+    if (docBusy) return;
+    docBusy = true; docPlan = docReport = null;
+    docSay('<p class="small"><span class="spinner"></span>Reading this document…</p>');
+    try {
+      const file = await readFile();
+      docCheck = (await api("POST", "/api/doccheck", file, { "X-Filename": "document.docx" })).id;
+      let st = await get("/api/doccheck/" + docCheck);  // answered once the check has run
+      while (st.state === "checking") { await new Promise((r) => setTimeout(r, 1000)); st = await get("/api/doccheck/" + docCheck); }
+      if (st.state === "error") {
+        docBusy = false;
+        if (/No references found/.test(st.error || "")) return docSay('<p class="small muted">No citations in this document yet. Cite from your library below.</p>');
+        return docSay(esc(st.error), "err");
+      }
+      docReport = st.report;
+      docPlan = await post("/api/word-addin/plan", { id: docCheck });
+    } finally { docBusy = false; }
+    renderDoc();
+  }
+  // what converting fixes by itself: duplicates become one reference, the reference list is rebuilt from the citations
+  const FIXED_BY_CONVERTING = /listed more than once|reference list has \d+ entries|Refresh the bibliography|No reference list|Listed twice/i;
+  function problemsHtml() {
+    const r = docReport, converted = docPlan && docPlan.converted;
+    let fixed = 0;
+    const keep = (text) => { if (converted && FIXED_BY_CONVERTING.test(text)) { fixed++; return false; } return true; };
+    const issues = r.citation_issues.filter((i) => i.level !== "info" && keep(i.text)).map((i) => ({ level: i.level, text: i.text }));
+    for (const ref of r.refs) {
+      if (ref.reliability !== "problem" && ref.reliability !== "check") continue;
+      const left = (ref.checks || []).filter((c) => keep(c.text));
+      if (!left.length && (ref.checks || []).length) continue;
+      const what = left.map((c) => c.text).join(" ");
+      issues.push({ level: ref.reliability, text: `[${ref.number}] ${ref.authors || ""}${ref.year ? " (" + ref.year + ")" : ""}: ${what || ref.title}` });
+    }
+    const fixedNote = fixed ? '<p class="small" style="color:var(--ok)">✓ Fixed while converting: duplicate references merged into one, and the reference list rebuilt from the citations.</p>' : "";
+    const online = fixedNote + (r.online ? "" : '<p class="small muted">Couldn\'t check the references online (no internet?): only the document itself was checked.</p>');
+    if (!issues.length && fixed) return online;
+    if (!issues.length) return `<p class="small" style="color:var(--ok)">✓ No problems found in the ${r.references} references${r.online ? " (checked online)" : ""}.</p>` + online;
+    const n = issues.length;
+    return `<details ${n <= 6 ? "open" : ""}><summary>${n} thing${n === 1 ? "" : "s"} to look at</summary><ul class="issues">` +
+      issues.map((i) => `<li class="lvl-${i.level === "problem" ? "problem" : "check"}">${esc(i.text)}</li>`).join("") + "</ul></details>" + online;
+  }
+  function renderDoc(done) {
+    const p = docPlan;
+    if (!p) return;
+    let html = "";
+    if (done) html += `<div class="notice ok">${done}</div>`;
+    if (p.citations) {
+      const by = Object.entries(p.by).map(([k, v]) => `${esc(k)} (${v})`).join(", ");
+      html += `<p class="big"><b>${p.citations} citation${p.citations === 1 ? "" : "s"}</b> made with ${by} can become Citrello citations, so you can edit them here.` +
+        `${p.bibliography && p.bibliography.kind !== "done" ? " The reference list becomes Citrello's too." : ""}</p>` +
+        `<label class="chk"><input type="checkbox" id="docTrack" checked> Show the changes as tracked changes (accept or reject them in Review)</label>` +
+        `<div class="row"><button class="primary" id="docConvert">Make them Citrello citations</button></div>`;
+    } else if (p.already) {
+      html += `<p class="small">All ${p.already} citation${p.already === 1 ? " is a Citrello citation" : "s are Citrello citations"}.</p>`;
+    }
+    html += problemsHtml();
+    html += '<div class="row"><button class="link" id="docAgain">Check again</button></div>';
+    docSay(html);
+    if ($("docConvert")) $("docConvert").onclick = () => convertDoc().catch((e) => { docBusy = false; renderDoc(); say("Couldn't convert: " + e.message); });
+    $("docAgain").onclick = () => checkDocument().catch((e) => docSay(esc(e.message), "err"));
+  }
+
+  async function convertDoc() {
+    if (docBusy || !docPlan) return;
+    docBusy = true;
+    const track = $("docTrack") && $("docTrack").checked;
+    const canTrack = !!(Office.context.requirements && Office.context.requirements.isSetSupported("WordApi", "1.4"));
+    let original = null, done = 0, missing = 0;
+    docSay('<p class="small"><span class="spinner"></span>Converting the citations…</p>');
+    try {
+      await Word.run(async (ctx) => {
+        const doc = ctx.document;
+        if (canTrack) {  // the conversion itself changes no text: not tracked
+          doc.load("changeTrackingMode"); await ctx.sync();
+          original = doc.changeTrackingMode;
+          doc.changeTrackingMode = "Off"; await ctx.sync();
+        }
+        const paras = doc.body.paragraphs;
+        paras.load("items/text"); await ctx.sync();
+        const bySig = new Map();
+        paras.items.forEach((p) => { const k = sigOf(p.text); if (!bySig.has(k)) bySig.set(k, []); bySig.get(k).push(p); });
+        const find = (t) => t && (bySig.get(t.sig) || [])[t.nth];
+        const bib = docPlan.bibliography;  // the reference list: wrapped as it is, rewritten in the style below
+        if (bib && bib.kind === "paragraphs") {
+          const a = find(bib.first), b = find(bib.last);
+          if (a && b) { const cc = a.getRange("Whole").expandTo(b.getRange("Whole")).insertContentControl(); cc.tag = BIB; cc.title = "Citrello reference list"; }
+        } else if (bib && bib.kind === "cc") {
+          const ccs = doc.contentControls; ccs.load("items/tag"); await ctx.sync();
+          ccs.items.filter((c) => (c.tag || "").toUpperCase().startsWith(bib.tag)).forEach((c) => { c.tag = BIB; c.title = "Citrello reference list"; });
+        }
+        await ctx.sync();
+        for (const t of docPlan.paragraphs) {
+          const p = find(t);
+          if (!p) { missing += t.count; continue; }
+          const ox = p.getOoxml(); await ctx.sync();
+          const r = await post("/api/word-addin/convert", { id: docCheck, ooxml: ox.value });
+          if (r.count) { p.getRange("Content").insertOoxml(r.ooxml, "Replace"); await ctx.sync(); done += r.count; }
+          docSay(`<p class="small"><span class="spinner"></span>Converting the citations… ${done} of ${docPlan.citations}</p>`);
+        }
+        if (canTrack && track) { doc.changeTrackingMode = "TrackAll"; await ctx.sync(); }
+      });
+      await refresh();  // every citation and the list in the chosen style: these are the visible (tracked) changes
+    } finally {
+      if (canTrack && original !== null) await Word.run(async (ctx) => { ctx.document.changeTrackingMode = original; await ctx.sync(); }).catch(() => {});
+      docBusy = false;
+    }
+    const notes = (docPlan.notes || []).length ? `<br>Left as they were: ${docPlan.notes.map(esc).join("; ")}` : "";
+    const lost = missing ? `<br>${missing} couldn't be found again in the document (was it edited meanwhile?): press Check again.` : "";
+    docPlan = { ...docPlan, citations: 0, already: (docPlan.already || 0) + done, paragraphs: [], converted: true };
+    renderDoc(`Done: ${done} citation${done === 1 ? " is" : "s are"} now Citrello citations` +
+      (canTrack && track ? ". The changes are tracked: Review → Accept or Reject." : ".") + notes + lost);
+  }
 
   // ---------- start ----------
   Office.onReady(async (info) => {

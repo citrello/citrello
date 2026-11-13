@@ -11,6 +11,7 @@ Run the bridge (see bridge/README.md) and serve the site, then:
 import gzip
 import json
 import os
+import re
 import time
 import urllib.parse
 import urllib.request
@@ -54,6 +55,97 @@ def save_cloud_copy(email):
         assert r.status == 200
 
 
+def blank_docx(tmp_path):
+    import docx
+    path = str(tmp_path / "blank.docx")
+    docx.Document().save(path)
+    return path
+
+
+def word_document(path):
+    """What the stand-in for Word needs: the .docx, and each paragraph's text and XML as Word gives them."""
+    import base64
+    import docx
+    from lxml import etree
+    import docconvert
+    from test_docconvert import PKG
+    paras = docconvert.body_paras(docx.Document(path).element.body)
+    return {"file": base64.b64encode(open(path, "rb").read()).decode(),
+            "paragraphs": [{"text": docconvert.para_text(p), "xml": PKG.format(etree.tostring(p, encoding="unicode"))}
+                           for p in paras]}
+
+
+def sign_in(page, email):
+    from playwright.sync_api import expect
+    expect(page.locator("#signin")).to_be_visible(timeout=LOAD)
+    page.fill("#siEmail", email)
+    page.click("#siSend")
+    expect(page.locator("#siStep2")).to_be_visible(timeout=30000)
+    page.fill("#siCode", B.bc.start_sign_in(email)["dev_code"])
+    page.click("#siVerify")
+
+
+def test_word_addin_turns_zotero_citations_into_its_own(tmp_path):
+    """A paper written with Zotero: the panel counts its citations, lists the problems, and converts them in place
+    (text kept, fields gone), then restyles them and the reference list with Track Changes on."""
+    import docx
+    from playwright.sync_api import expect, sync_playwright
+    from test_doccheck import TOPHAM, VETTERS, add_field, csl_field
+    email = f"wordconv-{int(time.time())}@example.com"
+    shots = os.environ.get("CITRELLO_E2E_SHOTS") or str(tmp_path)
+    save_cloud_copy(email)
+    dup = dict(TOPHAM, id="t2", title=TOPHAM["title"] + ".")  # the same paper saved twice in Zotero
+    d = docx.Document()
+    p = d.add_paragraph("Decommissioning is costly ")
+    add_field(p, csl_field([TOPHAM], zotero=True), "(Topham 2017)")
+    p.add_run(" today.")
+    p = d.add_paragraph("It was reviewed ")
+    add_field(p, csl_field([VETTERS, dup], zotero=True), "(Vetters 2024; Topham 2017)")
+    p.add_run(".")
+    d.add_heading("References", level=1)
+    d.add_paragraph("Topham E (2017) Sustainable decommissioning of an offshore wind farm.")
+    d.add_paragraph("Vetters J (2024) Sailing through end-of-life challenges.")
+    path = str(tmp_path / "zotero.docx")
+    d.save(path)
+    errors = []
+    with sync_playwright() as pw:
+        b = pw.chromium.launch()
+        page = b.new_page(viewport={"width": 360, "height": 900})
+        page.route("https://appsforoffice.microsoft.com/**", lambda r: r.fulfill(path=MOCK, content_type="text/javascript"))
+        page.on("pageerror", lambda e: errors.append(str(e)))
+        controls = lambda: page.evaluate("__doc.controls()")  # noqa: E731
+        page.goto(f"{BASE}/word/taskpane.html?bridge={urllib.parse.quote(B.bc.BRIDGE)}")
+        page.evaluate("d => __doc.load(d)", word_document(path))
+        sign_in(page, email)
+
+        card = page.locator("#doc")
+        expect(card).to_contain_text("2 citations made with Zotero (2) can become Citrello citations", timeout=180000)
+        expect(card).to_contain_text("The reference list becomes Citrello's too")
+        expect(card).to_contain_text("listed more than once")                     # the problems found
+        page.screenshot(path=os.path.join(shots, "word-document-check.png"))
+        page.click("#docConvert")
+        expect(card).to_contain_text("Done: 2 citations are now Citrello citations", timeout=60000)
+        expect(card).to_contain_text("The changes are tracked")
+        expect(card).to_contain_text("Fixed while converting: duplicate references merged")
+        expect(card).not_to_contain_text("listed more than once")
+        cits = [c for c in controls() if c["tag"].startswith("CITRELLO_CITATION_v1_")]
+        bib = [c for c in controls() if c["tag"] == "CITRELLO_BIBLIOGRAPHY"]
+        # APA, the duplicate merged; online, the details come from Crossref (all the authors: "Topham & McMillan")
+        t1, t2 = [c["text"] for c in cits]
+        assert re.fullmatch(r"\(Topham[^;]*, 2017\)", t1) and re.fullmatch(r"\(Topham[^;]*, 2017; Vetters[^;]*, 2024\)", t2)
+        assert len(bib) == 1 and bib[0]["text"].startswith("Topham, E.") and "Vetters, J." in bib[0]["text"]
+        assert bib[0]["text"].count("\n") == 1                                     # two entries
+        text = page.evaluate("__doc.text()")
+        assert text.startswith(f"Decommissioning is costly {t1} today.\nIt was reviewed {t2}.")
+        assert page.evaluate("__doc.trackLog") == ["Off", "TrackAll", "Off"]       # restyled with Track Changes on
+        page.screenshot(path=os.path.join(shots, "word-document-converted.png"))
+        # the converted citations are the add-in's own: click one, its papers are listed
+        page.evaluate("__doc.clickControl(1)")
+        expect(page.locator("#curList li")).to_have_count(2, timeout=10000)
+        assert not errors, errors
+        b.close()
+
+
 def test_word_addin_cites_suggests_and_keeps_the_list(tmp_path):
     from playwright.sync_api import expect, sync_playwright
     email = f"word-{int(time.time())}@example.com"
@@ -69,6 +161,7 @@ def test_word_addin_cites_suggests_and_keeps_the_list(tmp_path):
         doc = lambda js: page.evaluate(js)  # noqa: E731
         controls = lambda: doc("__doc.controls()")  # noqa: E731
         page.goto(f"{BASE}/word/taskpane.html?bridge={urllib.parse.quote(B.bc.BRIDGE)}")
+        page.evaluate("d => __doc.load(d)", word_document(blank_docx(tmp_path)))  # a new, empty document
 
         # sign in with an emailed code: the library comes from the cloud copy
         expect(page.locator("#signin")).to_be_visible(timeout=LOAD)
@@ -79,6 +172,7 @@ def test_word_addin_cites_suggests_and_keeps_the_list(tmp_path):
         page.click("#siVerify")
         expect(page.locator("#libInfo")).to_contain_text("3 references", timeout=60000)
         expect(page.locator("#results li")).to_have_count(3)
+        expect(page.locator("#doc")).to_contain_text("No citations in this document yet", timeout=60000)
 
         # search and cite
         doc("__doc.type('Decommissioning is costly ')")

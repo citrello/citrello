@@ -41,6 +41,7 @@ import bridge_client
 import citrello_core as core
 import codex_config
 import doccheck
+import docconvert
 import sources
 import fulltext
 import arxiv
@@ -1317,6 +1318,22 @@ class Handler(BaseHTTPRequestHandler):
             except ValueError as e:
                 return self.send(400, {"error": str(e)})
             return self.send(200, check_public(m.group(1)))
+        m = re.fullmatch(r"/api/word-addin/(plan|convert)", path)
+        if m:  # the Word add-in: turning the document's other citations into its own (docconvert.py)
+            b = self.json_body()
+            c = CHECKS.get(str(b.get("id", "")))
+            if not c or not c.get("report"):
+                return self.send(404, {"error": "Check the document first."})
+            try:
+                if m.group(1) == "plan":
+                    c["word_plan"], summary = docconvert.make_plan(c["path"], c["report"])
+                    return self.send(200, summary)
+                if not c.get("word_plan"):
+                    return self.send(400, {"error": "Check the document first."})
+                ooxml, n = docconvert.convert_ooxml(c["word_plan"], str(b.get("ooxml", "")))
+                return self.send(200, {"ooxml": ooxml, "count": n})
+            except ValueError as e:
+                return self.send(400, {"error": str(e)})
         if path == "/api/word-addin/items":  # the Word add-in: what a citation stores about each paper
             data = library.load()
             out = []

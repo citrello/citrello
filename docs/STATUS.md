@@ -190,6 +190,19 @@ manifest: `site/public/word/manifest.xml` (id ef6ca1ae-67cf-48fb-89a7-189c074612
   (italic/bold/superscript) so it keeps the document's font.
 - **Tests:** `tests/test_word_addin_e2e.py` (Chromium, local bridge, `tests/office_mock.js` plays Word), unit tests in
   test_webapp.py and test_doccheck.py. **Not yet tried in real Word.**
+- **Bringing documents in (built 13 Nov 2026):** when the panel opens it reads the document (Office
+  getFileAsync → the engine's "Check and fix"), and the "This document" card says how many citations were made with
+  Zotero / Mendeley (Desktop, Cite) / EndNote / Word / the web app's fields / typed / [@Key] markers, and lists the
+  problems (online checks, duplicates, list mismatches). "Make them Citrello citations" converts in place:
+  `docconvert.py` (plan: target paragraphs by text signature + nth; convert: Word's paragraph XML from getOoxml →
+  each citation wrapped in a CITRELLO content control, text unchanged, fields removed) and the panel puts it back with
+  `getRange("Content").insertOoxml`; the reference list (typed paragraphs or Mendeley's control) becomes the
+  Citrello list. Then everything is restyled with Track Changes on (WordApi 1.4 changeTrackingMode; the structural
+  step runs with tracking off), so the visible changes are revisions. Duplicates merge into one key; online-corrected
+  details are used. **Untested in real Word**: getOoxml/insertOoxml on a paragraph's content and wrapping
+  multi-paragraph lists are the parts most likely to need adjusting.
+- Windows install when "More Add-ins" is greyed out (university accounts): the PowerShell line on citrello.app/word
+  registers the manifest under HKCU\Software\Microsoft\Office\16.0\WEF\Developer (worked for Armin).
 - **Next:** Armin tries it in Word on the web (citrello.app/word steps); Pro "Find me a new paper" and "Check this
   citation" (Claude, through the bridge); adding papers to the library from Word (needs the cloud copy to be saved
   back); desktop app's cloud copy (desktop-only users have no library in the add-in yet); Partner Center submission

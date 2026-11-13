@@ -12,7 +12,8 @@ on:
             # Claude checks: the bridge's AI endpoints and the screen that uses them
             "tests/test_bridge_ai_e2e.py", "tests/anthropic_mock.py", "ui.html", "sources.py",
             # Citrello for Word: its panel, the stand-in for Word and the engine's endpoints
-            "site/public/word/**", "tests/test_word_addin_e2e.py", "tests/office_mock.js", "app.py"]
+            "site/public/word/**", "tests/test_word_addin_e2e.py", "tests/office_mock.js", "app.py",
+            "docconvert.py", "doccheck.py"]
   workflow_dispatch:
 
 concurrency: bridge-deploy
