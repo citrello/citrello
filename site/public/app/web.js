@@ -83,6 +83,10 @@
   // BroadcastChannel (same site only), and that tab answers its /api/clip/ requests. With no tab open, the pop-up
   // opens Citrello itself.
   const CLIP = !!window.CITRELLO_CLIP;
+  // Citrello for Word opens this page to fetch papers (?word_fetch=…). When Citrello is already open in another tab,
+  // this tab uses that one (its sign-in and library) instead of saying "already open": every request goes there.
+  const WORD_FETCH = params.has("word_fetch") || (() => { try { return !!sessionStorage.getItem("citrelloWordFetch"); } catch { return false; } })();
+  const RELAY_OK = CLIP || WORD_FETCH;
   const channel = "BroadcastChannel" in window ? new BroadcastChannel("citrello-web-app") : null;
   const me = Math.random().toString(36).slice(2);
   let relay = false; // this pop-up's requests go to the open Citrello tab
@@ -97,7 +101,7 @@
     navigator.locks.request("citrello-web-app", { ifAvailable: true }, (lock) => {
       if (relay) return null;
       if (!lock) {
-        if (CLIP) {  // the open tab is still starting: keep asking it
+        if (RELAY_OK) {  // the open tab (maybe still starting): keep asking it
           coverText("Waiting for your open Citrello tab…");
           setTimeout(() => { askOpenTab(); if (!relay) setTimeout(startHere, 1000); }, 500);
           return null;
@@ -113,7 +117,7 @@
 
   if (channel) channel.addEventListener("message", async (ev) => {
     const m = ev.data || {};
-    if (m.type === "pong" && m.to === me && CLIP && !worker && !relay) {
+    if (m.type === "pong" && m.to === me && RELAY_OK && !worker && !relay) {
       relay = true;
       hideCover();
       readyResolve();
@@ -126,7 +130,7 @@
     } else if (m.type === "request" && m.to === "open-tab" && worker && !relay) {
       const url = new URL(m.path, location.origin);
       let res;
-      if (!url.pathname.startsWith("/api/clip/")) {  // the pop-up only adds what it found
+      if (!m.tab && !url.pathname.startsWith("/api/clip/")) {  // the pop-up only adds what it found (a tab: anything)
         res = { status: 403, ctype: "application/json", body: new TextEncoder().encode('{"error":"not allowed"}') };
       } else {
         const r = await apiFetch(url, { method: m.method, headers: m.headers, body: m.body });
@@ -172,7 +176,7 @@
     const id = ++nextId;
     const m = await new Promise((resolve) => {
       pending.set(id, resolve);
-      if (relay) channel.postMessage({ type: "request", to: "open-tab", from: me, id, method,
+      if (relay) channel.postMessage({ type: "request", to: "open-tab", from: me, id, method, tab: !CLIP,
                                        path: url.pathname + url.search, headers, body });
       else worker.postMessage({ type: "request", id, method,
                                 path: url.pathname + url.search, headers, body }, body ? [body.buffer] : []);

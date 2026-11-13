@@ -433,3 +433,75 @@ def test_word_addin_gets_paywalled_papers_through_the_web_app(tmp_path):
     finally:
         srv.shutdown()
         srv.server_close()
+
+
+def test_word_fetch_uses_the_citrello_tab_already_open(tmp_path):
+    """Citrello is already open (and signed in) in a tab: the tab Word opens uses it, so there's no "already open in
+    another tab" and no second sign-in; the extension's papers are saved there and Word carries on."""
+    import anthropic_mock
+    from playwright.sync_api import expect, sync_playwright
+    from test_sources import PAPER
+    srv = anthropic_mock.start()
+    anthropic_mock.SEEN.clear()
+    email = f"wordtab-{int(time.time())}@example.com"
+    lib = {"projects": [], "items": [dict(i) for i in LIBRARY["items"]]}
+    for it in lib["items"]:
+        if it["key"] == "wang2020":
+            it["csl"] = dict(it["csl"], DOI="10.5555/citrello.test.blades")
+    save_cloud_copy(email, lib)
+    errors = []
+    try:
+        with sync_playwright() as pw:
+            b = pw.chromium.launch()
+            ctx = b.new_context(viewport={"width": 1280, "height": 900})
+            ctx.add_init_script(FAKE_EXTENSION + f"\nwindow.__PAPER = {json.dumps(PAPER)};")
+            # the person's Citrello tab: open and signed in
+            web = ctx.new_page()
+            web.on("pageerror", lambda e: errors.append("web: " + str(e)))
+            web.on("dialog", lambda d: d.accept())
+            web.goto(f"{BASE}/app/?bridge={urllib.parse.quote(B.bc.BRIDGE)}")
+            web.wait_for_selector("#webCover", state="detached", timeout=LOAD)
+            web.click("#wWebStart")
+            web.click('.side button.navb[data-tab="settings"]')
+            web.fill("#acctEmail", email)
+            web.click("#acctSend")
+            expect(web.locator("#acctCodeRow")).to_be_visible(timeout=30000)
+            web.fill("#acctCode", B.bc.start_sign_in(email)["dev_code"])
+            web.click("#acctVerify")
+            expect(web.locator("#acctConn")).to_contain_text("while this tab is open", timeout=30000)
+
+            word = ctx.new_page()
+            word.set_viewport_size({"width": 360, "height": 1000})
+            word.route("https://appsforoffice.microsoft.com/**", lambda r: r.fulfill(path=MOCK, content_type="text/javascript"))
+            word.on("pageerror", lambda e: errors.append("word: " + str(e)))
+            word.goto(f"{BASE}/word/taskpane.html?bridge={urllib.parse.quote(B.bc.BRIDGE)}")
+            word.evaluate("d => __doc.load(d)", word_document(blank_docx(tmp_path)))
+            sign_in(word, email)
+            expect(word.locator("#libInfo")).to_contain_text("3 references", timeout=60000)
+            word.evaluate("__doc.type('Recycling turbine blades at scale is now feasible and saves money ')")
+            word.fill("#q", "blade recycling")
+            expect(word.locator("#results li")).to_have_count(1)
+            expect(word.locator("#results li")).to_contain_text("Blade recycling")
+            word.click("#results button:has-text('Cite')")
+            word.wait_for_function("__doc.controls().length === 1", timeout=30000)
+            word.evaluate("__doc.clickControl(0)")
+            word.click("#claimCheck")
+            expect(word.locator("#getAccess")).to_be_visible(timeout=120000)
+            word.click("#getAccess")
+            word.wait_for_function("__doc.opened.length === 1", timeout=60000)
+
+            # the tab Word opens: no "already open", no sign-in; it uses the open tab and goes straight on
+            second = ctx.new_page()
+            second.on("pageerror", lambda e: errors.append("second: " + str(e)))
+            second.goto(word.evaluate("__doc.opened[0]"))
+            second.wait_for_selector("#webCover", state="detached", timeout=LOAD)
+            dlg = second.locator("#wfDlg")
+            expect(dlg).to_contain_text("Go back to Word", timeout=120000)
+            assert "Sign in" not in dlg.inner_text()
+            assert second.evaluate("window.__fetched") == ["wang2020"]
+            expect(word.locator("#claimOut .verdict:not(.none)")).to_have_count(1, timeout=120000)
+            assert not errors, errors
+            b.close()
+    finally:
+        srv.shutdown()
+        srv.server_close()
