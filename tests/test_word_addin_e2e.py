@@ -505,3 +505,76 @@ def test_word_fetch_uses_the_citrello_tab_already_open(tmp_path):
     finally:
         srv.shutdown()
         srv.server_close()
+
+
+def test_word_addin_fixes_its_own_citations_and_comments_the_rest(tmp_path):
+    """A document whose citations are Citrello's already: "Fix them" corrects the details found online (the year) and
+    merges the same paper under two keys, with Track Changes on; what only the writer can fix (a [@Key] marker for a
+    paper that isn't in the library) becomes a Word comment on that text."""
+    import base64 as b64
+    import docx
+    from docx.oxml import parse_xml
+    from docx.oxml.ns import nsdecls
+    from playwright.sync_api import expect, sync_playwright
+    from test_doccheck import TOPHAM, VETTERS
+
+    def cc(items, shown):
+        payload = {"citationID": "x" + shown[:3], "citationItems": [{"id": k, "itemData": dict(c, id=k)} for k, c in items],
+                   "properties": {"noteIndex": 0}}
+        tag = "CITRELLO_CITATION_v1_" + b64.b64encode(json.dumps(payload).encode()).decode()
+        return parse_xml(f'<w:sdt {nsdecls("w")}><w:sdtPr><w:alias w:val="Citrello citation"/><w:tag w:val="{tag}"/></w:sdtPr>'
+                         f'<w:sdtContent><w:r><w:t>{shown}</w:t></w:r></w:sdtContent></w:sdt>')
+    old = dict(TOPHAM, issued={"date-parts": [[2016]]})  # a wrong year (Crossref says 2017)
+    dup = dict(TOPHAM, title=TOPHAM["title"] + ".")       # the same paper under another key
+    d = docx.Document()
+    p = d.add_paragraph("Costs are high ")
+    p._p.append(cc([("topham-a", old)], "(Topham, 2016)"))
+    p.add_run(".")
+    p = d.add_paragraph("Reviews agree ")
+    p._p.append(cc([("topham-b", dup), ("vetters", VETTERS)], "(Topham, 2016; Vetters, 2024)"))
+    p.add_run(".")
+    d.add_paragraph("Claude wrote this [@Nobody2020].")
+    path = str(tmp_path / "own.docx")
+    d.save(path)
+    email = f"wordfix-{int(time.time())}@example.com"
+    shots = os.environ.get("CITRELLO_E2E_SHOTS") or str(tmp_path)
+    save_cloud_copy(email)
+    errors = []
+    with sync_playwright() as pw:
+        b = pw.chromium.launch()
+        page = b.new_page(viewport={"width": 360, "height": 1000})
+        page.route("https://appsforoffice.microsoft.com/**", lambda r: r.fulfill(path=MOCK, content_type="text/javascript"))
+        page.on("pageerror", lambda e: errors.append(str(e)))
+        controls = lambda: page.evaluate("__doc.controls()")  # noqa: E731
+        page.goto(f"{BASE}/word/taskpane.html?bridge={urllib.parse.quote(B.bc.BRIDGE)}")
+        page.evaluate("d => __doc.load(d)", word_document(path))
+        sign_in(page, email)
+        card = page.locator("#doc")
+        expect(card).to_contain_text("Citrello can fix", timeout=180000)
+        expect(card).to_contain_text("1 duplicate merged into one reference")
+        expect(card).to_contain_text("the reference list added at the end of the document")
+        expect(page.locator("#docNotes")).to_be_visible()
+        page.screenshot(path=os.path.join(shots, "word-fix-them.png"))
+
+        page.click("#docFix")
+        expect(card).to_contain_text("Fixed:", timeout=60000)
+        cits = [c for c in controls() if c["tag"].startswith("CITRELLO_CITATION_v1_")]
+        ids = [[ci["id"] for ci in json.loads(b64.b64decode(c["tag"][len("CITRELLO_CITATION_v1_"):]))["citationItems"]] for c in cits]
+        assert ids == [["topham-a"], ["topham-a", "vetters"]]                       # merged under one key
+        assert "2017" in cits[0]["text"] and "2016" not in cits[0]["text"]          # the year from Crossref
+        assert "TrackAll" in page.evaluate("__doc.trackLog")
+        # the document had no reference list: one is added at the end, under a heading
+        expect(card).to_contain_text("a reference list added at the end")
+        assert {"text": "References", "style": "Heading1"} in page.evaluate("__doc.added()")
+        bib = [c for c in controls() if c["tag"] == "CITRELLO_BIBLIOGRAPHY"]
+        assert len(bib) == 1 and "Topham" in bib[0]["text"] and "Vetters" in bib[0]["text"]
+
+        page.click("#docNotes")
+        expect(card).to_contain_text("Added 1 comment", timeout=30000)
+        comments = page.evaluate("__doc.comments")
+        assert comments[0]["on"] == "[@Nobody2020" and "isn't in your library" in comments[0]["text"]
+        page.click("#docNotes")                                                      # again: no second copy
+        expect(card).to_contain_text("No new comments. 1 was there already", timeout=30000)
+        page.screenshot(path=os.path.join(shots, "word-comments.png"))
+        assert not errors, errors
+        b.close()

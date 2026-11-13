@@ -232,6 +232,13 @@ manifest: `site/public/word/manifest.xml` (id ef6ca1ae-67cf-48fb-89a7-189c074612
   (`/api/clip/missing`, cached 5 min, only from an already-open Citrello tab): DOI from citation tags or the address,
   else the citation title. Match: orange "+" badge and a box on the page, "Add its text" (grab or linked PDF →
   `/api/clip/fulltext`). Privacy page and store listing updated. Needs the extension republished to reach people.
+- **Fix them + comments in Word (13 Nov 2026):** for documents whose citations are Citrello's already, the card offers
+  "Fix them" (`docconvert.fixes`: details checked online written into each citation's itemData, the same paper under
+  two keys merged, existing keys kept; then restyled with Track Changes; a reference list added at the end under a
+  "References" heading when there's none, also after converting). "Add what needs you as comments"
+  (`docconvert.notes`, WordApi 1.4 `insertComment`): retracted / not found / DOI problems on each citation of that
+  paper, a typed [7] with no reference, [@Key] markers not in the library, entries never cited; problems that
+  fixing corrects and minor notes (No DOI, preprint, web page) are left out; no duplicates on a second press.
 - Windows install when "More Add-ins" is greyed out (university accounts): the PowerShell line on citrello.app/word
   registers the manifest under HKCU\Software\Microsoft\Office\16.0\WEF\Developer (worked for Armin).
 - **Next:** Armin tries it in Word on the web (citrello.app/word steps); Pro "Find me a new paper" and "Check this

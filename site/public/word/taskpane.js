@@ -435,7 +435,7 @@
   // Mendeley, EndNote, Word's own, typed, the web app's) and checks the references online. Converting keeps the
   // text: each citation is wrapped in Citrello's content control (docconvert.py), then the whole document is
   // formatted in the chosen style with Track Changes on, so every change can be accepted or rejected.
-  let docCheck = null, docPlan = null, docReport = null, docBusy = false;
+  let docCheck = null, docPlan = null, docReport = null, docBusy = false, docFixes = null, docNotes = [];
   const sigOf = (t) => String(t || "").normalize("NFKD").replace(/[̀-ͯ]/g, "").toLowerCase().replace(/[^0-9a-z]+/g, "");
   function docSay(html, kind) {
     show("doc", true);
@@ -483,11 +483,13 @@
       }
       docReport = st.report;
       docPlan = await post("/api/word-addin/plan", { id: docCheck });
+      docFixes = await post("/api/word-addin/fixes", { id: docCheck });   // for citations that are Citrello's already
+      docNotes = (await post("/api/word-addin/notes", { id: docCheck })).notes;  // what only the writer can fix
     } finally { docBusy = false; }
     renderDoc();
   }
   // what converting fixes by itself: duplicates become one reference, the reference list is rebuilt from the citations
-  const FIXED_BY_CONVERTING = /listed more than once|reference list has \d+ entries|Refresh the bibliography|No reference list|Listed twice/i;
+  const FIXED_BY_CONVERTING = /listed more than once|reference list has \d+ entries|Refresh the bibliography|No reference list|Listed twice|^Title differs|^Authors differ|^Year differs|was not found; the paper was found by its title/i;
   function problemsHtml() {
     const r = docReport, converted = docPlan && docPlan.converted;
     let fixed = 0;
@@ -522,11 +524,120 @@
     } else if (p.already) {
       html += `<p class="small">All ${p.already} citation${p.already === 1 ? " is a Citrello citation" : "s are Citrello citations"}.</p>`;
     }
+    const fixN = docFixes ? Object.keys(docFixes.changes || {}).length : 0;
+    if (!p.citations && fixN) {
+      const parts = [docFixes.corrected && `${docFixes.corrected} paper${docFixes.corrected === 1 ? "'s" : "s'"} details corrected from what was found online`,
+                     docFixes.merged && `${docFixes.merged} duplicate${docFixes.merged === 1 ? "" : "s"} merged into one reference`].filter(Boolean);
+      html += `<p class="big"><b>Citrello can fix ${fixN === 1 ? "one thing" : `${fixN} things`}:</b> ${parts.join(", ")}, and the reference list ${p.bibliography ? "rebuilt" : "added at the end of the document"}.</p>` +
+        `<label class="chk"><input type="checkbox" id="docTrack" checked> Show the changes as tracked changes (accept or reject them in Review)</label>` +
+        `<div class="row"><button class="primary" id="docFix">Fix them</button></div>`;
+    }
     html += problemsHtml();
+    if (docNotes.length && !p.citations) html += `<div class="row"><button id="docNotes">Add what needs you as comments</button></div>` +
+      `<p class="small muted">${docNotes.length} comment${docNotes.length === 1 ? "" : "s"} in the text, next to each problem, so you can find them (Review → Next).</p>`;
     html += '<div class="row"><button class="link" id="docAgain">Check again</button></div>';
     docSay(html);
     if ($("docConvert")) $("docConvert").onclick = () => convertDoc().catch((e) => { docBusy = false; renderDoc(); say("Couldn't convert: " + e.message); });
     $("docAgain").onclick = () => checkDocument().catch((e) => docSay(esc(e.message), "err"));
+    if ($("docFix")) $("docFix").onclick = () => fixDoc().catch((e) => { docBusy = false; renderDoc(); say("Couldn't fix: " + e.message); });
+    if ($("docNotes")) $("docNotes").onclick = () => notesDoc().catch((e) => { docBusy = false; renderDoc(); say("Couldn't add the comments: " + e.message); });
+  }
+
+  // No reference list in the document: one at the end, under a "References" heading (as a tracked change when on)
+  async function ensureBibliography(ctx) {
+    const { cits, bibs } = await readCitations(ctx);
+    if (bibs.length || !cits.length) return false;
+    const body = ctx.document.body;
+    const h = body.insertParagraph("References", "End");
+    h.styleBuiltIn = "Heading1";
+    const cc = body.insertParagraph("", "End").insertContentControl();
+    cc.tag = BIB;
+    cc.title = "Citrello reference list";
+    cc.insertText("[reference list]", "Replace");
+    await ctx.sync();
+    return true;
+  }
+
+  // Fix them (citations that are Citrello's already): each citation's papers get the details checked online, the same
+  // paper listed twice becomes one, then everything is restyled (and the list rebuilt) with Track Changes on
+  async function fixDoc() {
+    if (docBusy || !docFixes) return;
+    docBusy = true;
+    const track = $("docTrack") && $("docTrack").checked;
+    const canTrack = !!(Office.context.requirements && Office.context.requirements.isSetSupported("WordApi", "1.4"));
+    const changes = docFixes.changes || {};
+    let original = null, citations = 0, addedList = false;
+    docSay('<p class="small"><span class="spinner"></span>Fixing…</p>');
+    try {
+      await Word.run(async (ctx) => {
+        const doc = ctx.document;
+        if (canTrack) { doc.load("changeTrackingMode"); await ctx.sync(); original = doc.changeTrackingMode; }
+        const { cits } = await readCitations(ctx);
+        for (const { cc, p } of cits) {
+          let changed = false;
+          const seen = new Set(), items = [];
+          for (const ci of p.citationItems) {
+            const ch = changes[ci.id];
+            const next = ch ? { ...ci, id: ch.into, itemData: ch.csl } : ci;
+            if (ch) changed = true;
+            if (seen.has(next.id)) { changed = true; continue; }  // merged into a paper already in this citation
+            seen.add(next.id); items.push(next);
+          }
+          if (changed) { p.citationItems = items; cc.tag = TAG + b64(p); citations++; }
+        }
+        if (canTrack && track) doc.changeTrackingMode = "TrackAll";
+        await ctx.sync();
+        addedList = await ensureBibliography(ctx);
+      });
+      await refresh();  // the visible changes: citations and the reference list, tracked
+    } finally {
+      if (canTrack && original !== null) await Word.run(async (ctx) => { ctx.document.changeTrackingMode = original; await ctx.sync(); }).catch(() => {});
+      docBusy = false;
+    }
+    docFixes = { changes: {}, corrected: 0, merged: 0 };
+    docPlan = { ...docPlan, converted: true };
+    renderDoc(`Fixed: ${citations} citation${citations === 1 ? "" : "s"} updated` + (addedList ? ", and a reference list added at the end" : "") +
+      (canTrack && track ? ". The changes are tracked: Review → Accept or Reject." : ".") +
+      " Press Check again to see what's left.");
+  }
+
+  // What only the writer can fix, as Word comments next to each problem (a retracted paper on its citations, a typed
+  // [7] with no reference 7, a paper missing from the library...), so they're easy to find in the text
+  async function notesDoc() {
+    if (docBusy || !docNotes.length) return;
+    if (!(Office.context.requirements && Office.context.requirements.isSetSupported("WordApi", "1.4"))) {
+      return say("This version of Word can't add comments from add-ins. Update Word, or see the list above.");
+    }
+    docBusy = true;
+    let added = 0, unplaced = 0, already = 0;
+    try {
+      await Word.run(async (ctx) => {
+        const body = ctx.document.body;
+        const existing = body.getComments();
+        existing.load("items/content");
+        const { cits, bibs } = await readCitations(ctx);
+        const have = new Set(existing.items.map((c) => (c.content || "").trim()));
+        for (const n of docNotes) {
+          if (have.has(n.text.trim())) { already++; continue; }
+          let ranges = [];
+          if (n.at.kind === "citation") ranges = cits.filter(({ p }) => p.citationItems.some((ci) => ci.id === n.at.key)).map(({ cc }) => cc.getRange("Whole"));
+          else if (n.at.kind === "bibliography") ranges = bibs.slice(0, 1).map((cc) => cc.getRange("Whole"));
+          else if (n.at.kind === "search" && n.at.text) {
+            const hits = body.search(n.at.text.slice(0, 250), { matchCase: true });
+            hits.load("items");
+            await ctx.sync();
+            ranges = hits.items.slice(0, 3);
+          }
+          if (!ranges.length) { unplaced++; continue; }
+          ranges.forEach((r) => r.insertComment(n.text));
+          added++;
+        }
+        await ctx.sync();
+      });
+    } finally { docBusy = false; }
+    renderDoc(`${added ? `Added ${added} comment${added === 1 ? "" : "s"} in the text: in Word, Review → Next goes through them.` : "No new comments."}` +
+      (already ? ` ${already} ${already === 1 ? "was" : "were"} there already.` : "") +
+      (unplaced ? ` ${unplaced} couldn't be placed in the text (see the list).` : ""));
   }
 
   async function convertDoc() {
@@ -534,7 +645,7 @@
     docBusy = true;
     const track = $("docTrack") && $("docTrack").checked;
     const canTrack = !!(Office.context.requirements && Office.context.requirements.isSetSupported("WordApi", "1.4"));
-    let original = null, done = 0, missing = 0;
+    let original = null, done = 0, missing = 0, addedList = false;
     docSay('<p class="small"><span class="spinner"></span>Converting the citations…</p>');
     try {
       await Word.run(async (ctx) => {
@@ -567,6 +678,7 @@
           docSay(`<p class="small"><span class="spinner"></span>Converting the citations… ${done} of ${docPlan.citations}</p>`);
         }
         if (canTrack && track) { doc.changeTrackingMode = "TrackAll"; await ctx.sync(); }
+        if (done) addedList = await ensureBibliography(ctx);
       });
       await refresh();  // every citation and the list in the chosen style: these are the visible (tracked) changes
     } finally {
@@ -576,7 +688,7 @@
     const notes = (docPlan.notes || []).length ? `<br>Left as they were: ${docPlan.notes.map(esc).join("; ")}` : "";
     const lost = missing ? `<br>${missing} couldn't be found again in the document (was it edited meanwhile?): press Check again.` : "";
     docPlan = { ...docPlan, citations: 0, already: (docPlan.already || 0) + done, paragraphs: [], converted: true };
-    renderDoc(`Done: ${done} citation${done === 1 ? " is" : "s are"} now Citrello citations` +
+    renderDoc(`Done: ${done} citation${done === 1 ? " is" : "s are"} now Citrello citations` + (addedList ? ", with a reference list added at the end" : "") +
       (canTrack && track ? ". The changes are tracked: Review → Accept or Reject." : ".") + notes + lost);
   }
 

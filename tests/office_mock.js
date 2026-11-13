@@ -17,11 +17,28 @@
   let paraXml = [];           // Word's XML of each paragraph of a loaded document (getOoxml)
   let fileBytes = null;       // the loaded .docx (getFileAsync)
   const trackLog = [];
-  const opened = [];          // pages the add-in opened in the browser (Office.context.ui.openBrowserWindow)
+  const opened = [];
+  const comments = [];
+  const styles = [];          // paragraphs the add-in added, with the style it gave them        // Word comments the add-in added: {text, on (the text it's attached to)}          // pages the add-in opened in the browser (Office.context.ui.openBrowserWindow)
   function paraSpans() {
     const t = flat(), out = [];
     let s = 0;
     for (let i = 0; i <= t.length; i++) if (i === t.length || t[i] === "\n") { out.push([s, i]); s = i + 1; }
+    return out;
+  }
+  function segsFromXml(pkg) {  // a paragraph's text pieces and content controls, from Word's XML of it
+    const xml = new DOMParser().parseFromString(pkg, "application/xml");
+    const W = "http://schemas.openxmlformats.org/wordprocessingml/2006/main";
+    const p = xml.getElementsByTagNameNS(W, "p")[0];
+    const out = [];
+    const texts = (el) => [...el.getElementsByTagNameNS(W, "t")].map((t) => t.textContent).join("");
+    for (const el of (p ? p.children : [])) {
+      if (el.localName === "sdt") {
+        const tag = el.getElementsByTagNameNS(W, "tag")[0], alias = el.getElementsByTagNameNS(W, "alias")[0];
+        out.push({ k: "cc", id: nextId++, tag: tag ? tag.getAttributeNS(W, "val") : "", title: alias ? alias.getAttributeNS(W, "val") : "",
+                   appearance: "", runs: [{ t: texts(el), font: {} }] });
+      } else if (["r", "hyperlink", "fldSimple"].includes(el.localName)) out.push({ k: "t", t: texts(el) });
+    }
     return out;
   }
   const startOf = (seg) => { let p = 0; for (const s of segs) { if (s === seg) return p; p += segLen(s); } return -1; };
@@ -73,19 +90,7 @@
       return { getFirst: () => new Range(sp[0], sp[1]) };
     }
     insertOoxml(pkg, where) {  // the paragraph's runs and content controls from Word's XML
-      const xml = new DOMParser().parseFromString(pkg, "application/xml");
-      const W = "http://schemas.openxmlformats.org/wordprocessingml/2006/main";
-      const p = xml.getElementsByTagNameNS(W, "p")[0];
-      const out = [];
-      const texts = (el) => [...el.getElementsByTagNameNS(W, "t")].map((t) => t.textContent).join("");
-      for (const el of p.children) {
-        if (el.localName === "sdt") {
-          const tag = el.getElementsByTagNameNS(W, "tag")[0], alias = el.getElementsByTagNameNS(W, "alias")[0];
-          out.push({ k: "cc", id: nextId++, tag: tag ? tag.getAttributeNS(W, "val") : "", title: alias ? alias.getAttributeNS(W, "val") : "",
-                     appearance: "", runs: [{ t: texts(el), font: {} }] });
-        } else if (el.localName === "r" || el.localName === "hyperlink") out.push({ k: "t", t: texts(el) });
-        else if (el.localName === "fldSimple") out.push({ k: "t", t: texts(el) });
-      }
+      const out = segsFromXml(pkg);
       const i = removeRange(this.s, this.e);
       segs.splice(i, 0, ...out);
       return this;
@@ -119,6 +124,7 @@
       return new CC(seg);
     }
     select() { setCursor(this.s, this.inCC); fire(); }
+    insertComment(text) { const c = { text, on: flat().slice(this.s, this.e) }; comments.push(c); return { content: text }; }
   }
 
   class CC {
@@ -163,7 +169,18 @@
       get changeTrackingMode() { return tracking; },
       set changeTrackingMode(v) { tracking = v; trackLog.push(v); },
       load() { return this; },
-      body: { get paragraphs() { return { items: paraSpans().map(([a, b], k) => new Para(a, b, k)), load() { return this; } }; } },
+      body: {
+        search(text) { return new Range(0, flat().length).search(text); },
+        insertParagraph(text, where) {  // a new paragraph at the end
+          const end = flat().length;
+          new Range(end, end).insertText("\n" + text, "End");
+          const s0 = end + 1, p = new Range(s0, s0 + text.length);
+          p.styleBuiltIn = "Normal";
+          styles.push({ text, p });
+          return p;
+        },
+        getComments() { return { items: comments.map((c) => ({ content: c.text })), load() { return this; } }; },
+        get paragraphs() { return { items: paraSpans().map(([a, b], k) => new Para(a, b, k)), load() { return this; } }; } },
       getSelection: () => { const p = cursorPos(); return new Range(p, p, inCC); },
       get contentControls() {
         return { items: segs.filter((s) => s.k === "cc").map((s) => new CC(s)), load() { return this; } };
@@ -204,12 +221,18 @@
     settings: settingsStore,
     trackLog,
     opened,
+    comments,
+    added: () => styles.map((x) => ({ text: x.text, style: x.p.styleBuiltIn })),
     tracking: () => tracking,
     load(doc) {  // a real document: its .docx (base64) and each paragraph's text and XML, as Word would give them
       segs.length = 0;
       fileBytes = Uint8Array.from(atob(doc.file), (c) => c.charCodeAt(0));
       paraXml = doc.paragraphs.map((p) => p.xml);
-      segs.push({ k: "t", t: doc.paragraphs.map((p) => p.text).join("\n") });
+      doc.paragraphs.forEach((p, k) => {  // content controls in the document stay content controls
+        if (k) segs.push({ k: "t", t: "\n" });
+        if (p.xml && p.xml.includes(":sdt")) segs.push(...segsFromXml(p.xml));
+        else segs.push({ k: "t", t: p.text });
+      });
       setCursor(flat().length);
     },
   };

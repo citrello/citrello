@@ -169,3 +169,46 @@ def test_citrello_citations_are_left_alone(tmp_path, lib):
     assert summary["by"] == {"Mendeley Desktop or Citrello": 1}
     with pytest.raises(ValueError):
         docconvert.convert_ooxml(plan, "<not xml")
+
+
+def _cc(items, shown):
+    from xml.sax.saxutils import escape
+    from docx.oxml import parse_xml
+    from docx.oxml.ns import nsdecls
+    tag = docconvert.payload_tag([{"id": k, "itemData": dict(c, id=k)} for k, c in items])
+    return parse_xml(f'<w:sdt {nsdecls("w")}><w:sdtPr><w:tag w:val="{tag}"/></w:sdtPr>'
+                     f'<w:sdtContent><w:r><w:t>{escape(shown)}</w:t></w:r></w:sdtContent></w:sdt>')
+
+
+def test_fixes_and_notes_for_a_document_with_citrello_citations(tmp_path, lib, monkeypatch):
+    """Already Citrello's: "Fix them" corrects details found online and merges the same paper listed twice (keeping
+    the citations' own keys); what only the writer can fix becomes notes placed on the citation or the text."""
+    old = dict(TOPHAM, issued={"date-parts": [[2016]]})            # the year was wrong in the document
+    dup = dict(TOPHAM, title=TOPHAM["title"] + ".")                 # the same paper under another key
+    d = docx.Document()
+    d.add_paragraph("Costs are high ")._p.append(_cc([("topham-a", old)], "(Topham, 2016)"))
+    p = d.add_paragraph("Reviews agree ")
+    p._p.append(_cc([("topham-b", dup), ("vetters", VETTERS)], "(Topham, 2016; Vetters, 2024)"))
+    d.add_paragraph("Claude wrote this [@Nobody2020].")
+    path = str(tmp_path / "own.docx")
+    d.save(path)
+
+    def lookup(raw, typed, email=None):  # Crossref: Topham's real year; Vetters not found
+        if (typed.get("DOI") or "") == TOPHAM["DOI"]:
+            return dict(TOPHAM), "crossref", {}
+        return None, None, {"not_found": True}
+    monkeypatch.setattr(doccheck.core, "crossref_lookup", lookup)
+    rep = doccheck.check(path)
+    plan, summary = docconvert.make_plan(path, rep)
+    assert summary["citations"] == 0 and summary["already"] == 2   # [@Nobody2020] isn't in the library: nothing to convert
+
+    f = docconvert.fixes(plan)
+    assert f["changes"]["topham-a"]["into"] == "topham-a" and "year corrected (2016 → 2017)" in f["changes"]["topham-a"]["what"]
+    assert f["changes"]["topham-a"]["csl"]["issued"] == {"date-parts": [[2017]]}
+    assert f["changes"]["topham-b"]["into"] == "topham-a" and "merged with the same paper" in f["changes"]["topham-b"]["what"]
+    assert "vetters" not in f["changes"] and f["merged"] == 1 and f["corrected"] == 1
+
+    notes = docconvert.notes(plan)
+    marker = [n for n in notes if n["at"] == {"kind": "search", "text": "[@Nobody2020"}]
+    assert marker and "isn't in your library" in marker[0]["text"]
+    assert not any("listed more than once" in n["text"] or "Listed twice" in n["text"] for n in notes)  # Fix them does it

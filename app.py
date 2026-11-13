@@ -1322,7 +1322,7 @@ class Handler(BaseHTTPRequestHandler):
             except ValueError as e:
                 return self.send(400, {"error": str(e)})
             return self.send(200, check_public(m.group(1)))
-        m = re.fullmatch(r"/api/word-addin/(plan|convert)", path)
+        m = re.fullmatch(r"/api/word-addin/(plan|convert|fixes|notes)", path)
         if m:  # the Word add-in: turning the document's other citations into its own (docconvert.py)
             b = self.json_body()
             c = CHECKS.get(str(b.get("id", "")))
@@ -1334,6 +1334,10 @@ class Handler(BaseHTTPRequestHandler):
                     return self.send(200, summary)
                 if not c.get("word_plan"):
                     return self.send(400, {"error": "Check the document first."})
+                if m.group(1) == "fixes":
+                    return self.send(200, docconvert.fixes(c["word_plan"]))
+                if m.group(1) == "notes":
+                    return self.send(200, {"notes": docconvert.notes(c["word_plan"])})
                 ooxml, n = docconvert.convert_ooxml(c["word_plan"], str(b.get("ooxml", "")))
                 return self.send(200, {"ooxml": ooxml, "count": n})
             except ValueError as e:

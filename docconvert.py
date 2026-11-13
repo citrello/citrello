@@ -89,10 +89,21 @@ class Plan:
         self.num_key, self.ident_key, self.csl = {}, {}, {}
         taken = {it["key"] for it in data["items"]}
         refs = {r["number"]: r for r in report["refs"]}
+        # citations that are Citrello's already keep their keys (their reference's id is its key)
+        self.own_keys = set()
+        for t in docx.Document(path).element.body.iter(qn("w:tag")):
+            val = t.get(qn("w:val")) or ""
+            if val.startswith(TAG):
+                pl = doccheck._b64json(val[len(TAG):]) or {}
+                self.own_keys.update(str(ci.get("id")) for ci in pl.get("citationItems", []) if ci.get("id"))
         for r in report["refs"]:
             base = refs.get(canon.get(r["number"], r["number"]), r)
             if base["number"] in self.num_key:
                 key = self.num_key[base["number"]]
+            elif base.get("manager_id") in self.own_keys:  # the details as checked online, under its own key
+                key = base["manager_id"]
+                self.csl[key] = dict(base["csl"])
+                taken.add(key)
             else:
                 hit, _ = index.find(base["csl"])
                 if hit and hit in by_id:  # in the library: its key, and the library's details
@@ -399,3 +410,86 @@ def convert_ooxml(plan, pkg):
         for p in body.findall(f"{{{W}}}p"):
             total += sum(convert_p(p, plan).values())
     return etree.tostring(root, encoding="unicode"), total
+
+
+# ---------------------------------------------------------------------------
+# Documents whose citations are Citrello's already: what "Fix them" changes, and what only the writer can fix
+# ---------------------------------------------------------------------------
+
+FIXED_BY_REBUILDING = re.compile(r"listed more than once|reference list has \d+ entries|Refresh the bibliography|"
+                                 r"No reference list|Listed twice", re.I)
+# corrected by "Fix them" / converting (the details found online are used) when the paper was found online
+FIXED_BY_CORRECTING = re.compile(r"^(Title differs|Authors differ|Year differs)|was not found; the paper was found by its title")
+MINOR = re.compile(r"^(No DOI|Preprint|Web page)")  # worth knowing, not worth a comment in the text
+
+
+def fixes(plan):
+    """For each Citrello citation's paper: the details checked online (when they differ) and the reference it merges
+    into (the same paper listed twice). -> {"changes": {key: {"into", "csl", "what"}}, "corrected", "merged"}"""
+    changes, corrected, merged = {}, 0, 0
+    for r in plan.report["refs"]:
+        old = r.get("manager_id")
+        if old not in plan.own_keys:
+            continue
+        new = plan.num_key.get(r["number"], old)
+        what = doccheck._changes(r.get("typed") or {}, r["csl"]) if r.get("lookup") else []
+        if new == old and not what:
+            continue
+        csl = dict(plan.csl.get(new) or r["csl"], id=new)
+        changes[old] = {"into": new, "csl": csl, "what": (["merged with the same paper"] if new != old else []) + what}
+        merged += new != old
+        corrected += bool(what) and new == old
+    return {"changes": changes, "corrected": corrected, "merged": merged}
+
+
+def _label(r):
+    c = r["csl"]
+    names = [a.get("family") or a.get("literal") or "" for a in c.get("author", [])]
+    who = names[0] + " et al." if len(names) > 2 else " & ".join(n for n in names if n)
+    return f"[{r['number']}] {who or c.get('title', '')[:40]} ({core.year_of(c) or 'n.d.'})"
+
+
+def notes(plan):
+    """What only the writer can fix, each with where it is in the text: [{"text", "at": {"kind": "citation", "key"} |
+    {"kind": "search", "text"} | {"kind": "bibliography"}}]. The add-in turns them into Word comments."""
+    out = []
+    for r in plan.report["refs"]:
+        found = bool(r.get("lookup"))
+        checks = [c["text"] for c in r.get("checks", []) if not FIXED_BY_REBUILDING.search(c["text"])
+                  and not MINOR.search(c["text"]) and not (found and FIXED_BY_CORRECTING.search(c["text"]))]
+        if r.get("reliability") not in ("problem", "check") or not checks:
+            continue
+        text = f"Citrello: {_label(r)}: " + " ".join(checks)
+        if r.get("cited") is False:
+            out.append({"text": text + " It's in the reference list but never cited.",
+                        "at": {"kind": "search", "text": (r.get("raw") or "")[:60]}})
+        else:
+            out.append({"text": text, "at": {"kind": "citation", "key": plan.num_key.get(r["number"], r.get("manager_id"))}})
+    for i in plan.report["citation_issues"]:
+        t = i["text"]
+        if i["level"] == "info" or FIXED_BY_REBUILDING.search(t):
+            continue
+        m = re.match(r"Citation (.+?) points to a reference that isn't in the list", t)
+        if m:
+            out.append({"text": f"Citrello: citation {m.group(1)} points to a reference that isn't in the list. Which "
+                                "paper is it? Cite it from your library, or add it to the list.",
+                        "at": {"kind": "search", "text": m.group(1)}})
+            continue
+        m = re.match(r"NOT CONVERTED \((.*?)\): ['\"](.+)['\"]$", t)
+        if m:
+            out.append({"text": f"Citrello: this citation couldn't be matched to a reference ({m.group(1)}).",
+                        "at": {"kind": "search", "text": m.group(2)[:120]}})
+            continue
+        if t.startswith("Markers for references that aren't in your library:"):
+            for k in re.findall(r"\[@([^\]]+)\]", t):
+                out.append({"text": f"Citrello: [@{k}] isn't in your library. Add the paper, or cite another one.",
+                            "at": {"kind": "search", "text": "[@" + k}})
+            continue
+        if t.startswith("In the list but never cited:"):
+            continue  # one note per reference, above (its own problems), or nothing: the rebuilt list leaves them out
+        out.append({"text": "Citrello: " + t, "at": {"kind": "bibliography"}})
+    for r in plan.report["refs"]:  # never cited, with nothing else wrong: one note on its entry in the list
+        if r.get("cited") is False and not any(n["text"].startswith(f"Citrello: {_label(r)}") for n in out):
+            out.append({"text": f"Citrello: {_label(r)} is in the reference list but never cited.",
+                        "at": {"kind": "search", "text": (r.get("raw") or "")[:60]}})
+    return out
