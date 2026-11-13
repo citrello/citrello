@@ -223,6 +223,10 @@ manifest: `site/public/word/manifest.xml` (id ef6ca1ae-67cf-48fb-89a7-189c074612
   one at a time, Claude reads the full texts (judge kind "library", 1 unit) and each verdict is replaced by the
   exact sentence from the body ("From the full text"). Papers with no free copy: "Get them with my access" (Word:
   the browser journey; web app: the extension directly), then they're read automatically.
+- **Web check cost (13 Nov 2026):** the Sonnet web search with page fetches cost ~20 cents a search (re-reading every
+  fetched page at each step). Armin chose: the search step runs on Haiku 5.5 (`AI_WEB_MODEL`), search results only (no
+  web_fetch), at most 3 searches, effort low: expected ~3-5 cents (1 cent per search + cheap tokens). Sonnet still checks
+  the papers found against their full text afterwards. Not yet measured with the real API (ai-real-test.yml).
 - Windows install when "More Add-ins" is greyed out (university accounts): the PowerShell line on citrello.app/word
   registers the manifest under HKCU\Software\Microsoft\Office\16.0\WEF\Developer (worked for Armin).
 - **Next:** Armin tries it in Word on the web (citrello.app/word steps); Pro "Find me a new paper" and "Check this

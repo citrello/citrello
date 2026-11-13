@@ -20,7 +20,7 @@ function client(env) {
                          maxRetries: 2, timeout: 120000 });
 }
 const model = (env) => env.AI_MODEL || "claude-sonnet-5-5";          // verdicts and library checks
-const webModel = (env) => env.AI_WEB_MODEL || model(env);              // web checks (needs web search: not Haiku)
+const webModel = (env) => env.AI_WEB_MODEL || "claude-haiku-5-5";     // the web search step of web checks (cheap)
 
 // Monthly allowances: checks (a verdict, or a library check, counts 1) and web checks, free and pro.
 export async function quota(env, userId) {
@@ -113,15 +113,16 @@ export async function judge(env, userId, body) {
   return { results, usage: usageOf(msg), quota: await quota(env, userId) };
 }
 
-const WEB_SYSTEM = `You help researchers find published sources for a sentence in their manuscript. Find peer-reviewed
-papers (journal articles, conference papers, books from academic publishers) whose findings support the sentence.
-Use web_search to find candidates, then web_fetch to open each promising candidate's page (its DOI link or the
-publisher's page) and read its abstract before listing it. Prefer recent, well-cited work with a DOI. Never invent
-papers, authors or DOIs: only list papers whose page you opened. List at most 5; 3 good ones are enough.
+const WEB_SYSTEM = `You help researchers find published sources for a sentence in their manuscript. Use web_search
+(at most 3 searches) to find peer-reviewed papers (journal articles, conference papers, academic books) whose findings
+support the sentence: search scholarly terms, and include words such as "doi" or "journal" to reach publishers' and
+indexes' pages. Judge each candidate from the title and abstract text in the search results; don't open pages. Prefer
+recent, well-cited work with a DOI. Never invent papers, authors or DOIs: only list papers that appear in your search
+results, with the DOI exactly as shown there (empty if none is shown). List at most 5; 3 good ones are enough.
 End your answer with only a JSON object, no other text after it:
 {"papers": [{"title": "", "authors": "Family name of the first author, or 'Family & Family', or 'Family et al.'",
 "year": "", "doi": "10.xxxx/... or empty", "url": "", "verdict": "supports" or "partly",
-"quote": "the exact sentence from the abstract that shows it", "reason": "one short plain sentence"}]}`;
+"quote": "the exact words from the search result's abstract text that show it", "reason": "one short plain sentence"}]}`;
 
 // {claim, context, exclude: [doi]} -> {papers: [...], quota}
 export async function findOnWeb(env, userId, body) {
@@ -131,10 +132,12 @@ export async function findOnWeb(env, userId, body) {
   const exclude = (Array.isArray(body.exclude) ? body.exclude : []).slice(0, 50).map((d) => clip(d, 200).toLowerCase());
   const done = await spend(env, userId, 1, "web");
   const params = {
-    model: webModel(env), max_tokens: 16000, ...fallback(webModel(env)), output_config: { effort: "medium" }, system: WEB_SYSTEM,
-    tools: /haiku/.test(webModel(env))  // Haiku has the basic versions of the web tools
-      ? [{ type: "web_search_20250305", name: "web_search", max_uses: 4 }, { type: "web_fetch_20250910", name: "web_fetch", max_uses: 5, max_content_tokens: 5000 }]
-      : [{ type: "web_search_20260209", name: "web_search", max_uses: 4 }, { type: "web_fetch_20260209", name: "web_fetch", max_uses: 5, max_content_tokens: 5000 }],
+    // the search step is cheap on purpose (Haiku, search results only, no pages opened: ~3-5 cents instead of ~20):
+    // the papers it picks are checked against their full text afterwards, by AI_MODEL
+    model: webModel(env), max_tokens: 16000, ...fallback(webModel(env)), output_config: { effort: "low" }, system: WEB_SYSTEM,
+    tools: [/haiku/.test(webModel(env))  // Haiku has the basic version of the web search tool
+      ? { type: "web_search_20250305", name: "web_search", max_uses: 3 }
+      : { type: "web_search_20260209", name: "web_search", max_uses: 3 }],
     messages: [{ role: "user", content: `The sentence: <claim>${claim}</claim>` +
       (body.context ? `\nThe paragraph around it: <context>${clip(body.context, 2000)}</context>` : "") +
       (exclude.length ? `\nAlready cited (don't list): ${exclude.join(", ")}` : "") }],

@@ -79,7 +79,9 @@ def test_claude_checks(claude):
     assert st == 200, raw
     r = json.loads(raw)
     assert r["papers"][0]["doi"] == "10.1016/j.example.2021.0042" and r["quota"]["web_used"] == 1
-    assert claude[-1]["body"]["tools"][0]["type"] == "web_search_20260209"
+    web = claude[-1]["body"]  # the cheap search step: Haiku, search results only (no pages opened), low effort
+    assert web["model"] == "claude-haiku-5-5" and [t["type"] for t in web["tools"]] == ["web_search_20250305"]
+    assert web["tools"][0]["max_uses"] == 3 and web["output_config"]["effort"] == "low"
     used = r["quota"]["used"]
     two = [dict(ITEM["papers"][0], ref=str(i)) for i in range(2)]
     st, _, raw = call("POST", "/api/ai/judge", {"kind": "library", "items": [dict(ITEM, papers=two)]}, headers=me)

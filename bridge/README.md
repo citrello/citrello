@@ -106,7 +106,7 @@ stored except monthly counts per account (`ai_usage`: checks, and web checks).
 - Secret: `ANTHROPIC_API_KEY` (GitHub secret of the same name; the deploy workflow passes it on). Without it the
   endpoints answer "Claude checks aren't switched on yet" and the app keeps showing word matches.
 - Variables (optional, in `wrangler.toml` `[vars]`): `AI_MODEL` for verdicts and library checks (default
-  `claude-sonnet-5-5`), `AI_WEB_MODEL` for web checks (default the same; Haiku gets the older web search tool),
+  `claude-sonnet-5-5`), `AI_WEB_MODEL` for the web search step of web checks (default `claude-haiku-5-5`, which gets the basic web search tool; it reads search results only, no page fetches, so a search costs ~3-5 cents),
   `AI_FREE_MONTHLY` / `AI_PRO_MONTHLY` citation checks (10 / 3000; a library check counts 1), `AI_FREE_WEB` /
   `AI_PRO_WEB` web checks (0 / 100). Library and web checks are Pro only (`pro_only`). `ANTHROPIC_BASE_URL` points the tests at a pretend Claude.
 - Pro, until payments exist: `curl -X POST -H "Authorization: Bearer ADMIN_TOKEN" -H "Content-Type: application/json"
