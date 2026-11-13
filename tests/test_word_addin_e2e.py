@@ -43,7 +43,6 @@ LIBRARY = {"projects": [], "items": [
 
 def save_cloud_copy(email, lib=None, texts=None):
     """Sign in like another device would and save a cloud copy holding LIBRARY (and papers' text)."""
-    B.bc.api("POST", "/api/auth/start", {"email": email})
     code = B.bc.start_sign_in(email)["dev_code"]
     res = B.bc.api("POST", "/api/auth/verify", {"email": email, "code": code, "device_name": "Test", "platform": "test",
                                                 "app_version": "test"})
@@ -322,6 +321,97 @@ def test_word_addin_checks_a_claim_and_finds_another(tmp_path):
             page.wait_for_function("__doc.controls()[0].text.includes('Lee')", timeout=30000)
             expect(page.locator("#curList li")).to_have_count(2)
             expect(page.locator("#quotaLine")).to_contain_text("Citrello Pro")
+            assert not errors, errors
+            b.close()
+    finally:
+        srv.shutdown()
+        srv.server_close()
+
+
+FAKE_EXTENSION = """
+// a stand-in for the Citrello browser extension: says hello, and "fetches" each paper by sending its text
+window.addEventListener("message", (e) => {
+  const m = e.data;
+  if (e.source !== window || !m) return;
+  if (m.citrelloExt === "ping") window.postMessage({citrelloExt: "hello", version: "test"}, location.origin);
+  if (m.citrelloExt === "fetch") {
+    window.__fetched = m.papers.map((p) => p.key);
+    window.postMessage({citrelloExt: "fetch-started", n: m.papers.length}, location.origin);
+    m.papers.forEach((p, i) => setTimeout(() => window.postMessage({citrelloExt: "fulltext", id: "t" + i, key: p.key,
+      text: p.title + ". " + window.__PAPER}, location.origin), 800 * (i + 1)));
+  }
+});
+"""
+
+
+def test_word_addin_gets_paywalled_papers_through_the_web_app(tmp_path):
+    """A paper with no free copy: Word opens the web app in the browser, which signs in, gets the paper from the cloud
+    copy, has the extension fetch it with the person's access and saves its text back; Word then checks the claim."""
+    import anthropic_mock
+    from playwright.sync_api import expect, sync_playwright
+    from test_sources import PAPER
+    srv = anthropic_mock.start()
+    anthropic_mock.SEEN.clear()
+    email = f"wordaccess-{int(time.time())}@example.com"
+    shots = os.environ.get("CITRELLO_E2E_SHOTS") or str(tmp_path)
+    lib = {"projects": [], "items": [dict(i) for i in LIBRARY["items"]]}
+    for it in lib["items"]:
+        if it["key"] == "wang2020":
+            it["csl"] = dict(it["csl"], DOI="10.5555/citrello.test.blades")  # paywalled: no free copy anywhere
+    save_cloud_copy(email, lib)
+    errors = []
+    try:
+        with sync_playwright() as pw:
+            b = pw.chromium.launch()
+            ctx = b.new_context(viewport={"width": 360, "height": 1000})
+            word = ctx.new_page()
+            word.route("https://appsforoffice.microsoft.com/**", lambda r: r.fulfill(path=MOCK, content_type="text/javascript"))
+            word.on("pageerror", lambda e: errors.append("word: " + str(e)))
+            word.goto(f"{BASE}/word/taskpane.html?bridge={urllib.parse.quote(B.bc.BRIDGE)}")
+            word.evaluate("d => __doc.load(d)", word_document(blank_docx(tmp_path)))
+            sign_in(word, email)
+            expect(word.locator("#libInfo")).to_contain_text("3 references", timeout=60000)
+            word.evaluate("__doc.type('Recycling turbine blades at scale is now feasible and saves money ')")
+            word.fill("#q", "blade recycling")
+            expect(word.locator("#results li")).to_have_count(1)
+            expect(word.locator("#results li")).to_contain_text("Blade recycling")
+            word.click("#results button:has-text('Cite')")
+            word.wait_for_function("__doc.controls().length === 1", timeout=30000)
+            word.evaluate("__doc.clickControl(0)")
+            word.click("#claimCheck")
+            expect(word.locator("#getAccess")).to_be_visible(timeout=120000)       # no free copy: the paper needs access
+            word.screenshot(path=os.path.join(shots, "word-needs-access.png"))
+            word.click("#getAccess")
+            word.wait_for_function("__doc.opened.length === 1", timeout=60000)
+            url = word.evaluate("__doc.opened[0]")
+            assert "/app/?word_fetch=wang2020" in url
+            expect(word.locator("#claimOut")).to_contain_text("Waiting for the paper from your browser", timeout=30000)
+
+            # the browser: the web app, with the extension
+            web = ctx.new_page()
+            web.set_viewport_size({"width": 1280, "height": 900})
+            web.add_init_script(FAKE_EXTENSION + f"\nwindow.__PAPER = {json.dumps(PAPER)};")
+            web.on("pageerror", lambda e: errors.append("web: " + str(e)))
+            web.goto(url)
+            web.wait_for_selector("#webCover", state="detached", timeout=LOAD)
+            dlg = web.locator("#wfDlg")
+            expect(dlg).to_contain_text("Sign in with the email you use in Word", timeout=30000)
+            web.click("#wfSignIn")
+            web.fill("#signinDlg #siEmail", email)
+            web.click("#signinDlg #siSend")
+            expect(web.locator("#signinDlg #siStep2")).to_be_visible(timeout=30000)
+            web.fill("#signinDlg #siCode", B.bc.start_sign_in(email)["dev_code"])
+            web.click("#signinDlg #siVerify")
+            expect(dlg).to_contain_text("Go back to Word", timeout=120000)
+            expect(dlg).to_contain_text("the text of 1 paper is saved")
+            assert web.evaluate("window.__fetched") == ["wang2020"]
+            web.screenshot(path=os.path.join(shots, "web-papers-for-word.png"))
+
+            # Word carries on by itself: the paper's text came through the cloud copy
+            expect(word.locator("#claimOut .verdict:not(.none)")).to_have_count(1, timeout=120000)
+            expect(word.locator("#quotaLine")).to_contain_text("2 of 3 free claim checks left")
+            assert "Blade recycling at scale" in anthropic_mock.SEEN[-1]["body"]["messages"][0]["content"]
+            word.screenshot(path=os.path.join(shots, "word-after-access.png"))
             assert not errors, errors
             b.close()
     finally:

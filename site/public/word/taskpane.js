@@ -636,7 +636,11 @@
     wireClaim();
   }
   function claimHtml(r) {
-    return (r.claim ? `<p class="small muted">Checked: “${esc(r.claim)}”</p>` : "") + r.papers.map((p) => {
+    const missing = r.papers.filter((p) => p.status !== "text" && (p.doi || p.status === "abstract"));
+    const access = missing.length ? `<div class="notice">${missing.length === 1 ? "One paper has" : `${missing.length} papers have`} no full text here.` +
+      ` Citrello can open ${missing.length === 1 ? "it" : "them"} in your browser with your university or library access, then carry on here by itself.` +
+      `<div class="row"><button class="primary" id="getAccess">Get ${missing.length === 1 ? "it" : "them"} with my access</button></div></div>` : "";
+    return (r.claim ? `<p class="small muted">Checked: “${esc(r.claim)}”</p>` : "") + access + r.papers.map((p) => {
       const v = p.result;
       if (!v) {
         const why = p.status === "none" ? "No full text found online, so Claude can't check it." : "Not checked.";
@@ -648,6 +652,7 @@
     }).join("");
   }
   function wireClaim() {
+    if ($("getAccess")) $("getAccess").onclick = () => getWithAccess().catch(claimFail);
     $("claimOut").querySelectorAll("[data-pdf]").forEach((b) => { b.onclick = () => pickPdf(b.dataset.pdf); });
     $("claimOut").querySelectorAll("[data-add]").forEach((b) => { b.onclick = () => useFound(b.dataset.add, b.dataset.how === "replace"); });
     $("claimOut").querySelectorAll("[data-addweb]").forEach((b) => { b.onclick = () => useWeb(+b.dataset.addweb, b.dataset.how === "replace"); });
@@ -691,6 +696,49 @@
     claimBusy = false;
     if (current && current.payload.citationID === cit.payload.citationID) { claimSay(claimHtml(claimShown)); wireClaim(); }
     if (libChanged) pushLibrary().catch(() => {});
+  }
+
+  // papers behind a paywall: the web app, in the person's own browser, opens them with the Citrello extension and
+  // their access; the texts come back through the cloud copy, and the check carries on here by itself
+  let waiting = null;
+  async function getWithAccess() {
+    const cit = current, r = claimShown;
+    if (!cit || !r) return;
+    const keys = r.papers.filter((p) => p.status !== "text").map((p) => p.key);
+    claimSay(spin("Saving the papers to your cloud copy…"));
+    libChanged = true;
+    await pushLibrary();  // the web app finds the papers in the cloud copy
+    const url = `${location.origin}/app/?word_fetch=${encodeURIComponent(keys.join(","))}` + (bridgeParam ? `&bridge=${encodeURIComponent(bridgeParam)}` : "");
+    try {
+      if (Office.context.ui && Office.context.ui.openBrowserWindow) Office.context.ui.openBrowserWindow(url);
+      else window.open(url, "_blank", "noopener");
+    } catch { window.open(url, "_blank", "noopener"); }
+    const started = Date.now();
+    waiting = { id: cit.payload.citationID, keys, items: cit.payload.citationItems };
+    const tick = async () => {
+      if (!waiting || waiting.id !== cit.payload.citationID) return;
+      const left = waiting.keys.length;
+      if (current && current.payload.citationID === cit.payload.citationID) claimSay(spin(`Waiting for ${left === 1 ? "the paper" : `${left} papers`} from your browser…`) +
+        `<p class="small muted">Citrello opened the web app in your browser: follow it there (sign in, the extension). This carries on by itself.` +
+        ` <a href="${esc(url)}" target="_blank" rel="noopener">Open it again</a> · <button class="link" id="stopWait">Stop waiting</button></p>`);
+      if ($("stopWait")) $("stopWait").onclick = () => { waiting = null; claimFor = null; renderClaim(); };
+      await pullLibrary(true);
+      const got = [];
+      for (const key of waiting.keys) {
+        const ci = waiting.items.find((x) => x.id === key) || {};
+        const t = await post("/api/word-addin/paper-text", { key, csl: ci.itemData, search: false });
+        if (t.status === "text") got.push(key);
+      }
+      waiting.keys = waiting.keys.filter((k) => !got.includes(k));
+      if (!waiting.keys.length) {  // all here: check the claim again
+        waiting = null;
+        if (current && current.payload.citationID === cit.payload.citationID) { claimShown = null; await checkClaim(); }
+        return;
+      }
+      if (Date.now() - started > 20 * 60 * 1000) { waiting = null; claimFor = null; renderClaim(); return; }
+      setTimeout(() => tick().catch(() => {}), 8000);
+    };
+    setTimeout(() => tick().catch(() => {}), 4000);
   }
 
   // a PDF from the writer's computer, for a paper Citrello couldn't find a free copy of

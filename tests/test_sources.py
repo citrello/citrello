@@ -145,6 +145,8 @@ def test_word_addin_checks_the_citation_clicked(tmp_path, monkeypatch):
     new = {"type": "article-journal", "title": "Cable recovery costs", "DOI": "10.1/cables", "issued": {"date-parts": [[2021]]}}
     got = sources.word_paper_text("Lee2021", new)
     assert got["key"] == "Lee2021" and got["changed"] and library.get(library.load(), "Lee2021")
+    monkeypatch.setattr(fulltext, "find_free", lambda keys=None, progress=None: 1 / 0)  # not searched again
+    assert sources.word_paper_text("Nope2", {"title": "Has a DOI", "DOI": "10.1/x"}, search=False)["status"] == "none"
     monkeypatch.setattr(fulltext, "find_free", lambda keys=None, progress=None: {"found": 0})
     assert sources.word_paper_text("Nope", {"title": "No DOI, no text"})["status"] == "none"
 

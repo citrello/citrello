@@ -1336,7 +1336,7 @@ class Handler(BaseHTTPRequestHandler):
                 return self.send(400, {"error": str(e)})
         if path == "/api/word-addin/paper-text":  # the Word add-in: a cited paper's text, found if needed
             b = self.json_body()
-            return self.send(200, sources.word_paper_text(str(b.get("key", "")), b.get("csl") or {}))
+            return self.send(200, sources.word_paper_text(str(b.get("key", "")), b.get("csl") or {}, b.get("search", True) is not False))
         if path == "/api/word-addin/claim-item":  # the Word add-in: what Claude reads for the citation clicked
             b = self.json_body()
             return self.send(200, sources.word_claim_item(str(b.get("paragraph", ""))[:20000], b.get("at", 0),

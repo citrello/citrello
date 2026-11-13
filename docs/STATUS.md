@@ -210,6 +210,12 @@ manifest: `site/public/word/manifest.xml` (id ef6ca1ae-67cf-48fb-89a7-189c074612
   (no browser extension inside Word): that stays in the web app with the extension. Changes to the library made in
   Word go back to the cloud copy (pushLibrary), so the web app gets them. Verdicts are kept in the panel's
   localStorage per sentence + papers.
+- **Paywalled papers from Word (built 13 Nov 2026):** papers with no free copy show "Get them with my access":
+  Word saves the papers to the cloud copy and opens the person's browser (Office openBrowserWindow) on
+  citrello.app/app/?word_fetch=keys. There the "Papers for Word" window (ui.html `wordFetchStart`) signs in if
+  needed, pulls the cloud copy, asks for the extension if it's missing, has the extension fetch just those papers,
+  then saves the cloud copy and says "Go back to Word". Word polls the cloud copy every 8 s (up to 20 min) and
+  checks the claim again by itself. Tested end to end with a stand-in extension.
 - Windows install when "More Add-ins" is greyed out (university accounts): the PowerShell line on citrello.app/word
   registers the manifest under HKCU\Software\Microsoft\Office\16.0\WEF\Developer (worked for Armin).
 - **Next:** Armin tries it in Word on the web (citrello.app/word steps); Pro "Find me a new paper" and "Check this

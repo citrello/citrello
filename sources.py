@@ -400,7 +400,7 @@ def sentence_at(paragraph, at):
     return best
 
 
-def word_paper_text(key, csl):
+def word_paper_text(key, csl, search=True):
     """A cited paper's text for checking: from the library, else a free copy found online (kept in the library;
     the paper is added to it first if needed). -> {"key", "status": "text"|"abstract"|"none", "changed", "doi"}"""
     data = library.load()
@@ -414,7 +414,7 @@ def word_paper_text(key, csl):
             it, _, _ = library.add_csl(d, dict(csl), source="word", key=key)
             it = dict(it)
         changed = True
-    if not it.get("fulltext") and it["csl"].get("DOI"):
+    if search and not it.get("fulltext") and it["csl"].get("DOI"):
         res = fulltext.find_free([it["key"]])
         if res["found"]:
             changed = True

@@ -768,6 +768,10 @@
   <p class="small muted">Pro is opening soon. Tell us you'd like it and we'll switch it on for your account.</p>
   <div class="row"><a class="btn primary" id="proGet" href="mailto:hello@citrello.app?subject=Citrello%20Pro">I'd like Pro</a><button class="link" id="proLater">Not now</button></div>
 </dialog>
+<dialog class="guide small-dlg" id="wfDlg" aria-labelledby="wfTitle">
+  <div class="g-head"><h2 id="wfTitle">Papers for Word</h2><button class="link" id="wfClose" aria-label="Close">✕</button></div>
+  <div id="wfBody"></div>
+</dialog>
 <dialog class="guide" id="guide" aria-labelledby="gTitle">
   <div class="g-head"><h2 id="gTitle"></h2><button class="icon g-x" id="gClose" aria-label="Close">✕</button></div>
   <div class="g-art" id="gArt"></div>
@@ -1878,7 +1882,7 @@ window.addEventListener("message", async (e) => {
       ok = r.ok; if (!ok) error = (await r.json().catch(() => ({}))).error || r.statusText;
     } catch (err) { error = err.message; }
     window.postMessage({citrelloExt: "saved", id: m.id, ok, error}, location.origin);
-    if (ok) { reloadSoon(); srcRefreshSoon(); }
+    if (ok) { reloadSoon(); srcRefreshSoon(); wordFetchSaved(m.key); }
   }
 });
 // the extension's toolbar panel: look a paper up, add it, keep its text (only "Add to Citrello" requests)
@@ -2612,7 +2616,7 @@ $("updCheck").onclick = async () => {
 // ---------- welcome (first launch) ----------
 function closeWelcome() { show("welcome", false); post("/api/config", {welcome_done: "1"}).catch(() => {}); $("q").focus(); }
 function maybeWelcome() {
-  if (status.welcome_done || status.signed_in) return;
+  if (status.welcome_done || status.signed_in || wordFetchKeys.length) return;  // arriving from Word: its papers first
   show("welcome"); setTimeout(() => $(status.web ? "wWebStart" : "wEmail").focus(), 50);
 }
 $("wSend").onclick = async () => {
@@ -2883,8 +2887,90 @@ function tourRender(fresh) {
 }
 document.addEventListener("keydown", (e) => { if (e.key === "Escape" && tour && !$("guide").open) endTour(false); });
 
+// ---------- papers for Word: the add-in sends the papers it needs the text of, and the extension gets them here ----------
+// Citrello for Word opens this page with ?word_fetch=key1,key2 (it saved those papers to the cloud copy first). Here:
+// sign in (same account), the cloud copy brings the papers, the extension opens each with the person's access, the
+// texts go back to the cloud copy, and Word carries on by itself.
+let wordFetch = null;  // {keys, n, saved: Set, started}
+const WF = "citrelloWordFetch";
+function wordFetchStart(keys) {
+  wordFetch = {keys, n: 0, saved: new Set(), started: false};
+  try { sessionStorage.setItem(WF, keys.join(",")); } catch {}
+  if (!$("wfDlg").open) $("wfDlg").showModal();
+  wordFetchStep().catch((e) => wfSay(`<div class="notice err">${esc(e.message)}</div>`));
+}
+const wfSay = (html) => { $("wfBody").innerHTML = html; };
+const wfSpin = (t) => `<p><span class="spinner"></span>${esc(t)}</p>`;
+$("wfClose").onclick = () => { $("wfDlg").close(); wordFetch = null; try { sessionStorage.removeItem(WF); } catch {} };
+async function wordFetchStep() {
+  const wf = wordFetch;
+  if (!wf || wf.started) return;
+  const acct = await api("/api/account").catch(() => ({}));
+  if (!acct.signed_in) {
+    wfSay(`<p>Word asked for the full text of ${wf.keys.length} paper${wf.keys.length === 1 ? "" : "s"}. Sign in with the email you use in Word, so they come here.</p>
+      <div class="row"><button class="primary" id="wfSignIn">Sign in</button></div>`);
+    $("wfSignIn").onclick = () => openSignIn(() => wordFetchStep().catch(() => {}), "Sign in with the email you use in Citrello for Word.");
+    return;
+  }
+  wfSay(wfSpin("Getting your library from your cloud copy…"));
+  let items = [];
+  for (let i = 0; i < 8; i++) {  // Word saved the papers a moment ago
+    if (window.citrelloWeb && window.citrelloWeb.cloudSync) await window.citrelloWeb.cloudSync("word");
+    items = (await api("/api/library?project=*")).items.filter((it) => wf.keys.includes(it.key));
+    if (items.length === wf.keys.length) break;
+    await new Promise((r) => setTimeout(r, 3000));
+  }
+  if (wordFetch !== wf) return;
+  loadLibrary();
+  const need = items.filter((it) => !it.fulltext);
+  const papers = need.filter((it) => it.doi || it.url).map((it) => ({key: it.key, doi: it.doi, url: it.url, title: it.title, type: it.type}));
+  const noLink = need.filter((it) => !it.doi && !it.url);
+  if (!need.length) return wordFetchDone(items.length ? "" : "These papers aren't in your cloud copy. In Word, press the button again.");
+  if (!papers.length) return wordFetchDone(`${noLink.length === 1 ? "This paper has" : "These papers have"} no DOI or link, so they can't be opened: add ${noLink.length === 1 ? "its PDF" : "their PDFs"} in Word.`);
+  if (!extVersion) {
+    wfSay(`<p>To open ${papers.length === 1 ? "this paper" : `these ${papers.length} papers`} with your university or library access, add the free <b>Citrello browser extension</b> (one click). Then come back to this tab.</p>
+      <div class="row"><a class="btn primary" href="https://citrello.app/extension" target="_blank" rel="noopener">Add the extension</a><button class="link" id="wfAgain">I've added it</button></div>
+      <p class="small muted">It opens each paper in a background tab with your login and keeps only the text.</p>`);
+    $("wfAgain").onclick = () => location.reload();  // a newly added extension starts on a fresh page
+    return;
+  }
+  wf.started = true; wf.n = papers.length;
+  wfSay(wfSpin(`The extension is opening ${papers.length} paper${papers.length === 1 ? "" : "s"} with your access (about 15 seconds each)…`) +
+    (noLink.length ? `<p class="small muted">${noLink.length} without a DOI or link can't be opened: add ${noLink.length === 1 ? "its PDF" : "their PDFs"} in Word.</p>` : ""));
+  window.postMessage({citrelloExt: "fetch", papers, fast: !!window.CITRELLO_TEST_FAST}, location.origin);
+}
+function wordFetchSaved(key) {  // one paper's text saved (from the extension's message handler)
+  const wf = wordFetch;
+  if (!wf || !wf.started || !wf.keys.includes(key)) return;
+  wf.saved.add(key);
+  if (wf.saved.size >= wf.n) return wordFetchDone();
+  wfSay(wfSpin(`${wf.saved.size} of ${wf.n} papers saved. The extension is opening the next one…`));
+}
+async function wordFetchDone(note) {
+  const wf = wordFetch;
+  if (!wf) return;
+  wfSay(wfSpin("Saving to your cloud copy, for Word…"));
+  for (let i = 0; i < 20; i++) {  // until the cloud copy has this browser's library
+    if (window.citrelloWeb && window.citrelloWeb.cloudSync) await window.citrelloWeb.cloudSync("word");
+    const st = await api("/api/web/state").catch(() => ({}));
+    if (st.stamp && st.stamp === st.cloud_stamp) break;
+    await new Promise((r) => setTimeout(r, 1500));
+  }
+  try { sessionStorage.removeItem(WF); } catch {}
+  wordFetch = null;
+  const got = wf.saved.size;
+  wfSay(`<div class="notice ok">${got ? `Done: the text of ${got} paper${got === 1 ? " is" : "s are"} saved.` : "Done."} Go back to Word: the check carries on there by itself.</div>` +
+    (note ? `<p class="small">${esc(note)}</p>` : "") +
+    (wf.started && got < wf.n ? `<p class="small muted">${wf.n - got} couldn't be opened with your access. Add ${wf.n - got === 1 ? "its PDF" : "their PDFs"} in Word.</p>` : ""));
+}
+window.addEventListener("message", (e) => {  // the extension arriving while Word's papers wait
+  if (e.source === window && e.data && e.data.citrelloExt === "hello" && wordFetch && !wordFetch.started) wordFetchStep().catch(() => {});
+});
+
 // ---------- start ----------
 const params = new URLSearchParams(location.search);
+const wordFetchKeys = (params.get("word_fetch") || (() => { try { return sessionStorage.getItem(WF) || ""; } catch { return ""; } })())
+  .split(",").map((k) => k.trim()).filter(Boolean).slice(0, 50);
 if (params.get("login_error")) { $("loginErr").textContent = "Mendeley login failed: " + params.get("login_error"); show("loginErr"); }
 if (params.get("connected") || params.get("login_error")) document.querySelector('.side button.navb[data-tab="settings"]').click();
 if (params.toString()) history.replaceState(null, "", location.pathname);
@@ -2892,6 +2978,7 @@ loadStatus().then(maybeWelcome); loadStyles();
 loadLibrary().then(() => {  // a new library starts on Home: what Citrello can do, with a guide for each
   if (!lib.items.length && !tabChosen) goTab("home");
 });
+if (wordFetchKeys.length) setTimeout(() => wordFetchStart(wordFetchKeys), 0);
 api("/api/account").then(renderSideConn).catch(() => {});
 setTimeout(() => status.web || checkUpdate(false), 3000);
 </script>

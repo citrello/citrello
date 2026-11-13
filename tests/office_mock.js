@@ -17,6 +17,7 @@
   let paraXml = [];           // Word's XML of each paragraph of a loaded document (getOoxml)
   let fileBytes = null;       // the loaded .docx (getFileAsync)
   const trackLog = [];
+  const opened = [];          // pages the add-in opened in the browser (Office.context.ui.openBrowserWindow)
   function paraSpans() {
     const t = flat(), out = [];
     let s = 0;
@@ -177,7 +178,7 @@
     EventType: { DocumentSelectionChanged: "documentSelectionChanged" },
     FileType: { Compressed: "compressed" },
     onReady(cb) { const info = { host: "Word", platform: "PC" }; setTimeout(() => cb && cb(info)); return Promise.resolve(info); },
-    context: { requirements: { isSetSupported: () => true }, document: {
+    context: { requirements: { isSetSupported: () => true }, ui: { openBrowserWindow: (url) => opened.push(url) }, document: {
       getFileAsync(type, opts, cb) {
         const data = fileBytes || new Uint8Array();
         cb({ status: "succeeded", value: { sliceCount: 1, getSliceAsync: (i, cb2) => cb2({ status: "succeeded", value: { data } }), closeAsync() {} } });
@@ -202,6 +203,7 @@
       runs: s.runs.map((r) => ({ t: r.t, ...r.font })) })),
     settings: settingsStore,
     trackLog,
+    opened,
     tracking: () => tracking,
     load(doc) {  // a real document: its .docx (base64) and each paragraph's text and XML, as Word would give them
       segs.length = 0;
