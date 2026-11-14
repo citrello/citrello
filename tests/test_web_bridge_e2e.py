@@ -251,19 +251,13 @@ def test_claude_checks_what_my_sources_say(browser_name, tmp_path):
             src.nth(3).locator(".src-locked").click()
             expect(page.locator("#proDlg")).to_be_visible()
             page.click("#proClose")
-            # with Pro (switched on by the admin for now): the library, then the web, then adding the paper found
+            # with Pro (switched on by the admin for now): a better source from the library
             assert B.call("POST", "/admin/pro", {"email": email, "pro": True}, headers={"Authorization": "Bearer testadmin"})[0] == 200
             src.nth(1).locator('[data-src-find="library"]').click()
             expect(src.nth(1).locator(".src-found")).to_contain_text("Found in your library", timeout=60000)
             expect(src.nth(1).locator('.src-found button[data-copy="[@lee2021]"]')).to_be_visible()
-            src.nth(1).locator('[data-src-find="web"]').click()
-            found = src.nth(1).locator(".src-found")
-            expect(found).to_contain_text("Found on the web", timeout=60000)
-            expect(found).to_contain_text("Cable recovery dominates offshore wind decommissioning costs")
-            # added to the library at once; no free copy of its full text, so it says the verdict rests on the abstract
-            expect(found.locator("button[data-copy]")).to_be_visible(timeout=60000)
-            expect(found).to_contain_text("no free copy, so its verdict rests on the abstract only", timeout=60000)
-            expect(found).to_contain_text("From the abstract")
+            assert src.nth(1).locator('[data-src-find="web"]').count() == 0          # no web search (switched off)
+            expect(src.nth(1).locator(".src-found")).to_contain_text("From the")      # where the verdict comes from
             # checking again: the blurred citation is checked now (Pro), the others come from this browser
             n = len(anthropic_mock.SEEN)
             page.click("#chkSources")

@@ -372,7 +372,7 @@
     <div class="home-tiles">
       <button class="home-tile" data-tour="check"><b>Catch mistakes in my references</b><span class="ht-text">Retracted papers, DOIs that don't exist (often made up by AI), wrong authors or years, the same paper listed twice.</span><span class="ht-go">Show me how →</span></button>
       <button class="home-tile" data-tour="cites"><b>Make sure every citation matches the list</b><span class="ht-text">Citations with no reference behind them, references never cited, gaps in the numbering.</span><span class="ht-go">Show me how →</span></button>
-      <button class="home-tile" data-tour="sources"><b>Check my sources say what I wrote</b><span class="ht-text">Claude reads each cited paper and says if it supports your sentence. If not, find a better reference in your library or on the web.</span><span class="ht-go">Show me how →</span></button>
+      <button class="home-tile" data-tour="sources"><b>Check my sources say what I wrote</b><span class="ht-text">Claude reads each cited paper and says if it supports your sentence. If not, find a better reference in your library.</span><span class="ht-go">Show me how →</span></button>
     </div>
     </div><div class="home-sec g2"><h2 class="home-group">Write</h2>
     <div class="home-tiles">
@@ -763,7 +763,7 @@
   <ul class="pro-list">
     <li><b>Every citation checked</b> by Claude against the paper's full text, not just 10 a month</li>
     <li><b>Find a better source in your library</b> when a paper doesn't clearly say it</li>
-    <li><b>New references from the web</b>: Claude finds published papers that support your sentence, ready to add</li>
+    <li><b>Every verdict from the paper's full text</b>, with the exact sentence that shows it</li>
   </ul>
   <p class="small muted">Pro is opening soon. Tell us you'd like it and we'll switch it on for your account.</p>
   <div class="row"><a class="btn primary" id="proGet" href="mailto:hello@citrello.app?subject=Citrello%20Pro">I'd like Pro</a><button class="link" id="proLater">Not now</button></div>
@@ -1243,8 +1243,7 @@ $("siCode").onkeydown = (e) => { if (e.key === "Enter") $("siVerify").click(); }
 $("siBack").onclick = () => { show("siStep2", false); show("siStep1"); $("siMsg").innerHTML = ""; };
 $("siClose").onclick = () => $("signinDlg").close();
 function openPro(why) {
-  $("proLead").textContent = why === "web" ? "New references from the web are part of Citrello Pro."
-    : why === "library" ? "Finding a better source in your library is part of Citrello Pro." : "Make sure every source says what you wrote.";
+  $("proLead").textContent = why === "library" ? "Finding a better source in your library is part of Citrello Pro." : "Make sure every source says what you wrote.";
   const email = lastAccount && lastAccount.email;
   $("proGet").href = "mailto:hello@citrello.app?subject=" + encodeURIComponent("Citrello Pro") + (email ? "&body=" + encodeURIComponent("Please switch on Pro for " + email + ".") : "");
   $("proDlg").showModal();
@@ -1882,7 +1881,7 @@ window.addEventListener("message", async (e) => {
       ok = r.ok; if (!ok) error = (await r.json().catch(() => ({}))).error || r.statusText;
     } catch (err) { error = err.message; }
     window.postMessage({citrelloExt: "saved", id: m.id, ok, error}, location.origin);
-    if (ok) { reloadSoon(); srcRefreshSoon(); wordFetchSaved(m.key); webFindArrived(m.key); }
+    if (ok) { reloadSoon(); srcRefreshSoon(); wordFetchSaved(m.key); }
   }
 });
 // the extension's toolbar panel: look a paper up, add it, keep its text (only "Add to Citrello" requests)
@@ -2134,7 +2133,7 @@ const markQuote = (passage, quote) => {  // the exact words Claude quoted, highl
   return i < 0 ? safe : safe.slice(0, i) + `<mark>${q}</mark>` + safe.slice(i + q.length);
 };
 const srcOpen = new Set();  // "More details" opened ("sentence.paper")
-const srcFinds = {};       // "sentence.paper" -> {kind: "library"|"web", state, papers, error}
+const srcFinds = {};       // "sentence.paper" -> {kind: "library", state, papers, error}
 
 function sourcesPanel(c, r, newOnes) {
   const head = `<div class="panel" id="chkSrcPanel" style="margin-top:16px"><strong>What your sources say</strong>
@@ -2184,7 +2183,7 @@ function paperRow(x, i, p, j) {  // one citation: how it looks in the paper, Cla
   if (DECIDED(p)) {
     tag = `<span class="tag ${VERDICT[p.status][0]}">${VERDICT[p.status][1]}</span>`;
     actions = `<button class="link" data-src-more="${id}">${open ? "Hide details" : "More details"}</button>
-      <span class="src-find">Find another reference from <button data-src-find="library" data-id="${id}">My library</button><button data-src-find="web" data-id="${id}">Web</button></span>`;
+      <span class="src-find"><button data-src-find="library" data-id="${id}">Find another reference in my library</button></span>`;
   } else if (p.status === "checking") tag = `<span class="tag">Claude is reading…</span>`;
   else if (p.status === "locked") tag = `<button class="src-locked" data-pro="1" title="Citrello Pro"><span class="blur">${["✓ Supports this", "Partly supports this", "Doesn't clearly say this"][(i + j) % 3]}</span><b>Get Pro</b></button>`;
   else if (p.status === "no_text") { tag = `<span class="tag">No text yet</span>`;
@@ -2200,30 +2199,18 @@ function paperRow(x, i, p, j) {  // one citation: how it looks in the paper, Cla
   return `<div class="src-p" data-row="${id}"><div class="src-line">${cite} ${tag}${actions ? `<span class="src-actions">${actions}</span>` : ""}</div>
     ${details ? `<div class="src-details">${details}</div>` : ""}${findHtml(id)}</div>`;
 }
-function findHtml(id) {
+function findHtml(id) {  // better sources from the library (not the web: a web search can't show that none exists)
   const f = srcFinds[id]; if (!f) return "";
-  const where = f.kind === "web" ? "on the web" : "in your library";
-  if (f.state === "busy") return `<div class="src-found small muted">${f.kind === "web" ? "Claude is searching the web for published papers that support this (about a minute)…" : "Claude is reading the best candidates in your library…"}</div>`;
+  if (f.state === "busy") return `<div class="src-found small muted">Claude is reading the best candidates in your library…</div>`;
   if (f.error) return `<div class="src-found"><div class="notice err">${esc(f.error)}</div></div>`;
-  const stateLine = {adding: "Adding Claude's papers to your library…", texts: "Getting the full text of each paper, to find the exact sentence…",
-    reading: "Claude is reading the full text…"}[f.state];
-  if (!f.papers.length) return `<div class="src-found small">No paper ${where} clearly supports this sentence.${f.kind === "library" ? ` <button class="link" data-src-find="web" data-id="${id}">Try the web</button>` : ""}</div>`;
-  const needAccess = f.kind === "web" ? f.papers.filter((p) => p.status === "needs_access" && p.hasLink) : [];
-  const tagOf = (v) => ({supports: ["ok", "Supports this"], partly: ["warn", "Partly"], contradicts: ["err", "Says something different"],
-    not_found: ["warn", "Doesn't seem to say it"]}[v] || ["warn", v]);
-  const head = stateLine ? `<p class="small muted"><span class="spinner"></span>${stateLine}</p>`
-    : needAccess.length ? `<div class="notice small">${needAccess.length === 1 ? "One paper has" : `${needAccess.length} papers have`} no free copy, so ${needAccess.length === 1 ? "its verdict rests" : "their verdicts rest"} on the abstract only. ` +
-      (f.fetching ? "The extension is opening them with your access…" : extVersion ? `<button class="primary" data-web-access="${id}">Get ${needAccess.length === 1 ? "it" : "them"} with my access</button>`
-        : `<a class="btn" href="https://citrello.app/extension" target="_blank" rel="noopener">Get the extension</a> to open ${needAccess.length === 1 ? "it" : "them"} with your access.`) + `</div>`
-    : f.kind === "web" && f.papers.some((p) => p.stage) ? `<p class="small muted">Every verdict below comes from the paper's full text. They're in your library, in the project “Found by Claude”.</p>` : "";
-  return `<div class="src-found"><p class="small" style="margin:0 0 4px"><b>Found ${where}</b></p>` + head + f.papers.map((p, k) => `<div class="src-cand">
-      <div><span class="tag ${tagOf(p.verdict)[0]}">${tagOf(p.verdict)[1]}</span>
-        <b>${esc(p.label || [p.authors, p.year].filter(Boolean).join(" "))}</b> <span class="muted">${esc(p.title)}</span>
-        ${p.doi ? `<a class="small" href="https://doi.org/${esc(p.doi)}" target="_blank" rel="noopener">${esc(p.doi)}</a>` : p.url ? `<a class="small" href="${esc(p.url)}" target="_blank" rel="noopener">link</a>` : ""}</div>
-      ${p.quote ? `<blockquote class="src-q supports">“${esc(p.quote)}”${f.kind === "web" ? `<span class="small muted">${p.stage === "fulltext" ? "From the full text" : p.status === "looking" ? "From the abstract · getting the full text…" : "From the abstract"}${p.confirmed === false ? " · its details couldn't be confirmed on Crossref: check them" : ""}</span>` : ""}</blockquote>` : ""}
+  const more = `<span class="small muted"> Papers without their full text are only checked from their abstract: add their text (Full texts) to include them fully.</span>`;
+  if (!f.papers.length) return `<div class="src-found small">No paper in your library clearly supports this sentence.${more}</div>`;
+  return `<div class="src-found"><p class="small" style="margin:0 0 4px"><b>Found in your library</b></p>` + f.papers.map((p) => `<div class="src-cand">
+      <div><span class="tag ${p.verdict === "supports" ? "ok" : "warn"}">${p.verdict === "supports" ? "Supports this" : "Partly"}</span>
+        <b>${esc(p.label)}</b> <span class="muted">${esc(p.title)}</span></div>
+      ${p.quote ? `<blockquote class="src-q supports">“${esc(p.quote)}”<span class="small muted">${p.full_text ? "From the full text" : "From the abstract only (no full text yet)"}</span></blockquote>` : ""}
       ${p.reason ? `<p class="src-reason">${esc(p.reason)}</p>` : ""}
-      <div class="row" style="margin:4px 0 0">${p.key ? `<button data-copy="[@${esc(p.key)}]">Copy [@${esc(p.key)}]</button><span class="small muted">Paste it into your sentence</span>`
-        : `<button data-src-addweb="${id}" data-k="${k}" ${p.adding ? "disabled" : ""}>${p.adding ? "Adding…" : "Add to my library"}</button>`}</div></div>`).join("") + `</div>`;
+      <div class="row" style="margin:4px 0 0"><button data-copy="[@${esc(p.key)}]">Copy [@${esc(p.key)}]</button><span class="small muted">Paste it into your sentence</span></div></div>`).join("") + `</div>`;
 }
 function srcMissing(s) {  // the cited papers in the library without text, once each
   const seen = new Map();
@@ -2271,7 +2258,7 @@ function aiLine(s) {
   let h = "";
   if (a.state === "done" || a.state === "limit") h = `<p class="small muted">Decisions by Claude, from each paper's full text. “More details” shows the exact words.${q
     ? ` This month: ${q.used} of ${q.limit} citation checks${q.pro ? " (Pro)" : ""}.` : ""}</p>`;
-  if (locked) h += `<div class="notice src-act src-pro"><span><b>${locked} more citation${locked === 1 ? "" : "s"} with Citrello Pro.</b> Free accounts get 10 citation checks a month; Pro checks every citation, and finds better sources in your library and on the web.</span>
+  if (locked) h += `<div class="notice src-act src-pro"><span><b>${locked} more citation${locked === 1 ? "" : "s"} with Citrello Pro.</b> Free accounts get 10 citation checks a month; Pro checks every citation, and finds better sources in your library.</span>
       <button class="primary" data-pro="1">Get Pro</button></div>`;
   return h;
 }
@@ -2352,13 +2339,13 @@ async function aiJudgeAll(confirmed) {
   if (s.ai.state === "busy") s.ai.state = "done";
   renderCheck();
 }
-async function srcFind(kind, id) {  // supporting papers for one citation: from the library first, or from the web
+async function srcFind(kind, id) {  // supporting papers for one citation, from the library
   const [i, j] = id.split(".").map(Number), x = chk.sources.sentences[i], p = x.papers[j];
   const claim = x.sentence.replace(CITE_RE, " ").replace(/\s+/g, " ").replace(/\s+([.,;:!?])/g, "$1").trim();
   const st = await aiReadyState();
   if (st.why === "signin") return openSignIn(() => srcFind(kind, id));
   if (!st.ok && st.why !== "limit") { chk.sources.ai = {state: st.why, error: st.error}; return renderCheck(); }
-  if (!st.quota.pro) return openPro(kind === "web" ? "web" : "library");
+  if (!st.quota.pro) return openPro("library");
   srcFinds[id] = {kind, state: "busy", papers: []}; renderCheck();
   try {
     const cited = x.papers.map((q) => q.key).filter(Boolean);
@@ -2370,77 +2357,10 @@ async function srcFind(kind, id) {  // supporting papers for one citation: from 
       const good = r.results.filter((res) => res.verdict === "supports" || res.verdict === "partly")
         .sort((a, b) => (a.verdict === "supports" ? 0 : 1) - (b.verdict === "supports" ? 0 : 1)).slice(0, 3);
       srcFinds[id] = {kind, papers: good.map((res) => { const c = papers.find((q) => q.ref === res.paper);
-        return {key: c.key, label: c.label, title: c.title, verdict: res.verdict, quote: res.quote, reason: res.reason}; })};
-    } else {
-      const exclude = x.papers.map((q) => q.doi).filter(Boolean);
-      const r = await aiFetch("POST", "/api/ai/find-web", {claim, exclude});
-      chk.sources.ai = Object.assign(chk.sources.ai || {}, {quota: r.quota});
-      srcFinds[id] = {kind, papers: r.papers, claim};
-      if (r.papers.length) return webFindVerify(id, true);
+        return {key: c.key, label: c.label, title: c.title, verdict: res.verdict, quote: res.quote, reason: res.reason, full_text: c.full_text}; })};
     }
   } catch (e) { if (e.code === "pro_only") { delete srcFinds[id]; renderCheck(); return openPro(kind); } srcFinds[id] = {kind, error: e.message, papers: []}; }
   renderCheck();
-}
-// On the web: Claude picks up to 5 papers from their abstracts; they go to the library ("Found by Claude") at once;
-// then each one's full text is fetched (free copies by themselves, the rest with the extension and the person's
-// access) and Claude reads it, so each verdict ends up resting on a sentence from the body of the paper.
-const webWaiting = new Map();  // paper key -> find id, while the extension fetches it
-async function webFindVerify(id, first) {
-  const f = srcFinds[id];
-  if (!f) return;
-  try {
-    if (first) {  // into the library, then the free copies, one paper at a time
-      f.state = "adding"; renderCheck();
-      const {added} = await post("/api/word-addin/add-found", {papers: f.papers});
-      const cited = new Set(chk.sources.sentences[+id.split(".")[0]].papers.map((q) => q.key));
-      f.papers = f.papers.map((p, k) => added[k] && {...p, key: added[k].key, confirmed: added[k].confirmed, stage: "abstract", status: "looking"})
-        .filter((p) => p && !cited.has(p.key));
-      loadLibrary();
-      for (const p of f.papers) {
-        f.state = "texts"; renderCheck();
-        const t = await post("/api/word-addin/paper-text", {key: p.key, csl: {}, search: true});
-        p.status = t.status === "text" ? "text" : "needs_access"; p.hasLink = !!(t.doi || p.url);
-      }
-    }
-    const ready = f.papers.filter((p) => p.status === "text" && p.stage !== "fulltext");
-    if (ready.length) {
-      f.state = "reading"; renderCheck();
-      const ci = await post("/api/word-addin/claim-item", {paragraph: f.claim, at: 0, keys: ready.map((p) => p.key)});
-      if (ci.item) {
-        const r = await aiFetch("POST", "/api/ai/judge", {kind: "library", items: [ci.item]});
-        chk.sources.ai = Object.assign(chk.sources.ai || {}, {quota: r.quota});
-        for (const res of r.results) { const p = f.papers.find((q) => q.key === res.paper); if (p) Object.assign(p, {stage: "fulltext", verdict: res.verdict, quote: res.quote, reason: res.reason}); }
-      }
-    }
-  } catch (e) { f.error = e.message; }
-  f.state = null; renderCheck();
-}
-function webFindAccess(id) {  // the papers without a free copy: the extension opens them with the person's access
-  const f = srcFinds[id];
-  const papers = f.papers.filter((p) => p.status === "needs_access" && p.hasLink);
-  papers.forEach((p) => webWaiting.set(p.key, id));
-  f.fetching = true; renderCheck();
-  window.postMessage({citrelloExt: "fetch", papers: papers.map((p) => ({key: p.key, doi: p.doi, url: p.url, title: p.title})), fast: !!window.CITRELLO_TEST_FAST}, location.origin);
-}
-function webFindArrived(key) {  // one of them came in: Claude reads its full text
-  const id = webWaiting.get(key);
-  if (!id || !srcFinds[id]) return;
-  webWaiting.delete(key);
-  const p = srcFinds[id].papers.find((q) => q.key === key);
-  if (p) p.status = "text";
-  webFindVerify(id, false);
-}
-async function srcAddWeb(id, k) {  // a paper Claude found on the web goes to the library (looked up and checked by its DOI)
-  const f = srcFinds[id], p = f.papers[k];
-  p.adding = true; renderCheck();
-  try {
-    const ref = `${p.authors || ""} (${p.year || "n.d."}) ${p.title}.${p.doi ? " https://doi.org/" + p.doi : p.url ? " " + p.url : ""}`;  // looked up by its DOI; the details if that fails
-    const r = await post("/api/library/add", {text: ref, project: chk.name.replace(/\.docx$/i, "")});
-    const res = r.results[0];
-    if (!res.ok) throw new Error(res.error);
-    p.key = res.item.key; toast(`Added as [@${res.item.key}]`); loadLibrary();
-  } catch (e) { toast(e.message); }
-  p.adding = false; renderCheck();
 }
 function srcRefreshSoon() {  // a paper's text arrived: show it under its sentences (only while the results are on screen)
   if (!chk || !chk.sources || !$("chkSrcPanel")) return;
@@ -2502,8 +2422,6 @@ function bindSources() {
   document.querySelectorAll("[data-src-filter]").forEach((b) => b.onclick = () => { srcFilter = b.dataset.srcFilter; srcShown = 20; renderCheck(); });
   document.querySelectorAll("[data-src-more]").forEach((b) => b.onclick = () => { const id = b.dataset.srcMore; srcOpen.has(id) ? srcOpen.delete(id) : srcOpen.add(id); renderCheck(); });
   document.querySelectorAll("[data-src-find]").forEach((b) => b.onclick = () => srcFind(b.dataset.srcFind, b.dataset.id));
-  document.querySelectorAll("[data-src-addweb]").forEach((b) => b.onclick = () => srcAddWeb(b.dataset.srcAddweb, +b.dataset.k));
-  document.querySelectorAll("[data-web-access]").forEach((b) => b.onclick = () => webFindAccess(b.dataset.webAccess));
   document.querySelectorAll("#chkSrcPanel [data-pro]").forEach((b) => b.onclick = () => openPro("all"));
   document.querySelectorAll("#chkSrcPanel [data-signin]").forEach((b) => b.onclick = () => openSignIn(() => {
     try { localStorage.setItem("citrelloAiOk", "1"); } catch {}  // the window said what's sent to Claude
@@ -2757,7 +2675,7 @@ const TOURS = {
      text: "<p>Under each sentence, each cited paper gets Claude's verdict: <b>supports</b>, <b>partly</b>, <b>seems to contradict</b> or <b>doesn't clearly say</b> it. Click <b>More details</b> to read the exact words in the paper. Use the filters to see the doubtful ones first.</p>",
      missing: "<p>No passages to show yet: add the papers' text (Full texts), then click <b>Check again</b>.</p>"},
     {el: () => document.querySelector("[data-src-find]"), title: "Find a better source",
-     text: "<p>When a paper doesn't clearly say it, look for one that does: <b>in my library</b> first (quick), or <b>on the web</b>, where Claude searches for published papers you can add with one click.</p>",
+     text: "<p>When a paper doesn't clearly say it, look for one that does <b>in your library</b>: Claude reads the papers you have and shows the exact sentence that says it.</p>",
      missing: "<p>Every citation is supported: nothing to replace. When one isn't, a <b>Find support</b> link appears under it.</p>"}]},
   fix: {title: "Turn typed references into live citations", steps: [STEP_DOC("the Word document"), STEP_WAIT,
     {el: "#chkFixPanel", title: "Choose the style", text: "<p>Pick a style from the list, or type a journal's name underneath to find its own style (there are over 10,000).</p>"},
@@ -2965,7 +2883,12 @@ const wfSpin = (t) => `<p><span class="spinner"></span>${esc(t)}</p>`;
 $("wfClose").onclick = () => { $("wfDlg").close(); wordFetch = null; try { sessionStorage.removeItem(WF); } catch {} };
 async function wordFetchStep() {
   const wf = wordFetch;
-  if (!wf || wf.started) return;
+  // once at a time: the extension saying hello while this runs mustn't start a second run (two fetch tabs)
+  if (!wf || wf.started || wf.running) return;
+  wf.running = true;
+  try { await wordFetchRun(wf); } finally { wf.running = false; }
+}
+async function wordFetchRun(wf) {
   const acct = await api("/api/account").catch(() => ({}));
   if (!acct.signed_in) {
     wfSay(`<p>Word asked for the full text of ${wf.keys.length} paper${wf.keys.length === 1 ? "" : "s"}. Sign in with the email you use in Word, so they come here.</p>

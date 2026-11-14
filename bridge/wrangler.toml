@@ -8,8 +8,8 @@ routes = [{ pattern = "mcp.citrello.app", custom_domain = true }]
 [vars]
 PUBLIC_URL = "https://mcp.citrello.app"
 MAIL_FROM = "Citrello <hello@citrello.app>"
-# Claude checks (src/ai.js): Sonnet for verdicts and library checks (Armin, 12 Nov); Haiku for the web search step
-# of web checks, ~3-5 cents instead of ~20 (Armin, 13 Nov): Sonnet then checks the papers it finds on their full text
+# Claude checks (src/ai.js): Sonnet for verdicts and library checks (Armin, 12 Nov). Finding papers on the web is
+# switched off (Armin, 14 Nov; AI_WEB_FIND = "1" would turn it back on, with Haiku doing the search)
 AI_MODEL = "claude-sonnet-5-5"
 AI_WEB_MODEL = "claude-haiku-5-5"
 

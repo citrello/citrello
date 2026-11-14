@@ -748,7 +748,12 @@ async function route(request, env, ctx) {
   if (path === "/device/connect") return deviceConnect(request, env);
   if (path === "/api/ai/quota" && m === "GET") return aiCall(request, env, (d) => ai.quota(env, d.user_id));
   if (path === "/api/ai/judge" && m === "POST") return aiCall(request, env, async (d) => ai.judge(env, d.user_id, await readBody(request)));
-  if (path === "/api/ai/find-web" && m === "POST") return aiCall(request, env, async (d) => ai.findOnWeb(env, d.user_id, await readBody(request)));
+  // Finding papers on the web is switched off (Armin, 14 Nov): a web search can't show that no paper supports a
+  // sentence, so Citrello finds better sources only in the person's library, where it has the full texts.
+  if (path === "/api/ai/find-web" && m === "POST") {
+    if (env.AI_WEB_FIND !== "1") return json({ error: "not_offered", error_description: "Finding papers on the web isn't part of Citrello. Find another reference in your library instead." }, 410);
+    return aiCall(request, env, async (d) => ai.findOnWeb(env, d.user_id, await readBody(request)));
+  }
   if (path === "/admin/pro" && m === "POST") return adminPro(request, env);
   if (path === "/api/cloud/available" && m === "GET") return json({ ready: !!env.CLOUD });  // is the cloud copy switched on?
   if (path === "/api/cloud" && m === "GET") return cloudCall(request, env, (d) => cloud.info(env, d.user_id));

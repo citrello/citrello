@@ -54,10 +54,8 @@ def test_claude_checks(claude):
     assert sent["body"]["output_config"]["format"]["type"] == "json_schema"  # a structured answer
     assert sent["body"]["fallbacks"] == "default"
 
-    # finding supporting papers (library or web) is for Pro: refused plainly, nothing sent to Claude
+    # finding supporting papers in the library is for Pro: refused plainly, nothing sent to Claude
     n = len(claude)
-    st, _, raw = call("POST", "/api/ai/find-web", {"claim": "Cable recovery is the costliest step."}, headers=me)
-    assert st == 402 and json.loads(raw)["error"] == "pro_only"
     st, _, raw = call("POST", "/api/ai/judge", {"kind": "library", "items": [ITEM]}, headers=me)
     assert st == 402 and json.loads(raw)["error"] == "pro_only" and len(claude) == n
 
@@ -74,15 +72,12 @@ def test_claude_checks(claude):
     q = json.loads(call("GET", "/api/ai/quota", headers=me)[2])
     assert q["pro"] and q["limit"] > 3 and q["web_limit"] > 0
     assert call("POST", "/api/ai/judge", {"items": [ITEM]}, headers=me)[0] == 200
-    # with Pro: supporting papers on the web (Claude searches) and in the library (counts as one check)
+    # finding papers on the web is switched off, even with Pro (a web search can't show that none exists); finding
+    # better sources in the library is Pro, and counts as one check
+    n = len(claude)
     st, _, raw = call("POST", "/api/ai/find-web", {"claim": "Cable recovery is the costliest step."}, headers=me)
-    assert st == 200, raw
-    r = json.loads(raw)
-    assert r["papers"][0]["doi"] == "10.1016/j.example.2021.0042" and r["quota"]["web_used"] == 1
-    web = claude[-1]["body"]  # the cheap search step: Haiku, search results only (no pages opened), low effort
-    assert web["model"] == "claude-haiku-5-5" and [t["type"] for t in web["tools"]] == ["web_search_20250305"]
-    assert web["tools"][0]["max_uses"] == 3 and web["output_config"]["effort"] == "low"
-    used = r["quota"]["used"]
+    assert st == 410 and json.loads(raw)["error"] == "not_offered" and len(claude) == n   # Claude wasn't asked
+    used = q["used"] + 1
     two = [dict(ITEM["papers"][0], ref=str(i)) for i in range(2)]
     st, _, raw = call("POST", "/api/ai/judge", {"kind": "library", "items": [dict(ITEM, papers=two)]}, headers=me)
     assert st == 200 and json.loads(raw)["quota"]["used"] == used + 1

@@ -87,22 +87,6 @@ def main():
     total += c
     print(f"  cost ${c:.4f}")
 
-    # 3. a web check
-    t = time.time()
-    st, _, raw = call("POST", "/api/ai/find-web", {"claim": "Most decommissioned wind turbine blades end up in landfill."}, headers=me)
-    took = time.time() - t
-    r = json.loads(raw)
-    print(f"\n== Web check: {took:.1f} s, {r.get('usage')}")
-    if st != 200:
-        print("   failed:", st, raw)
-    if r.get("raw"):
-        print("   no papers; Claude's answer ended with (stop:", r.get("stop"), "):\n", r["raw"])
-    for p in r.get("papers", []):
-        print(f"   {p['verdict']:<9} {p['authors']} ({p['year']}) {p['title']} doi:{p['doi']}\n             {p['quote']!r}")
-    if st == 200:
-        c = cost(r["usage"])
-        total += c
-        print(f"  cost ${c:.4f}")
     print(f"\n== Total for this test: ${total:.4f}")
     return 0
 

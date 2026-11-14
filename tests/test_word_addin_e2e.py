@@ -312,31 +312,16 @@ def test_word_addin_checks_a_claim_and_finds_another(tmp_path):
             assert B.call("POST", "/admin/pro", {"email": email, "pro": True}, headers={"Authorization": "Bearer testadmin"})[0] == 200
             doc("__doc.clickControl(0)")
             expect(page.locator("#claimOut .verdict.supports")).to_be_visible(timeout=10000)  # checked before: shown again
-            page.click("#findAnother")
-            page.click("#findLib")
+            page.click("#findAnother")                                                  # straight to the library
             lee = page.locator("#claimOut .verdict", has_text="Lee 2021")
             expect(lee).to_contain_text("Supports it", timeout=60000)
+            expect(lee).to_contain_text("From the full text.")                         # Lee's text is in the library
             page.screenshot(path=os.path.join(shots, "word-find-another.png"))
             lee.locator("button[data-add]:has-text('Add to this citation')").click()
             page.wait_for_function("__doc.controls()[0].text.includes('Lee')", timeout=30000)
             expect(page.locator("#curList li")).to_have_count(2)
             expect(page.locator("#quotaLine")).to_contain_text("Citrello Pro")
 
-            # with Pro, on the web: Claude picks papers from their abstracts, they go to the library, then Claude reads
-            # their full text (here the paper is already in the library with its text) for the exact sentence
-            page.locator("#curList li", has_text="Lee").locator("button[data-rm]").click()  # Claude's paper isn't cited yet
-            expect(page.locator("#curList li")).to_have_count(1, timeout=30000)
-            page.click("#findAnother")
-            page.click("#findWeb")
-            web = page.locator("#claimOut .verdict", has_text="Cable recovery dominates")
-            expect(web).to_contain_text("The full text supports it", timeout=120000)
-            expect(web).to_contain_text("From the full text.")
-            expect(web).not_to_contain_text("couldn't be confirmed")                    # it was already in the library
-            expect(page.locator("#claimOut")).to_contain_text("Every verdict below comes from the paper's full text")
-            expect(page.locator("#claimOut")).to_contain_text("in the project “Found by Claude”")
-            kinds = [m["body"]["messages"][0]["content"] for m in anthropic_mock.SEEN[-2:]]
-            assert "The sentence:" in kinds[0] and "<passage" in kinds[1]               # web search, then full-text check
-            page.screenshot(path=os.path.join(shots, "word-find-web.png"))
             assert not errors, errors
             b.close()
     finally:
@@ -350,7 +335,9 @@ window.addEventListener("message", (e) => {
   const m = e.data;
   if (e.source !== window || !m) return;
   if (m.citrelloExt === "ping") window.postMessage({citrelloExt: "hello", version: "test"}, location.origin);
+  if (m.citrelloExt === "ping") setTimeout(() => window.postMessage({citrelloExt: "hello", version: "test"}, location.origin), 1200);
   if (m.citrelloExt === "fetch") {
+    window.__fetches = (window.__fetches || 0) + 1;
     window.__fetched = m.papers.map((p) => p.key);
     window.postMessage({citrelloExt: "fetch-started", n: m.papers.length}, location.origin);
     m.papers.forEach((p, i) => setTimeout(() => window.postMessage({citrelloExt: "fulltext", id: "t" + i, key: p.key,
@@ -421,6 +408,7 @@ def test_word_addin_gets_paywalled_papers_through_the_web_app(tmp_path):
             expect(dlg).to_contain_text("Go back to Word", timeout=120000)
             expect(dlg).to_contain_text("the text of 1 paper is saved")
             assert web.evaluate("window.__fetched") == ["wang2020"]
+            assert web.evaluate("window.__fetches") == 1                                # one fetch page, not two
             web.screenshot(path=os.path.join(shots, "web-papers-for-word.png"))
 
             # Word carries on by itself: the paper's text came through the cloud copy
@@ -499,6 +487,7 @@ def test_word_fetch_uses_the_citrello_tab_already_open(tmp_path):
             expect(dlg).to_contain_text("Go back to Word", timeout=120000)
             assert "Sign in" not in dlg.inner_text()
             assert second.evaluate("window.__fetched") == ["wang2020"]
+            assert second.evaluate("window.__fetches") == 1                             # one fetch page, not two
             expect(word.locator("#claimOut .verdict:not(.none)")).to_have_count(1, timeout=120000)
             assert not errors, errors
             b.close()

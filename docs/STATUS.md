@@ -239,6 +239,14 @@ manifest: `site/public/word/manifest.xml` (id ef6ca1ae-67cf-48fb-89a7-189c074612
   (`docconvert.notes`, WordApi 1.4 `insertComment`): retracted / not found / DOI problems on each citation of that
   paper, a typed [7] with no reference, [@Key] markers not in the library, entries never cited; problems that
   fixing corrects and minor notes (No DOI, preprint, web page) are left out; no duplicates on a second press.
+- **Finding papers on the web: switched off (Armin, 14 Nov 2026).** A web search can't show that no paper supports a
+  sentence ("feels like a scam"), so "Find another reference" searches only the library, where Citrello has the full
+  texts (results say "From the full text" or "From the abstract only"). Removed from the Word panel, the web app,
+  the Pro window and the website; the bridge answers `/api/ai/find-web` with 410 unless `AI_WEB_FIND = "1"`
+  (`ai.findOnWeb` kept, Haiku search step, if it ever comes back). Credits: claim check 3, library find 8.
+- **Two fetch tabs from Word, fixed (14 Nov):** with Citrello already open and signed in, the extension's hello
+  arriving while "Papers for Word" was loading the library started a second run, so two fetch pages opened.
+  `wordFetchStep` now runs once at a time (test: the already-open-tab scenario asserts one fetch).
 - Windows install when "More Add-ins" is greyed out (university accounts): the PowerShell line on citrello.app/word
   registers the manifest under HKCU\Software\Microsoft\Office\16.0\WEF\Developer (worked for Armin).
 - **Next:** Armin tries it in Word on the web (citrello.app/word steps); Pro "Find me a new paper" and "Check this

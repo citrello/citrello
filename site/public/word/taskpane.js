@@ -868,15 +868,14 @@
     } catch (e) { claimBusy = false; claimFail(e); }
   };
 
-  // ----- find another reference (Pro): in the library, or on the web -----
-  let found = { library: [], web: [] };
+  // ----- find another reference (Pro): in the library, where Citrello has the papers' full text -----
+  // (Not on the web: a web search can't show that no paper supports the sentence, so it was taken out, 14 Nov.)
+  let found = { library: [] };
   $("findAnother").onclick = async () => {
     if (!quota || !quota.pro) await loadQuota();  // just switched to Pro?
-    if (!quota || !quota.pro) return showPro("Finding another reference is part of Citrello Pro.");
+    if (!quota || !quota.pro) return showPro("Finding another reference in your library is part of Citrello Pro.");
     show("proCard", false);
-    claimSay('<p class="small">Find another reference that says this:</p><div class="row"><button id="findLib">In my library</button><button id="findWeb">On the web</button></div>');
-    $("findLib").onclick = () => findInLibrary().catch(claimFail);
-    $("findWeb").onclick = () => findOnWeb().catch(claimFail);
+    findInLibrary().catch(claimFail);
   };
   async function claimOfCurrent() {
     return (await post("/api/word-addin/claim-item", { paragraph: current.paragraph, at: current.at, keys: [] })).claim;
@@ -885,88 +884,18 @@
     claimSay(spin("Looking through your library…"));
     const claim = await claimOfCurrent();
     const cands = (await post("/api/sources/library-candidates", { claim, exclude: current.payload.citationItems.map((c) => c.id) })).papers;
-    if (!cands.length) return claimSay('<div class="notice">Nothing in your library seems to say this. Try <button class="link" id="findWeb2">the web</button>.</div>'), ($("findWeb2").onclick = () => findOnWeb().catch(claimFail));
-    claimSay(spin(`Claude is reading ${cands.length} papers from your library…`));
+    const more = '<p class="small muted">Papers without their full text in Citrello are only checked from their abstract: add their text (Full texts in Citrello) to include them fully.</p>';
+    if (!cands.length) return claimSay('<div class="notice">Nothing in your library seems to say this.</div>' + more);
+    claimSay(spin(`Claude is reading ${cands.length} paper${cands.length === 1 ? "" : "s"} from your library…`));
     const res = await bridgeAi("POST", "/api/ai/judge", { kind: "library", items: [{ id: "lib", claim, papers: cands }] });
     found.library = res.results.filter((r) => r.verdict === "supports" || r.verdict === "partly")
-      .map((r) => ({ ...r, cand: cands.find((c) => c.ref === r.paper) })).filter((r) => r.cand);
-    if (!found.library.length) return claimSay('<div class="notice">None of the papers in your library clearly says this.</div>');
+      .map((r) => ({ ...r, cand: cands.find((c) => c.ref === r.paper) })).filter((r) => r.cand)
+      .sort((a, b) => (b.cand.full_text ? 1 : 0) - (a.cand.full_text ? 1 : 0) || (a.verdict === "supports" ? -1 : 1));
+    if (!found.library.length) return claimSay(`<div class="notice">None of the ${cands.length} closest papers in your library clearly says this.</div>` + more);
     claimSay(found.library.map((r) => `<div class="verdict ${r.verdict}"><b>${esc(r.cand.label)}: ${VERDICT[r.verdict]}</b>${esc(r.cand.title)}<br>${esc(r.reason)}` +
-      `${r.quote ? `<q>${esc(r.quote)}</q>` : ""}<div class="row"><button data-add="${esc(r.cand.key)}">Add to this citation</button><button data-add="${esc(r.cand.key)}" data-how="replace">Use instead</button></div></div>`).join(""));
+      `${r.quote ? `<q>${esc(r.quote)}</q>` : ""}<span class="small muted">${r.cand.full_text ? "From the full text." : "From the abstract only (no full text in Citrello yet)."}</span>` +
+      `<div class="row"><button data-add="${esc(r.cand.key)}">Add to this citation</button><button data-add="${esc(r.cand.key)}" data-how="replace">Use instead</button></div></div>`).join(""));
     wireClaim();
-  }
-  // On the web: Claude picks up to 5 papers from their abstracts; they go to the library ("Found by Claude") and are
-  // shown at once; then each one's full text is fetched (free copies by themselves, the rest with the person's access)
-  // and Claude reads it, so each verdict ends up resting on a sentence from the body of the paper.
-  let webRun = null;  // {cit, claim, papers: [{...claude's, key, confirmed, stage, status}]}
-  async function findOnWeb() {
-    const cit = current;
-    claimSay(spin("Claude is searching published papers (about a minute)…"));
-    const claim = await claimOfCurrent();
-    const res = await bridgeAi("POST", "/api/ai/find-web", { claim, context: cit.paragraph.slice(0, 2000),
-      exclude: cit.payload.citationItems.map((c) => (c.itemData || {}).DOI).filter(Boolean) });
-    if (!(res.papers || []).length) return claimSay('<div class="notice">Claude didn\'t find a published paper that clearly says this.</div>');
-    claimSay(spin(`Claude found ${res.papers.length} paper${res.papers.length === 1 ? "" : "s"}. Adding them to your library…`));
-    const added = (await post("/api/word-addin/add-found", { papers: res.papers })).added;
-    const inCitation = new Set(cit.payload.citationItems.map((c) => c.id));
-    const papers = res.papers.map((p, i) => added[i] && { ...p, key: added[i].key, confirmed: added[i].confirmed, stage: "abstract", status: "looking" })
-      .filter((p) => p && !inCitation.has(p.key));
-    if (!papers.length) return claimSay('<div class="notice">Claude only found papers that are already in this citation.</div>');
-    libChanged = true;
-    const run = webRun = { cit, claim, papers };
-    found.web = papers;
-    showWeb(run, `Getting the full text of each paper, to find the exact sentence…`);
-    for (let i = 0; i < papers.length; i++) {  // free copies, one paper at a time
-      if (webRun !== run) return;
-      const t = await post("/api/word-addin/paper-text", { key: papers[i].key, csl: {}, search: true });
-      papers[i].status = t.status === "text" ? "text" : "needs_access";
-      papers[i].hasLink = !!(t.doi || papers[i].url);
-      showWeb(run, `Getting the full text of each paper (${i + 1} of ${papers.length})…`);
-    }
-    await verifyWeb(run);
-    pushLibrary().catch(() => {});
-  }
-  async function verifyWeb(run) {  // Claude reads the full text of the papers that have it
-    const ready = run.papers.filter((p) => p.status === "text" && p.stage !== "fulltext");
-    if (ready.length) {
-      showWeb(run, `Claude is reading the full text of ${ready.length} paper${ready.length === 1 ? "" : "s"}…`);
-      const ci = await post("/api/word-addin/claim-item", { paragraph: run.cit.paragraph, at: run.cit.at, keys: ready.map((p) => p.key) });
-      if (ci.item) {
-        const res = await bridgeAi("POST", "/api/ai/judge", { kind: "library", items: [ci.item] });
-        for (const r of res.results) {
-          const p = run.papers.find((x) => x.key === r.paper);
-          if (p) Object.assign(p, { stage: "fulltext", verdict: r.verdict, quote: r.quote, reason: r.reason });
-        }
-      }
-    }
-    showWeb(run);
-  }
-  const FT_VERDICT = { supports: "✓ The full text supports it", partly: "≈ The full text partly supports it",
-                       contradicts: "✗ The full text says something different", not_found: "? The full text doesn't seem to say it" };
-  function showWeb(run, busy) {
-    if (webRun !== run || !current || current.payload.citationID !== run.cit.payload.citationID) return;
-    const rank = (p) => (p.stage === "fulltext" ? 0 : 1) * 10 + ({ supports: 0, partly: 1, not_found: 2, contradicts: 3 }[p.verdict] ?? 2);
-    const order = run.papers.map((p, i) => [p, i]).sort((a, b) => rank(a[0]) - rank(b[0]));
-    const needAccess = run.papers.filter((p) => p.status === "needs_access" && p.hasLink);
-    const head = busy ? spin(busy) : needAccess.length
-      ? `<div class="notice">${needAccess.length === 1 ? "One paper has" : `${needAccess.length} papers have`} no free copy, so ${needAccess.length === 1 ? "its verdict rests" : "their verdicts rest"} on the abstract only.` +
-        `<div class="row"><button class="primary" id="webAccess">Get ${needAccess.length === 1 ? "it" : "them"} with my access</button></div></div>`
-      : `<p class="small muted">Every verdict below comes from the paper's full text.</p>`;
-    claimSay(head + order.map(([p, i]) => {
-      const ft = p.stage === "fulltext";
-      const where = ft ? "From the full text." : p.status === "looking" ? "From the abstract · getting the full text…"
-        : p.status === "needs_access" ? "From the abstract · no free copy of the full text." : "From the abstract.";
-      return `<div class="verdict ${esc(p.verdict)}"><b>${esc(p.authors)}${p.year ? " (" + esc(p.year) + ")" : ""}: ${ft ? FT_VERDICT[p.verdict] : VERDICT[p.verdict]}</b>${esc(p.title)}<br>${esc(p.reason)}` +
-        `${p.quote ? `<q>${esc(p.quote)}</q>` : ""}<span class="small muted">${where}${p.confirmed ? "" : " Its details couldn't be confirmed on Crossref: check them."}</span>` +
-        `${p.doi ? ` <a class="small" href="https://doi.org/${esc(p.doi)}" target="_blank" rel="noopener">doi.org/${esc(p.doi)}</a>` : ""}` +
-        `<div class="row"><button data-add="${esc(p.key)}">Add to this citation</button><button data-add="${esc(p.key)}" data-how="replace">Use instead</button></div></div>`;
-    }).join("") + '<p class="small muted">They\'re in your library, in the project “Found by Claude”.</p>');
-    wireClaim();
-    if ($("webAccess")) $("webAccess").onclick = () => viaBrowser(needAccess.map((p) => p.key), run.cit, async () => {
-      needAccess.forEach((p) => { p.status = "text"; });
-      webRun = run;
-      await verifyWeb(run);
-    }).catch(claimFail);
   }
   async function useFound(key, replace) {
     if (replace) await editCurrent((p) => { p.citationItems.length = 0; });
