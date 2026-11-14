@@ -75,6 +75,7 @@ so their AI assistant can read them.
 The code is not minified or generated: answer "No" when asked whether the add-on contains minified or machine-generated code.
 
 ## Screenshots and promo image
-1280 × 800: the fetch page ("Full texts with your access") and the notice on a paper's page are in
-packaging/extension-shots/ (extension-fetch.png, extension-notice.png); a 440 × 280 promo tile is promo-440x280.png. For the toolbar panel,
+1280 × 800, in packaging/extension-shots/, in this order: store-panel.png (the toolbar panel on a real paper's
+page), store-notice.png (the notice on a paper in the library without its text), extension-fetch.png (the fetch page,
+"Full texts with your access"). A 440 × 280 promo tile is promo-440x280.png. For the toolbar panel,
 take a screenshot of a real paper's page with the panel open (Windows: Win+Shift+S; Mac: Cmd+Shift+4), at 1280 × 800.
