@@ -24,6 +24,10 @@ This extension adds two things:
   takes its text, and closes the tab. ChatGPT and Claude can then check what your sources really say. It goes
   slowly on purpose, one paper every 10–20 seconds, because publishers don't allow fast automatic downloading.
 
+• Never miss a paper's text. Open a paper that's in your Citrello library without its full text, and the extension
+  says so on the page, with one button: "Add its text". (Optional: it's turned on when you allow the extension to
+  read pages, and the check happens on your computer.)
+
 Only the text is kept, in your Citrello library on your own computer (or in your browser). Nothing is sent to
 Citrello's servers. Source code: github.com/citrello/citrello
 
@@ -70,6 +74,7 @@ so their AI assistant can read them.
 ## Firefox: source code
 The code is not minified or generated: answer "No" when asked whether the add-on contains minified or machine-generated code.
 
-## Screenshots
-1280 × 800: the fetch page ("Full texts with your access") is in packaging/extension-shots/. For the toolbar panel,
+## Screenshots and promo image
+1280 × 800: the fetch page ("Full texts with your access") and the notice on a paper's page are in
+packaging/extension-shots/ (extension-fetch.png, extension-notice.png); a 440 × 280 promo tile is promo-440x280.png. For the toolbar panel,
 take a screenshot of a real paper's page with the panel open (Windows: Win+Shift+S; Mac: Cmd+Shift+4), at 1280 × 800.
