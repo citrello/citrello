@@ -5,6 +5,11 @@ name: Real test of Claude checks
 # (a few cents). Nothing is deployed.
 on:
   workflow_dispatch:
+    inputs:
+      model:
+        description: "Claude model for the checks (empty: the one in bridge/wrangler.toml)"
+        required: false
+        default: ""
 
 jobs:
   real:
@@ -29,7 +34,8 @@ jobs:
           npm ci
           npx wrangler d1 migrations apply citrello --local
           printf 'ANTHROPIC_API_KEY=%s\n' "$ANTHROPIC_API_KEY" > .dev.vars
-          npx wrangler dev --port 8787 --var DEV_RETURN_CODES:1 --var ADMIN_TOKEN:testadmin --var PUBLIC_URL:http://localhost:8787 > wrangler.log 2>&1 &
+          MODEL_VAR=""; [ -n "${{ inputs.model }}" ] && MODEL_VAR="--var AI_MODEL:${{ inputs.model }}"
+          npx wrangler dev --port 8787 --var DEV_RETURN_CODES:1 --var ADMIN_TOKEN:testadmin --var PUBLIC_URL:http://localhost:8787 $MODEL_VAR > wrangler.log 2>&1 &
           for i in $(seq 60); do curl -sf http://localhost:8787/ > /dev/null && break; sleep 1; done
       - name: Real cases
         run: CITRELLO_BRIDGE=http://localhost:8787 CITRELLO_BRIDGE_E2E=1 python tests/ai_real_check.py || { tail -50 bridge/wrangler.log; exit 1; }
