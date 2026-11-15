@@ -177,15 +177,20 @@ def test_find_free_full_texts_in_the_browser(browser_name, tmp_path):
 @pytest.mark.parametrize("browser_name", BROWSERS)
 def test_claude_checks_what_my_sources_say(browser_name, tmp_path):
     """Claude's decision for each citation (through the bridge, with a pretend Claude API): signing in in a window,
-    free accounts' allowance (the rest blurred, never sent), the exact words in "More details", and Pro (finding
-    support in the library and on the web, and adding the paper found)."""
+    what the credits cover (the rest blurred, never sent), the exact words in "More details", the Plans window, and
+    with more credits finding support in the library."""
     from playwright.sync_api import expect, sync_playwright
     import docx
     import anthropic_mock
+    import stripe_mock
+    from test_bridge_ai_e2e import sign_in as api_sign_in
     from test_sources import PAPER
-    srv = anthropic_mock.start()
+    srv, pay = anthropic_mock.start(), stripe_mock.start()
     anthropic_mock.SEEN.clear()
     email = f"ai-{browser_name}-{int(time.time())}@example.com"
+    admin = {"Authorization": "Bearer testadmin"}
+    api_sign_in(email)                                                                     # the account exists...
+    assert B.call("POST", "/admin/credits", {"email": email, "credits": -91}, headers=admin)[0] == 200  # ...with 9 credits
     bib = tmp_path / "two.bib"
     bib.write_text("@article{topham2017, title={Sustainable decommissioning of an offshore wind farm}, author={Topham, Eva}, year={2017}}\n"
                    "@article{lee2021, title={Export cable recovery costs}, author={Lee, Ann}, year={2021}}\n", encoding="utf-8")
@@ -231,39 +236,42 @@ def test_claude_checks_what_my_sources_say(browser_name, tmp_path):
             page.fill("#siCode", B.bc.start_sign_in(email)["dev_code"])
             page.click("#siVerify")
             expect(page.locator("#signinDlg")).to_be_hidden(timeout=30000)
-            # straight on to Claude (no second question): this free account's 3 checks, the 4th citation blurred
+            # straight on to Claude (no second question): 9 credits cover 3 citations, the 4th is blurred
             expect(src.nth(0)).to_contain_text("Supports this", timeout=60000)
             expect(src.nth(1)).to_contain_text("Seems to contradict this")
             expect(src.nth(3).locator(".src-locked")).to_be_visible()
-            expect(page.locator("#srcAi")).to_contain_text("1 more citation with Citrello Pro")
-            expect(page.locator("#srcAi")).to_contain_text("This month: 3 of 3 citation checks")
+            expect(page.locator("#srcAi")).to_contain_text("1 more citation to check: not enough credits left")
+            expect(page.locator("#srcAi")).to_contain_text("0 credits left")
             expect(src.nth(0).locator(".src-cite")).to_have_text("[@topham2017]")  # the citation as in the paper
             assert not any("thirty turbines" in json.dumps(r["body"]) for r in anthropic_mock.SEEN)  # the blurred one was never sent
             # More details: the paper, Claude's reason and the exact words, highlighted
             src.nth(1).locator("[data-src-more]").click()
             expect(src.nth(1).locator("mark")).to_contain_text("halved that cost")
             expect(src.nth(1)).to_contain_text("The paper says it halved the cost.")
-            # free account: finding support opens the window about Pro
+            # no credits left: finding support opens the Plans window, with Stripe's prices
             src.nth(1).locator('[data-src-find="library"]').click()
             expect(page.locator("#proDlg")).to_be_visible()
-            expect(page.locator("#proLead")).to_contain_text("better source in your library")
+            expect(page.locator("#proLead")).to_contain_text("needs 8 credits and 0 are left")
+            expect(page.locator("#planList .plan-card", has_text="Researcher")).to_contain_text("£18")
+            page.check("#planEvery input[value=year]")
+            expect(page.locator("#planList .plan-card", has_text="Researcher")).to_contain_text("£150")
             page.click("#proLater")
             src.nth(3).locator(".src-locked").click()
             expect(page.locator("#proDlg")).to_be_visible()
             page.click("#proClose")
-            # with Pro (switched on by the admin for now): a better source from the library
-            assert B.call("POST", "/admin/pro", {"email": email, "pro": True}, headers={"Authorization": "Bearer testadmin"})[0] == 200
+            # more credits (given by the admin here; a plan in real life): a better source from the library
+            assert B.call("POST", "/admin/credits", {"email": email, "credits": 100}, headers=admin)[0] == 200
             src.nth(1).locator('[data-src-find="library"]').click()
             expect(src.nth(1).locator(".src-found")).to_contain_text("Found in your library", timeout=60000)
             expect(src.nth(1).locator('.src-found button[data-copy="[@lee2021]"]')).to_be_visible()
             assert src.nth(1).locator('[data-src-find="web"]').count() == 0          # no web search (switched off)
             expect(src.nth(1).locator(".src-found")).to_contain_text("From the")      # where the verdict comes from
-            # checking again: the blurred citation is checked now (Pro), the others come from this browser
+            # checking again: the blurred citation is checked now, the others come from this browser
             n = len(anthropic_mock.SEEN)
             page.click("#chkSources")
             expect(src.nth(3).locator(".src-locked")).to_have_count(0, timeout=60000)
             expect(src.nth(3).locator(".tag")).to_contain_text("Supports this")
-            expect(page.locator("#srcAi")).to_contain_text("(Pro)")
+            expect(page.locator("#srcAi")).to_contain_text("89 credits left")
             assert len(anthropic_mock.SEEN) == n + 1
             page.locator("#chkSrcPanel").scroll_into_view_if_needed()
             page.screenshot(path=os.path.join(os.environ.get("CITRELLO_E2E_SHOTS") or str(tmp_path), f"web-bridge-{browser_name}-claude.png"))
@@ -271,6 +279,7 @@ def test_claude_checks_what_my_sources_say(browser_name, tmp_path):
             b.close()
     finally:
         srv.stop()
+        pay.stop()
 
 
 @pytest.mark.parametrize("browser_name", BROWSERS)

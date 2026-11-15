@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Thank you · Citrello</title>
+<meta name="description" content="Your Citrello plan.">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link href="https://fonts.googleapis.com/css2?family=Gloock&family=Figtree:wght@400;500;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/site.css">
+<style>.policy{padding:56px 24px 96px}.policy h1{font-size:clamp(40px,5vw,56px);margin-bottom:8px}.policy h2{font-size:28px;margin:36px 0 8px}.policy p,.policy li{font-size:17px}.policy .date{color:var(--muted)}</style>
+</head>
+<body>
+<div class="tiles" aria-hidden="true"></div>
+<header class="wrap nav"><a class="logo" href="/">citr<span>ello</span></a>
+  <nav aria-label="Main"><a href="/app/">Web app</a><a href="/#problems">What it fixes</a><a href="https://github.com/citrello/citrello">GitHub</a><a class="nav-cta" href="/#download">Download</a></nav></header>
+<main class="wrap narrow policy">
+<h1 id="tTitle">Thank you</h1>
+<p id="tText">Your plan is ready. Its credits appear in Citrello by themselves within a minute: in Word, in the web app and in the desktop app.</p>
+<p>You can close this tab and go back to what you were writing.</p>
+<p><a class="btn" href="/app/">Open the web app</a></p>
+<p class="date">Manage your plan (switch, change card, cancel) any time with "Manage plan" next to your credits in Citrello. Questions: <a href="mailto:hello@citrello.app">hello@citrello.app</a>.</p>
+<script>
+(() => {
+  const q = new URLSearchParams(location.search), set = (id, t) => { document.getElementById(id).textContent = t; };
+  const ready = (n, c) => set("tText", `Your ${n} plan is ready: ${c} credits a month. They appear in Citrello by themselves within a minute: in Word, in the web app and in the desktop app.`);
+  if (q.get("cancelled")) { set("tTitle", "No payment made"); set("tText", "You left Stripe's page before paying, so nothing was charged. You can choose a plan again any time from Citrello."); }
+  else if (q.get("managed")) { set("tTitle", "All set"); set("tText", "Your changes are saved. Citrello shows them by itself within a minute."); }
+  else if (q.get("plan") === "researcher") ready("Researcher", "4,000");
+  else if (q.get("plan") === "student") ready("Student", "1,000");
+})();
+</script>
+</main>
+<footer><div class="tiles" aria-hidden="true"></div><div class="wrap foot"><a class="logo" href="/">citr<span>ello</span></a><p>References, the sweet part.</p>
+<nav aria-label="Footer"><a href="https://github.com/citrello/citrello">GitHub</a><a href="/privacy">Privacy</a><a href="/terms">Terms</a><a href="/pricing">Pricing</a><a href="https://github.com/citrello/citrello/blob/main/LICENSE">Licence (AGPL)</a></nav>
+<p class="small">© 2026 Armin Hosseinghorbani. Citrello™ is a trademark of Armin Hosseinghorbani.</p></div></footer>
+</body>
+</html>

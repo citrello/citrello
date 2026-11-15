@@ -11,6 +11,8 @@
 import { Relay } from "./relay.js";
 import * as pages from "./pages.js";
 import * as ai from "./ai.js";
+import * as billing from "./billing.js";
+import * as credits from "./credits.js";
 import * as cloud from "./cloud.js";
 
 export { Relay };
@@ -618,7 +620,7 @@ async function aiCall(request, env, fn) {
   try {
     return json(await fn(d));
   } catch (e) {
-    if (e instanceof ai.AiError) throw new HttpError(e.status, e.code, e.message);
+    if (e instanceof ai.AiError || ai.isCreditError(e)) throw new HttpError(e.status, e.code, e.message);
     if (ai.isApiError(e)) {  // the Claude API said no (busy, overloaded, bad key...)
       console.error("Claude API", e.status, e.message);
       throw new HttpError(e.status === 429 || e.status === 529 ? 503 : 502, "ai_unavailable",
@@ -639,13 +641,40 @@ async function cloudCall(request, env, fn) {
   }
 }
 
-// Turn Citrello Pro on or off for an account (until payments exist): {"email": ..., "pro": true}
-async function adminPro(request, env) {
+// Give credits to an account by hand (support, refunds, testers): {"email": ..., "credits": 500}
+async function adminCredits(request, env) {
   requireAdmin(request, env);
   const b = await readBody(request);
-  const r = await env.DB.prepare("UPDATE users SET pro = ? WHERE email = ?").bind(b.pro ? 1 : 0, String(b.email || "").trim().toLowerCase()).run();
-  if (!r.meta.changes) throw new HttpError(404, "not_found", "No account with that email.");
-  return json({ ok: true, email: b.email, pro: !!b.pro });
+  const n = Math.trunc(Number(b.credits));
+  if (!Number.isFinite(n) || !n || Math.abs(n) > 100000) throw new HttpError(400, "invalid_request", "Say how many credits (for example 500).");
+  try {
+    return json({ ok: true, email: b.email, balance: await credits.give(env, b.email, n, String(b.why || "given by admin").slice(0, 80)) });
+  } catch (e) {
+    if (credits.CreditError && e instanceof credits.CreditError) throw new HttpError(e.status, e.code, e.message);
+    throw e;
+  }
+}
+
+// Plans and payments (src/billing.js): signed-in accounts; Stripe's webhook needs no sign-in (it's checked with Stripe)
+async function billingCall(request, env, fn) {
+  const d = await deviceFromRequest(env, request);
+  try {
+    return json(await fn(d));
+  } catch (e) {
+    if (e instanceof credits.CreditError) throw new HttpError(e.status, e.code, e.message);
+    throw e;
+  }
+}
+async function stripeWebhook(request, env) {
+  if (!env.STRIPE_SECRET_KEY) return json({ ok: true, ignored: "billing off" });
+  let event;
+  try { event = await request.json(); } catch { throw new HttpError(400, "invalid_request", "Not JSON."); }
+  try {
+    return json({ ok: true, ...(await billing.webhook(env, event)) });
+  } catch (e) {
+    if (e instanceof credits.CreditError) return json({ ok: false, error: e.message }, 502);  // Stripe retries later
+    throw e;
+  }
 }
 
 async function adminStats(request, env) {
@@ -754,7 +783,11 @@ async function route(request, env, ctx) {
     if (env.AI_WEB_FIND !== "1") return json({ error: "not_offered", error_description: "Finding papers on the web isn't part of Citrello. Find another reference in your library instead." }, 410);
     return aiCall(request, env, async (d) => ai.findOnWeb(env, d.user_id, await readBody(request)));
   }
-  if (path === "/admin/pro" && m === "POST") return adminPro(request, env);
+  if (path === "/admin/credits" && m === "POST") return adminCredits(request, env);
+  if (path === "/api/billing" && m === "GET") return billingCall(request, env, (d) => billing.info(env, d.user_id));
+  if (path === "/api/billing/checkout" && m === "POST") return billingCall(request, env, async (d) => billing.checkout(env, d, await readBody(request)));
+  if (path === "/api/billing/portal" && m === "POST") return billingCall(request, env, (d) => billing.portal(env, d));
+  if (path === "/api/stripe/webhook" && m === "POST") return stripeWebhook(request, env);
   if (path === "/api/cloud/available" && m === "GET") return json({ ready: !!env.CLOUD });  // is the cloud copy switched on?
   if (path === "/api/cloud" && m === "GET") return cloudCall(request, env, (d) => cloud.info(env, d.user_id));
   if (path === "/api/cloud" && m === "PUT") return cloudCall(request, env, (d) => cloud.save(env, d.user_id, request));

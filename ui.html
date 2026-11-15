@@ -220,6 +220,7 @@
   dialog.small-dlg { width: min(440px, calc(100vw - 32px)); }
   dialog.small-dlg .field input { font-size: 15px; }
   .pro-list { padding-left: 20px; margin: 10px 0; } .pro-list li { margin: 6px 0; }
+  .plan-card { border: 1px solid var(--line, #d5dbe8); border-radius: 12px; padding: 10px 12px; margin: 8px 0; } .plan-card b { color: var(--cobalt, #1d3f8f); } .plan-price { float: right; font-weight: 700; }
   .src-cite { font-weight: 700; color: var(--cobalt); background: var(--sky); border-radius: 6px; padding: 1px 7px; min-width: 34px; text-align: center; }
   .src-name { font-weight: 600; color: var(--ink); }
   .src-line .src-actions { display: contents; font-size: 13px; }
@@ -758,15 +759,16 @@
   <p class="small muted" style="margin-top:12px">No password: we email you a code each time. Your library stays on your computer.</p>
 </dialog>
 <dialog class="guide small-dlg" id="proDlg" aria-labelledby="proTitle">
-  <div class="g-head"><h2 id="proTitle">Citrello Pro</h2><button class="link" id="proClose" aria-label="Close">✕</button></div>
+  <div class="g-head"><h2 id="proTitle">Plans</h2><button class="link" id="proClose" aria-label="Close">✕</button></div>
   <p class="muted" id="proLead">Make sure every source says what you wrote.</p>
-  <ul class="pro-list">
-    <li><b>Every citation checked</b> by Claude against the paper's full text, not just 10 a month</li>
-    <li><b>Find a better source in your library</b> when a paper doesn't clearly say it</li>
-    <li><b>Every verdict from the paper's full text</b>, with the exact sentence that shows it</li>
-  </ul>
-  <p class="small muted">Pro is opening soon. Tell us you'd like it and we'll switch it on for your account.</p>
-  <div class="row"><a class="btn primary" id="proGet" href="mailto:hello@citrello.app?subject=Citrello%20Pro">I'd like Pro</a><button class="link" id="proLater">Not now</button></div>
+  <p class="small muted">Claude's checks use credits: 3 for each cited paper it checks, 8 to find another reference in your library. Every account starts with 100 free credits.</p>
+  <div class="row small" id="planEvery" role="radiogroup" aria-label="Pay">
+    <label><input type="radio" name="planEvery" value="month" checked> Monthly</label>
+    <label><input type="radio" name="planEvery" value="year"> Yearly</label>
+  </div>
+  <div id="planList"></div>
+  <p class="small muted" id="planNote"></p>
+  <div class="row"><button class="link" id="proLater">Not now</button></div>
 </dialog>
 <dialog class="guide small-dlg" id="wfDlg" aria-labelledby="wfTitle">
   <div class="g-head"><h2 id="wfTitle">Papers for Word</h2><button class="link" id="wfClose" aria-label="Close">✕</button></div>
@@ -1214,11 +1216,11 @@ $("guide").addEventListener("keydown", (e) => {
 });
 
 
-// ---------- signing in and Citrello Pro, in a window (the person stays where they are) ----------
+// ---------- signing in and plans, in a window (the person stays where they are) ----------
 let siThen = null;
 function openSignIn(then, lead) {
   siThen = then || null;
-  $("siLead").textContent = lead || "Claude checks your citations through your free Citrello account: 10 citations a month.";
+  $("siLead").textContent = lead || "Claude checks your citations through your free Citrello account: 100 free credits to start (about 33 citations).";
   show("siStep1"); show("siStep2", false); $("siMsg").innerHTML = "";
   $("signinDlg").showModal(); setTimeout(() => $("siEmail").focus(), 30);
 }
@@ -1245,11 +1247,69 @@ $("siEmail").onkeydown = (e) => { if (e.key === "Enter") $("siSend").click(); };
 $("siCode").onkeydown = (e) => { if (e.key === "Enter") $("siVerify").click(); };
 $("siBack").onclick = () => { show("siStep2", false); show("siStep1"); $("siMsg").innerHTML = ""; };
 $("siClose").onclick = () => $("signinDlg").close();
-function openPro(why) {
-  $("proLead").textContent = why === "library" ? "Finding a better source in your library is part of Citrello Pro." : "Make sure every source says what you wrote.";
-  const email = lastAccount && lastAccount.email;
-  $("proGet").href = "mailto:hello@citrello.app?subject=" + encodeURIComponent("Citrello Pro") + (email ? "&body=" + encodeURIComponent("Please switch on Pro for " + email + ".") : "");
+// Plans: Student and Researcher, monthly or yearly, paid on Stripe's page (Managed Payments); credits arrive by themselves
+let billing = null, planWatch = null;
+const PLAN_NOTE = 'Payment on Stripe\'s secure page (your statement shows "Sold through Link"). Cancel any time.';
+const money = (p) => p ? (p.amount / 100).toLocaleString("en-GB", {style: "currency", currency: (p.currency || "gbp").toUpperCase(), minimumFractionDigits: p.amount % 100 ? 2 : 0}) : "";
+function drawPlans() {
+  const every = (document.querySelector('input[name="planEvery"]:checked') || {}).value || "month", b = billing || {};
+  show("planEvery", !b.plan);
+  if (b.plan) {
+    const renew = new Date(b.plan.renews_at * 1000).toLocaleDateString("en-GB", {day: "numeric", month: "long"});
+    $("planList").innerHTML = `<div class="plan-card"><b>${esc(b.plan.name)} plan</b> (${b.plan.interval === "year" ? "yearly" : "monthly"})<br>
+      <span class="small">${b.plan.left.toLocaleString()} of ${b.plan.per_month.toLocaleString()} credits left this month · new credits on ${renew}${b.bonus ? ` · ${b.bonus} free credits too` : ""}</span></div>
+      <div class="row"><button class="primary" id="planManage">Manage plan</button></div><p class="small muted">Switch plan, change your card or cancel on Stripe's page.</p>`;
+    $("planManage").onclick = () => planGo("/api/billing/portal").catch((e) => { $("planNote").textContent = e.message; });
+    return;
+  }
+  const plans = b.plans || [];
+  if (!b.billing || !plans.some((p) => p.prices && p.prices[every])) {
+    $("planList").innerHTML = `<p class="small">Plans open soon. Until then, write to <a href="mailto:hello@citrello.app">hello@citrello.app</a> for more credits.</p>`;
+    return;
+  }
+  const who = {student: "For PhD and Master's students", researcher: "For researchers and supervisors who check more papers"};
+  $("planList").innerHTML = (b.credits !== undefined ? `<p class="small">You have <b>${b.credits.toLocaleString()}</b> credits left.</p>` : "") + plans.map((p) => {
+    const price = p.prices[every]; if (!price) return "";
+    return `<div class="plan-card"><span class="plan-price">${money(price)}<span class="small muted">/${every}</span></span><b>${esc(p.name)}</b><br>
+      <span class="small">${who[p.id] || ""}: ${p.credits_per_month.toLocaleString()} credits a month (about ${Math.floor(p.credits_per_month / 3).toLocaleString()} claim checks)</span>
+      <div class="row"><button class="primary" data-plan="${esc(p.id)}">Choose ${esc(p.name)}</button></div></div>`;
+  }).join("");
+  $("planList").querySelectorAll("[data-plan]").forEach((x) => x.onclick = () => planGo("/api/billing/checkout", {plan: x.dataset.plan, interval: every}).catch((e) => { $("planNote").textContent = e.message; }));
+}
+document.querySelectorAll('input[name="planEvery"]').forEach((r) => r.onchange = drawPlans);
+async function loadPlans() {
+  try { billing = await aiFetch("GET", "/api/billing"); } catch { billing = {billing: false}; }
+  drawPlans();
+}
+async function planGo(path, body) {  // Stripe's page in a new tab; this page notices the change by itself
+  const tab = window.open("", "_blank");
+  $("planNote").textContent = "Opening Stripe's page…";
+  let r;
+  try { r = await aiFetch("POST", path, body || {}); } catch (e) { if (tab) tab.close(); throw e; }
+  if (tab) tab.location = r.url; else location.href = r.url;
+  $("planNote").textContent = "Finish on Stripe's page: your credits show up here by themselves.";
+  clearInterval(planWatch);
+  const was = JSON.stringify(billing && billing.plan), until = Date.now() + 15 * 60 * 1000;
+  planWatch = setInterval(async () => {
+    if (Date.now() > until) return clearInterval(planWatch);
+    try {
+      const q = await aiFetch("GET", "/api/ai/quota");
+      if (JSON.stringify(q.plan) !== was) {
+        clearInterval(planWatch); toast(q.plan ? `${q.plan.name} plan: ${q.credits.toLocaleString()} credits` : "Plan changed");
+        if ($("proDlg").open) loadPlans();
+        if (chk && chk.sources && chk.sources.sentences.some((x) => x.papers.some((p) => p.status === "locked"))) aiJudgeAll(true);
+      }
+    } catch {}
+  }, 5000);
+}
+async function openPro(why) {
+  try { aiSession = aiSession && aiSession.signed_in ? aiSession : await api("/api/ai/session"); } catch {}
+  if (!aiSession || !aiSession.signed_in) return openSignIn(() => openPro(why), "Sign in first: plans belong to your free Citrello account.");
+  $("proLead").textContent = typeof why === "string" && why.length > 12 ? why : "Make sure every source says what you wrote.";
+  $("planNote").textContent = PLAN_NOTE;
+  $("planList").innerHTML = '<p class="small muted">Loading the plans…</p>';
   $("proDlg").showModal();
+  loadPlans();
 }
 $("proClose").onclick = () => $("proDlg").close();
 $("proLater").onclick = () => $("proDlg").close();
@@ -2188,7 +2248,7 @@ function paperRow(x, i, p, j) {  // one citation: how it looks in the paper, Cla
     actions = `<button class="link" data-src-more="${id}">${open ? "Hide details" : "More details"}</button>
       <span class="src-find"><button data-src-find="library" data-id="${id}">Find another reference in my library</button></span>`;
   } else if (p.status === "checking") tag = `<span class="tag">Claude is reading…</span>`;
-  else if (p.status === "locked") tag = `<button class="src-locked" data-pro="1" title="Citrello Pro"><span class="blur">${["✓ Supports this", "Partly supports this", "Doesn't clearly say this"][(i + j) % 3]}</span><b>Get Pro</b></button>`;
+  else if (p.status === "locked") tag = `<button class="src-locked" data-pro="1" title="Needs more credits"><span class="blur">${["✓ Supports this", "Partly supports this", "Doesn't clearly say this"][(i + j) % 3]}</span><b>See plans</b></button>`;
   else if (p.status === "no_text") { tag = `<span class="tag">No text yet</span>`;
     actions = `${p.doi || p.url ? `<a class="small" href="${esc(p.doi ? "https://doi.org/" + p.doi : p.url)}" target="_blank" rel="noopener">Open the paper</a>` : ""}
       <label class="link small" for="srcPdf-${esc(p.key)}">Add its PDF</label><input type="file" id="srcPdf-${esc(p.key)}" data-src-pdf="${esc(p.key)}" accept=".pdf" hidden>`; }
@@ -2229,7 +2289,7 @@ async function runSources(add, quiet) {
   catch (e) { if (!quiet) toast(e.message); if ($("chkSources")) { $("chkSources").disabled = false; $("chkSources").textContent = "Show what my sources say"; } }
 }
 
-// ---------- Claude's verdicts (pro): through Citrello's server, with this account ----------
+// ---------- Claude's verdicts (credits): through Citrello's server, with this account ----------
 let aiSession = null;
 async function aiReadyState() {  // -> {ok, why, quota, session}
   try { aiSession = await api("/api/ai/session"); } catch { return {ok: false, why: "error"}; }
@@ -2237,7 +2297,8 @@ async function aiReadyState() {  // -> {ok, why, quota, session}
   try {
     const q = await aiFetch("GET", "/api/ai/quota");
     if (!q.ready) return {ok: false, why: "off", quota: q};
-    return {ok: q.used < q.limit, why: q.used < q.limit ? "" : "limit", quota: q};
+    const enough = q.credits >= ((q.costs && q.costs.claim) || 3);
+    return {ok: enough, why: enough ? "" : "limit", quota: q};
   } catch (e) { return {ok: false, why: "error", error: e.message}; }
 }
 async function aiFetch(method, path, body) {
@@ -2252,7 +2313,7 @@ function aiLine(s) {
   const a = s.ai || {}, q = a.quota;
   const locked = s.sentences.reduce((n, x) => n + x.papers.filter((p) => p.status === "locked").length, 0);
   if (a.state === "busy") return `<p class="small muted">Claude is reading the papers: ${a.done} of ${a.total} sentences…</p>`;
-  if (a.state === "signin") return `<div class="notice src-act"><span><b>Let Claude check your citations.</b> It reads each cited paper's text and tells you whether it really says what you wrote. Free for 10 citations a month.</span>
+  if (a.state === "signin") return `<div class="notice src-act"><span><b>Let Claude check your citations.</b> It reads each cited paper's text and tells you whether it really says what you wrote. 100 free credits to start (about 33 citations).</span>
       <button class="primary" data-signin="1">Sign in to check</button></div>`;
   if (a.state === "consent") return `<div class="notice src-act"><span><b>Ask Claude about your citations?</b> Citrello sends each cited sentence and a few short passages of the paper (not your whole document, not the PDFs) to Claude through Citrello's server. Nothing is kept there.</span>
       <button class="primary" id="srcAiGo">Yes, check with Claude</button></div>`;
@@ -2260,9 +2321,9 @@ function aiLine(s) {
   if (a.state === "error") return `<div class="notice err">${esc(a.error || "Claude couldn't be reached.")} <button class="link" id="srcAiRetry">Try again</button></div>`;
   let h = "";
   if (a.state === "done" || a.state === "limit") h = `<p class="small muted">Decisions by Claude, from each paper's full text. “More details” shows the exact words.${q
-    ? ` This month: ${q.used} of ${q.limit} citation checks${q.pro ? " (Pro)" : ""}.` : ""}</p>`;
-  if (locked) h += `<div class="notice src-act src-pro"><span><b>${locked} more citation${locked === 1 ? "" : "s"} with Citrello Pro.</b> Free accounts get 10 citation checks a month; Pro checks every citation, and finds better sources in your library.</span>
-      <button class="primary" data-pro="1">Get Pro</button></div>`;
+    ? ` ${q.credits.toLocaleString()} credits left${q.plan ? ` (${esc(q.plan.name)} plan)` : ""}. <button class="link" data-pro="1">${q.plan ? "Manage plan" : "Plans"}</button>` : ""}</p>`;
+  if (locked) h += `<div class="notice src-act src-pro"><span><b>${locked} more citation${locked === 1 ? "" : "s"} to check: not enough credits left.</b> Each cited paper Claude checks costs 3 credits. A plan gives you 1,000 or 4,000 credits every month.</span>
+      <button class="primary" data-pro="1">See plans</button></div>`;
   return h;
 }
 // Claude's verdicts are kept in this browser, so checking again (or a paper's text arriving) only asks about
@@ -2296,7 +2357,7 @@ async function aiJudgeAll(confirmed) {
   if (!confirmed && !aiConsent()) { s.ai = {state: "consent"}; return renderCheck(); }
   const run = ++aiRun, q = st.quota;
   const {items: all} = await post(`/api/doccheck/${id}/ai-items`, {});
-  let left = q.pro ? Infinity : Math.max(0, q.limit - q.used);  // free: 10 citation checks a month; the rest isn't sent
+  let left = Math.max(0, Math.floor(q.credits / ((q.costs && q.costs.claim) || 3)));  // papers the credits cover; the rest isn't sent
   const items = [];
   for (const it of all) {  // in the paper's order: what's known comes from the cache; then what the allowance covers
     const todo = [];
@@ -2329,7 +2390,7 @@ async function aiJudgeAll(confirmed) {
         }
       } catch (e) {
         for (const it of batch) for (const p of it.papers) { const sp = s.sentences[+it.id].papers[+p.ref]; if (sp.status === "checking") sp.status = e.status === 402 ? "locked" : "pending"; }
-        if (e.status === 402) next = batches.length;  // allowance used up meanwhile: the rest is for Pro
+        if (e.status === 402) next = batches.length;  // credits used up meanwhile: the rest waits for a plan
         else if (e.status === 401 || e.status === 503) { s.ai = {state: "error", error: e.message}; next = batches.length; }
       }
       if (s.ai.state === "busy") s.ai.done += batch.length;
@@ -2338,7 +2399,7 @@ async function aiJudgeAll(confirmed) {
   };
   await Promise.all([worker(), worker(), worker()]);
   if (run !== aiRun || chk.sources !== s) return;
-  for (const x of s.sentences) for (const p of x.papers) if (p.status === "checking") p.status = q.pro ? "pending" : "locked";
+  for (const x of s.sentences) for (const p of x.papers) if (p.status === "checking") p.status = "pending";
   if (s.ai.state === "busy") s.ai.state = "done";
   renderCheck();
 }
@@ -2348,7 +2409,8 @@ async function srcFind(kind, id) {  // supporting papers for one citation, from 
   const st = await aiReadyState();
   if (st.why === "signin") return openSignIn(() => srcFind(kind, id));
   if (!st.ok && st.why !== "limit") { chk.sources.ai = {state: st.why, error: st.error}; return renderCheck(); }
-  if (!st.quota.pro) return openPro("library");
+  const need = (st.quota && st.quota.costs && st.quota.costs.library) || 8;
+  if (!st.quota || st.quota.credits < need) return openPro(`Finding another reference needs ${need} credits and ${st.quota ? st.quota.credits : 0} are left.`);
   srcFinds[id] = {kind, state: "busy", papers: []}; renderCheck();
   try {
     const cited = x.papers.map((q) => q.key).filter(Boolean);
@@ -2362,7 +2424,7 @@ async function srcFind(kind, id) {  // supporting papers for one citation, from 
       srcFinds[id] = {kind, papers: good.map((res) => { const c = papers.find((q) => q.ref === res.paper);
         return {key: c.key, label: c.label, title: c.title, verdict: res.verdict, quote: res.quote, reason: res.reason, full_text: c.full_text}; })};
     }
-  } catch (e) { if (e.code === "pro_only") { delete srcFinds[id]; renderCheck(); return openPro(kind); } srcFinds[id] = {kind, error: e.message, papers: []}; }
+  } catch (e) { if (e.code === "no_credits") { delete srcFinds[id]; renderCheck(); return openPro(e.message); } srcFinds[id] = {kind, error: e.message, papers: []}; }
   renderCheck();
 }
 function srcRefreshSoon() {  // a paper's text arrived: show it under its sentences (only while the results are on screen)
@@ -2966,6 +3028,7 @@ loadLibrary().then(() => {  // a new library starts on Home: what Citrello can d
   if (!lib.items.length && !tabChosen) goTab("home");
 });
 if (wordFetchKeys.length) setTimeout(() => wordFetchStart(wordFetchKeys), 0);
+if (params.get("plans")) setTimeout(() => openPro(), 400);  // citrello.app/pricing → "Choose a plan"
 api("/api/account").then(renderSideConn).catch(() => {});
 setTimeout(() => status.web || checkUpdate(false), 3000);
 </script>

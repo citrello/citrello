@@ -28,7 +28,8 @@ Word:
 
 • Check what your sources say (with a free Citrello account). Click a citation and press "Check the claim": Claude
   reads the cited paper's full text and shows the exact sentence that supports what you wrote, or says it doesn't.
-  10 claim checks a month are free; Citrello Pro checks every citation and finds a better source in your library.
+  Every free account gets 100 credits (about 33 claim checks); the Student and Researcher plans give 1,000 or
+  4,000 credits a month, and "Find another reference" looks for a better source in your library.
 
 Try it without an account: open the add-in and choose "Try it with sample papers".
 
@@ -36,8 +37,8 @@ Your library and documents stay on your computer and in your own Citrello accoun
 github.com/citrello/citrello
 
 ## Additional purchase
-Tick "My add-in requires an additional purchase" / "Additional purchase may be required": Citrello Pro (more Claude
-checks) is sold on citrello.app.
+Tick "My add-in requires an additional purchase" / "Additional purchase may be required": the Student and Researcher plans (more
+credits for Claude's checks) are sold through Stripe (Link) from inside the add-in and on citrello.app/pricing.
 
 ## Category
 Productivity (secondary: Education)

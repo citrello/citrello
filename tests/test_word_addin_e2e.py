@@ -233,14 +233,16 @@ def test_word_addin_cites_suggests_and_keeps_the_list(tmp_path):
 
 
 def test_word_addin_checks_a_claim_and_finds_another(tmp_path):
-    """Click a citation: Check the claim (free: the allowance goes down), a paper without text gets its PDF added,
-    Find another reference is Pro (the Pro card for free accounts; with Pro, a better paper from the library)."""
+    """Click a citation: Check the claim (3 credits a paper), a paper without text gets its PDF added, Find another
+    reference (8 credits): the Plans card when the credits run short (Stripe's page opens in the browser); with
+    credits, a better paper from the library."""
     import anthropic_mock
+    import stripe_mock
     import fulltext
     from playwright.sync_api import expect, sync_playwright
     from test_doccheck import make_pdf
     from test_sources import PAPER
-    srv = anthropic_mock.start()
+    srv, pay = anthropic_mock.start(), stripe_mock.start()
     anthropic_mock.SEEN.clear()
     email = f"wordclaim-{int(time.time())}@example.com"
     shots = os.environ.get("CITRELLO_E2E_SHOTS") or str(tmp_path)
@@ -264,6 +266,8 @@ def test_word_addin_checks_a_claim_and_finds_another(tmp_path):
             page.evaluate("d => __doc.load(d)", word_document(blank_docx(tmp_path)))
             sign_in(page, email)
             expect(page.locator("#libInfo")).to_contain_text("4 references", timeout=60000)
+            admin = {"Authorization": "Bearer testadmin"}
+            assert B.call("POST", "/admin/credits", {"email": email, "credits": -91}, headers=admin)[0] == 200  # 9 left
 
             # two citations: one paper with its text in the library, one without (no free copy: no DOI)
             doc("__doc.type('Removing the subsea export cables accounted for most of the decommissioning cost ')")
@@ -279,21 +283,32 @@ def test_word_addin_checks_a_claim_and_finds_another(tmp_path):
             page.click("#results button:has-text('Cite')")
             page.wait_for_function("__doc.controls().length === 2", timeout=30000)
 
-            # click the first citation: Check the claim (free: 3 a month on this test copy of the server)
+            # click the first citation: Check the claim (3 credits)
             doc("__doc.clickControl(0)")
-            expect(page.locator("#quotaLine")).to_contain_text("3 of 3 free claim checks left", timeout=30000)
+            page.evaluate("document.getElementById('quotaLine').textContent = ''")
             page.click("#claimCheck")
             expect(page.locator("#claimOut .verdict.supports")).to_contain_text("Supports it", timeout=60000)
-            expect(page.locator("#quotaLine")).to_contain_text("2 of 3 free claim checks left")
+            expect(page.locator("#quotaLine")).to_contain_text("6 credits left (about 2 claim checks)")
             sent = anthropic_mock.SEEN[-1]["body"]["messages"][0]["content"]
             assert "Removing the subsea export cables accounted for most of the decommissioning cost" in sent and "42%" in sent
             page.locator("#claimOut summary").first.click()
             page.screenshot(path=os.path.join(shots, "word-claim-check.png"))
 
-            # Find another reference: Pro only
+            # Find another reference needs 8 credits: the Plans card, with Stripe's prices; choosing opens Stripe's page
             page.click("#findAnother")
             expect(page.locator("#proCard")).to_be_visible()
-            expect(page.locator("#proLead")).to_contain_text("part of Citrello Pro")
+            expect(page.locator("#proLead")).to_contain_text("needs 8 credits and 6 are left")
+            student = page.locator("#planList .plan", has_text="Student")
+            expect(student).to_contain_text("£6")
+            expect(student).to_contain_text("1,000 credits a month")
+            page.check("#planEvery input[value=year]")
+            expect(student).to_contain_text("£50")
+            page.screenshot(path=os.path.join(shots, "word-plans.png"))
+            student.locator("button[data-plan]").click()
+            page.wait_for_function("__doc.opened.some((u) => u.startsWith('https://checkout.stripe.test/'))", timeout=30000)
+            expect(page.locator("#planNote")).to_contain_text("Finish paying in your browser")
+            sid = [u for u in page.evaluate("__doc.opened") if "checkout.stripe.test" in u][-1].rsplit("/", 1)[1]
+            assert stripe_mock.STATE["sessions"][sid]["params"]["line_items[0][price]"] == "price_sy"
             page.click("#proLater")
 
             # the second citation: no text anywhere, so its PDF is added from the computer
@@ -301,15 +316,17 @@ def test_word_addin_checks_a_claim_and_finds_another(tmp_path):
             expect(page.locator("#claimOut")).to_be_empty()
             page.click("#claimCheck")
             expect(page.locator("#claimOut .verdict.none")).to_contain_text("No full text found", timeout=60000)
-            expect(page.locator("#quotaLine")).to_contain_text("2 of 3")             # nothing was sent to Claude
+            expect(page.locator("#quotaLine")).to_contain_text("6 credits left")     # nothing was sent to Claude
             with page.expect_file_chooser() as fc:
                 page.click("#claimOut button[data-pdf]")
             fc.value.set_files(str(pdf))
             expect(page.locator("#claimOut .verdict:not(.none)")).to_have_count(1, timeout=60000)
-            expect(page.locator("#quotaLine")).to_contain_text("1 of 3")
+            expect(page.locator("#quotaLine")).to_contain_text("3 credits left")
 
-            # with Pro: another reference from the library, added to the citation
-            assert B.call("POST", "/admin/pro", {"email": email, "pro": True}, headers={"Authorization": "Bearer testadmin"})[0] == 200
+            # Stripe says the payment went through: the Student plan's credits arrive by themselves
+            assert B.call("POST", "/api/stripe/webhook", {"type": "checkout.session.completed", "data": {"object": {"id": sid}}})[0] == 200
+            expect(page.locator("#quotaLine")).to_contain_text("Student plan · 1,003 credits left", timeout=30000)
+            # with credits: another reference from the library, added to the citation
             doc("__doc.clickControl(0)")
             expect(page.locator("#claimOut .verdict.supports")).to_be_visible(timeout=10000)  # checked before: shown again
             page.click("#findAnother")                                                  # straight to the library
@@ -320,13 +337,18 @@ def test_word_addin_checks_a_claim_and_finds_another(tmp_path):
             lee.locator("button[data-add]:has-text('Add to this citation')").click()
             page.wait_for_function("__doc.controls()[0].text.includes('Lee')", timeout=30000)
             expect(page.locator("#curList li")).to_have_count(2)
-            expect(page.locator("#quotaLine")).to_contain_text("Citrello Pro")
+            expect(page.locator("#quotaLine")).to_contain_text("Student plan · 995 credits left")
+            page.click("#quotaPro")                                                     # Manage plan: Stripe's portal
+            expect(page.locator("#planList")).to_contain_text("992 of 1,000 credits left this month")
+            page.click("#planManage")
+            page.wait_for_function("__doc.opened.some((u) => u.includes('billing.stripe.test/portal'))", timeout=30000)
 
             assert not errors, errors
             b.close()
     finally:
         srv.shutdown()
         srv.server_close()
+        pay.stop()
 
 
 FAKE_EXTENSION = """
@@ -413,7 +435,7 @@ def test_word_addin_gets_paywalled_papers_through_the_web_app(tmp_path):
 
             # Word carries on by itself: the paper's text came through the cloud copy
             expect(word.locator("#claimOut .verdict:not(.none)")).to_have_count(1, timeout=120000)
-            expect(word.locator("#quotaLine")).to_contain_text("2 of 3 free claim checks left")
+            expect(word.locator("#quotaLine")).to_contain_text("97 credits left")
             assert "Blade recycling at scale" in anthropic_mock.SEEN[-1]["body"]["messages"][0]["content"]
             word.screenshot(path=os.path.join(shots, "word-after-access.png"))
             assert not errors, errors
@@ -598,7 +620,7 @@ def test_word_addin_try_it_without_an_account(tmp_path):
         page.screenshot(path=os.path.join(os.environ.get("CITRELLO_E2E_SHOTS") or str(tmp_path), "word-demo.png"))
         # Claude's checks need an account
         page.evaluate("__doc.clickControl(0)")
-        expect(page.locator("#quotaLine")).to_contain_text("Sign in for 10 free claim checks", timeout=10000)
+        expect(page.locator("#quotaLine")).to_contain_text("Sign in for 100 free credits", timeout=10000)
         page.click("#claimCheck")
         expect(page.locator("#claimOut")).to_contain_text("needs a free Citrello account")
         # signing in: the person's own library replaces the samples

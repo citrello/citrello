@@ -98,19 +98,40 @@ repositories don't let web pages download their files. The Worker looks the DOI 
 PDF (up to four locations, 40 MB max, must start with `%PDF-`) and returns it; nothing is stored. Tested by
 `tests/test_web_bridge_e2e.py::test_find_free_full_texts_in_the_browser` against the real services.
 
-## Claude checks (`/api/ai/*`, a pro feature)
-"What your sources say" asks Claude, through here, whether each cited paper supports the sentence (`/api/ai/judge`:
-the sentence plus a few passages of the paper's text picked by the app; structured JSON answer), and can look for
-supporting papers on the web (`/api/ai/find-web`, Claude's web search tool). Signed-in accounts only; nothing is
-stored except monthly counts per account (`ai_usage`: checks, and web checks).
+## Claude checks (`/api/ai/*`) and credits
+"What your sources say" and the Word add-in's "Check the claim" ask Claude, through here, whether each cited paper
+supports the sentence (`/api/ai/judge`: the sentence plus a few passages of the paper's text picked by the app;
+structured JSON answer); `kind: "library"` judges candidate papers from the person's own library ("Find another
+reference"). The web search (`/api/ai/find-web`) is switched off (410 unless `AI_WEB_FIND = "1"`). Signed-in accounts
+only; nothing of the text is stored.
 - Secret: `ANTHROPIC_API_KEY` (GitHub secret of the same name; the deploy workflow passes it on). Without it the
   endpoints answer "Claude checks aren't switched on yet" and the app keeps showing word matches.
-- Variables (optional, in `wrangler.toml` `[vars]`): `AI_MODEL` for verdicts and library checks (default
-  `claude-sonnet-5-5`), `AI_WEB_MODEL` for the web search step of web checks (default `claude-haiku-5-5`, which gets the basic web search tool; it reads search results only, no page fetches, so a search costs ~3-5 cents),
-  `AI_FREE_MONTHLY` / `AI_PRO_MONTHLY` citation checks (10 / 3000; a library check counts 1), `AI_FREE_WEB` /
-  `AI_PRO_WEB` web checks (0 / 100). Library and web checks are Pro only (`pro_only`). `ANTHROPIC_BASE_URL` points the tests at a pretend Claude.
-- Pro, until payments exist: `curl -X POST -H "Authorization: Bearer ADMIN_TOKEN" -H "Content-Type: application/json"
-  -d '{"email":"someone@example.com","pro":true}' https://mcp.citrello.app/admin/pro`
+- Variables (optional, in `wrangler.toml` `[vars]`): `AI_MODEL`, `AI_WEB_MODEL`; `ANTHROPIC_BASE_URL` points the tests
+  at a pretend Claude.
+- **Credits** (`src/credits.js`): a claim check costs 3 credits per paper, a library find 8 (`COST`). Every account
+  gets 100 free credits once (`users.bonus_credits`). Plans add monthly credits (Student 1,000, Researcher 4,000;
+  yearly plans also month by month, from `plan_anchor`); a plan's credits are spent first and don't carry over, then
+  the bonus. Credits are checked before Claude is asked (402 `no_credits`) and taken only after it answers.
+  `credit_log` records each spend/gift. `/api/ai/quota` returns `{credits, bonus, checks_left, costs, plan, ...}`.
+- Credits by hand (support, refunds, testers; negative to take away): `curl -X POST -H "Authorization: Bearer
+  ADMIN_TOKEN" -H "Content-Type: application/json" -d '{"email":"someone@example.com","credits":500,"why":"refund"}'
+  https://mcp.citrello.app/admin/credits`
+
+## Plans and payments (`/api/billing`, Stripe Managed Payments)
+`src/billing.js`. Stripe sells the plans as seller of record (Managed Payments: tax, receipts, disputes; customers see
+"Sold through Link"). `GET /api/billing` (plans with prices + balance), `POST /api/billing/checkout {plan, interval}`
+(a Checkout Session, `mode=subscription`, `managed_payments[enabled]=true`; success/cancel go to
+citrello.app/thanks), `POST /api/billing/portal` (Stripe's customer portal: switch, card, cancel), `POST
+/api/stripe/webhook`. The webhook isn't signed-checked: it only says *something* changed; the bridge reads the
+subscription back from Stripe with its own key, so a made-up event can't give credits.
+- Secret: `STRIPE_SECRET_KEY` (GitHub secret; a restricted or secret test key in the sandbox, a live key for real
+  payments). Without it the Plans windows say "Plans open soon".
+- `scripts/stripe-setup.mjs` (run by bridge.yml after each deploy, safe to repeat) creates the two products and four
+  prices (GBP, tax inclusive, tax code `txcd_10105001`, lookup keys `citrello_{student,researcher}_{monthly,yearly}`),
+  the webhook endpoint and the default customer portal. Prices: Student £6/month or £50/year, Researcher £18/month or
+  £150/year (change in the script and on site/public/pricing.html; Stripe prices can't be edited, so a new price
+  needs the old lookup key moved, `transfer_lookup_key`).
+- Tests: `tests/stripe_mock.py` (pretend Stripe on 127.0.0.1:8798, `STRIPE_API_BASE`), `tests/test_bridge_billing_e2e.py`.
 
 ## The cloud copy of web-app libraries (`/api/cloud`)
 Signed in, citrello.app/app saves its library (references, projects, papers' text; one gzip file) here and brings

@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Pricing · Citrello</title>
+<meta name="description" content="Citrello is free. Claude's citation checks use credits: 100 free, or a Student or Researcher plan.">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link href="https://fonts.googleapis.com/css2?family=Gloock&family=Figtree:wght@400;500;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/site.css">
+<style>.policy{padding:56px 24px 96px}.policy h1{font-size:clamp(40px,5vw,56px);margin-bottom:8px}.policy h2{font-size:28px;margin:36px 0 8px}.policy p,.policy li{font-size:17px}.policy .date{color:var(--muted)}
+.plans{display:grid;grid-template-columns:repeat(3,1fr);gap:24px;margin:28px 0}
+.plan{border:2px solid var(--line);border-radius:24px;padding:24px;background:#fff;display:flex;flex-direction:column}
+.plan.mine{border-color:var(--cobalt);box-shadow:10px 10px 0 var(--lemon)}
+.plan h2{margin:0 0 4px}.plan .who{color:var(--muted);margin:0 0 12px;font-size:15px}
+.plan .price{font:400 40px Gloock,serif;color:var(--cobalt)}.plan .price small{font:500 16px Figtree,sans-serif;color:var(--muted)}
+.plan ul{padding-left:20px;margin:12px 0 20px}.plan li{font-size:16px;margin:4px 0}
+.plan .btn{margin-top:auto;align-self:flex-start}
+.toggle{display:inline-flex;border:2px solid var(--line);border-radius:999px;padding:3px;background:#fff}
+.toggle button{border:0;background:none;border-radius:999px;padding:6px 16px;font:600 15px Figtree,sans-serif;cursor:pointer;color:var(--ink)}
+.toggle button[aria-pressed=true]{background:var(--cobalt);color:#fff}
+table.costs{border-collapse:collapse;width:100%;font-size:16px}.costs td,.costs th{text-align:left;border-bottom:1px solid var(--line);padding:10px 12px}
+@media (max-width:800px){.plans{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<div class="tiles" aria-hidden="true"></div>
+<header class="wrap nav"><a class="logo" href="/">citr<span>ello</span></a>
+  <nav aria-label="Main"><a href="/app/">Web app</a><a href="/#problems">What it fixes</a><a href="https://github.com/citrello/citrello">GitHub</a><a class="nav-cta" href="/#download">Download</a></nav></header>
+<main class="wrap policy">
+<h1>Pricing</h1>
+<p style="font-size:19px;max-width:38em">Citrello is free: your library, citing in Word, 10,000+ styles, checking and fixing references, LaTeX and the AI connectors. Only Claude's citation checks cost something, because each one pays for Claude to read the paper. They use credits.</p>
+<p><span class="toggle" role="group" aria-label="Pay"><button id="pM" aria-pressed="true">Monthly</button><button id="pY" aria-pressed="false">Yearly (save about 30%)</button></span></p>
+<div class="plans">
+  <div class="plan"><h2>Free</h2><p class="who">For everyone</p><div class="price">£0</div>
+    <ul><li>Everything except Claude's checks</li><li><b>100 credits</b> to start (about 33 claim checks)</li><li>Free account, no card</li></ul>
+    <a class="btn" href="/app/">Open Citrello</a></div>
+  <div class="plan mine"><h2>Student</h2><p class="who">For PhD and Master's students</p>
+    <div class="price" data-m="£6" data-y="£50">£6 <small data-m="a month" data-y="a year">a month</small></div>
+    <ul><li><b>1,000 credits a month</b></li><li>About 330 claim checks a month</li><li>Find another reference in your library</li></ul>
+    <a class="btn primary" href="/app/?plans=1">Choose Student</a></div>
+  <div class="plan"><h2>Researcher</h2><p class="who">For researchers and supervisors who check more papers</p>
+    <div class="price" data-m="£18" data-y="£150">£18 <small data-m="a month" data-y="a year">a month</small></div>
+    <ul><li><b>4,000 credits a month</b></li><li>About 1,330 claim checks a month</li><li>Find another reference in your library</li></ul>
+    <a class="btn" href="/app/?plans=1">Choose Researcher</a></div>
+</div>
+<p class="date">Prices include VAT or sales tax where it applies. Payment on Stripe's page; your statement shows Link.com and Citrello. Cancel any time with "Manage plan" in Citrello.</p>
+
+<h2>What a check costs</h2>
+<table class="costs">
+<tr><th>Claude's check</th><th>Credits</th></tr>
+<tr><td>Check the claim: does the cited paper say what you wrote? (each cited paper)</td><td>3</td></tr>
+<tr><td>Find another reference in your library for a sentence</td><td>8</td></tr>
+</table>
+<p>Example: checking a thesis chapter with 100 citations takes about 300 credits; finding a better source for 60 of them takes about 480 more.</p>
+
+<h2>Questions</h2>
+<p><b>Do credits carry over?</b> A plan's credits renew every month and don't carry over. Your 100 free credits don't expire, and are used after the plan's.</p>
+<p><b>Yearly plans?</b> You pay once a year and still get the credits every month.</p>
+<p><b>Running out?</b> Citrello tells you before a check and doesn't take credits for checks that fail. Switch to Researcher any time with "Manage plan".</p>
+<p><b>Where do I buy?</b> In Citrello (web app, desktop app or Word): click your credits, then "Plans". See the <a href="/terms">terms</a>.</p>
+<script>
+(() => {
+  const set = (y) => {
+    document.getElementById("pM").setAttribute("aria-pressed", !y); document.getElementById("pY").setAttribute("aria-pressed", y);
+    document.querySelectorAll(".price[data-m]").forEach((el) => { el.firstChild.textContent = (y ? el.dataset.y : el.dataset.m) + " ";
+      const s = el.querySelector("small"); s.textContent = y ? s.dataset.y : s.dataset.m; });
+  };
+  document.getElementById("pM").onclick = () => set(false); document.getElementById("pY").onclick = () => set(true);
+})();
+</script>
+</main>
+<footer><div class="tiles" aria-hidden="true"></div><div class="wrap foot"><a class="logo" href="/">citr<span>ello</span></a><p>References, the sweet part.</p>
+<nav aria-label="Footer"><a href="https://github.com/citrello/citrello">GitHub</a><a href="/privacy">Privacy</a><a href="/terms">Terms</a><a href="/pricing">Pricing</a><a href="https://github.com/citrello/citrello/blob/main/LICENSE">Licence (AGPL)</a></nav>
+<p class="small">© 2026 Armin Hosseinghorbani. Citrello™ is a trademark of Armin Hosseinghorbani.</p></div></footer>
+</body>
+</html>

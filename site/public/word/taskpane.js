@@ -138,7 +138,7 @@
     search();
     checkDocument().catch((e) => docSay(e.message, "err"));
     if (!demo) loadQuota();
-    else $("quotaLine").innerHTML = 'Sign in for 10 free claim checks a month · <button class="link" id="quotaSignIn">Sign in</button>';
+    else $("quotaLine").innerHTML = 'Sign in for 100 free credits (about 33 claim checks) · <button class="link" id="quotaSignIn">Sign in</button>';
     if ($("quotaSignIn")) $("quotaSignIn").onclick = signInFromDemo;
     if (!demo && !pulling) pulling = setInterval(() => pullLibrary(true), 5 * 60 * 1000);  // new references arrive by themselves
   }
@@ -161,7 +161,7 @@
   }
   $("demoSignIn").onclick = signInFromDemo;
   function needAccount(what) {  // the Claude features need an account
-    claimSay(`<div class="notice">${esc(what)} needs a free Citrello account (10 claim checks a month free). <button class="link" id="needSignIn">Sign in</button></div>`);
+    claimSay(`<div class="notice">${esc(what)} needs a free Citrello account (100 free credits to start). <button class="link" id="needSignIn">Sign in</button></div>`);
     $("needSignIn").onclick = signInFromDemo;
   }
 
@@ -723,7 +723,7 @@
       (canTrack && track ? ". The changes are tracked: Review → Accept or Reject." : ".") + notes + lost);
   }
 
-  // ---------- Claude checks the citation clicked (free: 10 a month), and finds another (Pro) ----------
+  // ---------- Claude checks the citation clicked, and finds another (credits: src/credits.js in the bridge) ----------
   // The papers' text comes from the library; when a paper has none, Citrello looks for a free copy online (it's kept
   // in the library, and the library goes back to the cloud copy so the web app has it too). Without a free copy the
   // writer can add the PDF. Claude reads the passages of each paper that matter for the sentence.
@@ -745,14 +745,88 @@
   async function loadQuota() { try { quota = await bridgeAi("GET", "/api/ai/quota"); showQuota(); } catch {} }
   function showQuota() {
     if (!quota) return;
-    const left = Math.max(0, quota.limit - quota.used);
-    $("quotaLine").innerHTML = quota.pro ? `Citrello Pro · ${left.toLocaleString()} claim checks left this month`
-      : `<b>${left} of ${quota.limit}</b> free claim checks left this month · <button class="link" id="quotaPro">Get Pro</button>`;
-    if ($("quotaPro")) $("quotaPro").onclick = () => showPro();
+    const n = (quota.credits || 0).toLocaleString();
+    $("quotaLine").innerHTML = quota.plan
+      ? `${esc(quota.plan.name)} plan · <b>${n}</b> credits left · <button class="link" id="quotaPro">Manage plan</button>`
+      : `<b>${n}</b> credits left (about ${quota.checks_left} claim checks) · <button class="link" id="quotaPro">Plans</button>`;
+    $("quotaPro").onclick = () => showPro();
+  }
+  // ----- plans: Student and Researcher, monthly or yearly, paid on Stripe's page in the browser -----
+  let billing = null;
+  const money = (p) => p ? (p.amount / 100).toLocaleString("en-GB", { style: "currency", currency: (p.currency || "gbp").toUpperCase(),
+    minimumFractionDigits: p.amount % 100 ? 2 : 0 }) : "";
+  function openOutside(url) {
+    try {
+      if (Office.context.ui && Office.context.ui.openBrowserWindow) Office.context.ui.openBrowserWindow(url);
+      else window.open(url, "_blank", "noopener");
+    } catch { window.open(url, "_blank", "noopener"); }
+  }
+  function drawPlans() {
+    const every = (document.querySelector('input[name="planEvery"]:checked') || {}).value || "month";
+    const b = billing || {};
+    show("planEvery", !b.plan);
+    if (b.plan) {
+      const renew = new Date(b.plan.renews_at * 1000).toLocaleDateString("en-GB", { day: "numeric", month: "long" });
+      $("planList").innerHTML = `<div class="plan"><b>${esc(b.plan.name)} plan</b> (${b.plan.interval === "year" ? "yearly" : "monthly"})<br>
+        <span class="small">${b.plan.left.toLocaleString()} of ${b.plan.per_month.toLocaleString()} credits left this month · new credits on ${renew}</span></div>
+        <div class="row"><button class="primary" id="planManage">Manage plan</button></div>
+        <p class="small muted">Switch plan, change your card or cancel on Stripe's page.</p>`;
+      $("planManage").onclick = () => manage().catch((e) => { $("planNote").textContent = e.message; });
+      return;
+    }
+    const plans = b.plans || [];
+    if (!b.billing || !plans.some((p) => p.prices && p.prices[every])) {
+      $("planList").innerHTML = '<p class="small">Plans open soon. Until then, write to <a href="mailto:hello@citrello.app">hello@citrello.app</a> for more credits.</p>';
+      return;
+    }
+    const who = { student: "For PhD and Master's students", researcher: "For researchers and supervisors who check more papers" };
+    $("planList").innerHTML = plans.map((p) => {
+      const price = p.prices[every];
+      if (!price) return "";
+      return `<div class="plan"><span class="price">${money(price)}<span class="small muted">/${every === "year" ? "year" : "month"}</span></span>
+        <b>${esc(p.name)}</b><br><span class="small">${who[p.id] || ""}: ${p.credits_per_month.toLocaleString()} credits a month
+        (about ${Math.floor(p.credits_per_month / 3).toLocaleString()} claim checks)</span>
+        <div class="row"><button class="primary" data-plan="${esc(p.id)}">Choose ${esc(p.name)}</button></div></div>`;
+    }).join("");
+    $("planList").querySelectorAll("[data-plan]").forEach((x) => { x.onclick = () => buy(x.dataset.plan, every).catch((e) => { $("planNote").textContent = e.message; }); });
+  }
+  document.querySelectorAll('input[name="planEvery"]').forEach((r) => { r.onchange = drawPlans; });
+  async function loadPlans() {
+    try { billing = await bridgeAi("GET", "/api/billing"); } catch (e) { billing = { billing: false }; }
+    drawPlans();
+  }
+  let planWatch = null;
+  function watchBalance() {  // after Stripe's page: the new plan shows up by itself
+    clearInterval(planWatch);
+    const was = JSON.stringify(quota && quota.plan), until = Date.now() + 15 * 60 * 1000;
+    planWatch = setInterval(async () => {
+      if (Date.now() > until) return clearInterval(planWatch);
+      await loadQuota();
+      if (quota && JSON.stringify(quota.plan) !== was) {
+        clearInterval(planWatch);
+        if (!$("proCard").classList.contains("hidden")) loadPlans();
+      }
+    }, 5000);
+  }
+  async function buy(plan, interval) {
+    $("planNote").textContent = "Opening Stripe's payment page…";
+    const r = await bridgeAi("POST", "/api/billing/checkout", { plan, interval });
+    openOutside(r.url);
+    $("planNote").textContent = "Finish paying in your browser: your credits appear here by themselves.";
+    watchBalance();
+  }
+  async function manage() {
+    const r = await bridgeAi("POST", "/api/billing/portal");
+    openOutside(r.url);
+    $("planNote").textContent = "Changes you make on Stripe's page show up here by themselves.";
+    watchBalance();
   }
   function showPro(lead) {
     $("proLead").textContent = lead || "Make sure every source says what you wrote.";
+    $("planNote").textContent = 'Payment on Stripe\'s secure page (shown as "Sold through Link"). Cancel any time.';
     show("proCard", true);
+    $("planList").innerHTML = '<p class="small muted">Loading the plans…</p>';
+    loadPlans();
     $("proCard").scrollIntoView({ block: "nearest" });
   }
   $("proLater").onclick = () => show("proCard", false);
@@ -802,7 +876,7 @@
 
   $("claimCheck").onclick = () => checkClaim().catch((e) => { claimBusy = false; claimFail(e); });
   function claimFail(e) {
-    if (e.code === "ai_limit" || e.code === "pro_only") { claimSay(`<div class="notice warn">${esc(e.message)}</div>`); showPro(e.message); }
+    if (e.code === "no_credits") { claimSay(`<div class="notice warn">${esc(e.message)}</div>`); showPro(e.message); }
     else claimSay(`<div class="notice err">${esc(e.message)}</div>`);
   }
   async function checkClaim() {
@@ -810,9 +884,10 @@
     if (!session || !session.signed_in) return needAccount("Checking a claim with Claude");
     claimBusy = true;
     const cit = current, items = cit.payload.citationItems;
-    if (quota && !quota.pro && quota.used + items.length > quota.limit) {
+    const need = items.length * ((quota && quota.costs && quota.costs.claim) || 3);
+    if (quota && quota.credits < need) {
       claimBusy = false;
-      return showPro(`Your ${quota.limit} free claim checks this month are used up. Citrello Pro checks every citation.`);
+      return showPro(`Checking this citation needs ${need} credits and ${quota.credits} are left. Choose a plan to keep checking.`);
     }
     await pullLibrary(true);  // the newest library first (papers' text added elsewhere)
     const papers = [];
@@ -900,13 +975,14 @@
     } catch (e) { claimBusy = false; claimFail(e); }
   };
 
-  // ----- find another reference (Pro): in the library, where Citrello has the papers' full text -----
+  // ----- find another reference: in the library, where Citrello has the papers' full text -----
   // (Not on the web: a web search can't show that no paper supports the sentence, so it was taken out, 14 Nov.)
   let found = { library: [] };
   $("findAnother").onclick = async () => {
     if (!session || !session.signed_in) return needAccount("Finding another reference with Claude");
-    if (!quota || !quota.pro) await loadQuota();  // just switched to Pro?
-    if (!quota || !quota.pro) return showPro("Finding another reference in your library is part of Citrello Pro.");
+    const need = (quota && quota.costs && quota.costs.library) || 8;
+    if (!quota || quota.credits < need) await loadQuota();  // just bought a plan?
+    if (quota && quota.credits < need) return showPro(`Finding another reference needs ${need} credits and ${quota.credits} are left. Choose a plan to keep going.`);
     show("proCard", false);
     findInLibrary().catch(claimFail);
   };

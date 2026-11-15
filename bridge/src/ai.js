@@ -3,12 +3,13 @@
 // can also look on the web for published papers that support a sentence. Nothing is stored here except a monthly
 // count per account. The API key is a secret of this Worker (ANTHROPIC_API_KEY); the model is AI_MODEL.
 import Anthropic from "@anthropic-ai/sdk";
+import * as credits from "./credits.js";
 
 const VERDICTS = ["supports", "partly", "contradicts", "not_found"];
-const month = () => new Date().toISOString().slice(0, 7);
 const clip = (s, n) => String(s ?? "").slice(0, n);
 
 export const isApiError = (e) => e instanceof Anthropic.APIError;
+export const isCreditError = (e) => e instanceof credits.CreditError;
 
 export class AiError extends Error {
   constructor(status, code, message) { super(message); this.status = status; this.code = code; }
@@ -22,29 +23,8 @@ function client(env) {
 const model = (env) => env.AI_MODEL || "claude-sonnet-5-5";          // verdicts and library checks
 const webModel = (env) => env.AI_WEB_MODEL || "claude-haiku-5-5";     // the web search step of web checks (cheap)
 
-// Monthly allowances: checks (a verdict, or a library check, counts 1) and web checks, free and pro.
-export async function quota(env, userId) {
-  const u = await env.DB.prepare("SELECT pro FROM users WHERE id = ?").bind(userId).first();
-  const row = await env.DB.prepare("SELECT units, web FROM ai_usage WHERE user_id = ? AND month = ?").bind(userId, month()).first();
-  const pro = !!(u && u.pro);
-  return { pro, month: month(), ready: !!env.ANTHROPIC_API_KEY,
-           used: row ? row.units : 0, limit: Number(pro ? env.AI_PRO_MONTHLY || 3000 : env.AI_FREE_MONTHLY || 10),
-           web_used: row ? row.web : 0, web_limit: Number(pro ? env.AI_PRO_WEB || 100 : env.AI_FREE_WEB || 0) };
-}
-
-async function spend(env, userId, units, kind = "units") {
-  const q = await quota(env, userId);
-  const web = kind === "web", used = web ? q.web_used : q.used, limit = web ? q.web_limit : q.limit;
-  const what = web ? "web checks" : "Claude checks";
-  if (used + units > limit) {
-    throw new AiError(402, "ai_limit", q.pro
-      ? `You've used this month's ${limit} ${what}. They start again next month.`
-      : `Free accounts get ${limit} ${what} a month, and they're used up. Citrello Pro checks every citation.`);
-  }
-  const col = web ? "web" : "units";
-  return async () => env.DB.prepare(`INSERT INTO ai_usage (user_id, month, ${col}) VALUES (?, ?, ?)
-      ON CONFLICT(user_id, month) DO UPDATE SET ${col} = ${col} + ?`).bind(userId, month(), units, units).run();
-}
+// What each check costs: credits (src/credits.js). quota() is the account's balance, for the app and the Word add-in.
+export const quota = (env, userId) => credits.balance(env, userId);
 
 // Claude Opus refuses some topics on safety grounds; "default" falls back to a model that can answer.
 const fallback = (m) => (/opus|sonnet|fable/.test(m) ? { betas: ["server-side-fallback-2026-07-01"], fallbacks: "default" } : {});
@@ -77,13 +57,9 @@ function textOf(msg) {
 }
 
 // {items: [{id, claim, papers: [{ref, title, passages: [text]}]}]} -> {results: [{id, paper, verdict, ...}], quota}
-// Finding support (in the library or on the web) is for Citrello Pro; free accounts get 10 verdicts a month.
-async function requirePro(env, userId) {
-  if (!(await quota(env, userId)).pro) throw new AiError(402, "pro_only", "Finding supporting papers is part of Citrello Pro.");
-}
-
+// A claim check costs COST.claim credits per paper; a library find (several candidate papers for one sentence)
+// COST.library per sentence.
 export async function judge(env, userId, body) {
-  if (body.kind === "library") await requirePro(env, userId);
   const items = (Array.isArray(body.items) ? body.items : []).slice(0, 12).map((it) => ({
     id: clip(it.id, 40), claim: clip(it.claim, 1200),
     papers: (Array.isArray(it.papers) ? it.papers : []).slice(0, 8).map((p) => ({
@@ -91,9 +67,9 @@ export async function judge(env, userId, body) {
       passages: (Array.isArray(p.passages) ? p.passages : []).slice(0, 8).map((x) => clip(x, 1500)) })),
   })).filter((it) => it.claim && it.papers.length);
   if (!items.length) throw new AiError(400, "invalid_request", "Nothing to check.");
-  // a verdict = one sentence against one paper; a library check (several candidate papers for one sentence) counts 1
-  const units = body.kind === "library" ? items.length : items.reduce((a, it) => a + it.papers.length, 0);
-  const done = await spend(env, userId, units);
+  const library = body.kind === "library";
+  const cost = library ? items.length * credits.COST.library : items.reduce((a, it) => a + it.papers.length, 0) * credits.COST.claim;
+  const done = await credits.charge(env, userId, cost, library ? "library find" : "claim check");
   const prompt = items.map((it) => `<item id="${it.id}">\n<claim>${it.claim}</claim>\n` + it.papers.map((p) =>
     `<paper ref="${p.ref}" title="${p.title.replace(/"/g, "'")}">\n` + p.passages.map((x, i) => `<passage n="${i + 1}">${x}</passage>`).join("\n") + "\n</paper>").join("\n")
     + "\n</item>").join("\n\n");
@@ -126,11 +102,10 @@ End your answer with only a JSON object, no other text after it:
 
 // {claim, context, exclude: [doi]} -> {papers: [...], quota}
 export async function findOnWeb(env, userId, body) {
-  await requirePro(env, userId);
   const claim = clip(body.claim, 1200);
   if (!claim) throw new AiError(400, "invalid_request", "Nothing to look for.");
   const exclude = (Array.isArray(body.exclude) ? body.exclude : []).slice(0, 50).map((d) => clip(d, 200).toLowerCase());
-  const done = await spend(env, userId, 1, "web");
+  const done = await credits.charge(env, userId, credits.COST.web, "web find");
   const params = {
     // the search step is cheap on purpose (Haiku, search results only, no pages opened: ~3-5 cents instead of ~20):
     // the papers it picks are checked against their full text afterwards, by AI_MODEL

@@ -49,7 +49,7 @@ def main():
         print("ANTHROPIC_API_KEY isn't set: add it as a GitHub secret.")
         return 1
     email = json.loads(call("GET", "/api/me", headers=me)[2])["user"]["email"]
-    call("POST", "/admin/pro", {"email": email, "pro": True}, headers={"Authorization": "Bearer testadmin"})
+    call("POST", "/admin/credits", {"email": email, "credits": 1000, "why": "real test"}, headers={"Authorization": "Bearer testadmin"})
     total, right = 0.0, 0
 
     # 1. verdicts: six sentences against one paper, as the app sends them (the paper's best passages)

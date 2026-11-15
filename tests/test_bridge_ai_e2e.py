@@ -1,6 +1,6 @@
 """Claude checks through the bridge (local wrangler dev), with a pretend Claude API (tests/anthropic_mock.py).
 
-The bridge must run with ANTHROPIC_BASE_URL=http://127.0.0.1:8799, ANTHROPIC_API_KEY=test-key, AI_FREE_MONTHLY=3,
+The bridge must run with ANTHROPIC_BASE_URL=http://127.0.0.1:8799, ANTHROPIC_API_KEY=test-key,
 DEV_RETURN_CODES=1 and ADMIN_TOKEN=testadmin (see .github/workflows/bridge.yml), then:
   CITRELLO_BRIDGE_E2E=1 CITRELLO_BRIDGE=http://localhost:8787 pytest tests/test_bridge_ai_e2e.py
 """
@@ -41,46 +41,44 @@ def test_claude_checks(claude):
     me = sign_in(f"ai{int(time.time())}@example.com")
     st, _, raw = call("GET", "/api/ai/quota", headers=me)
     q = json.loads(raw)
-    assert st == 200 and q == dict(q, pro=False, used=0, limit=3, web_used=0, web_limit=0, ready=True)
+    assert st == 200 and q == dict(q, credits=100, bonus=100, plan=None, checks_left=33, ready=True)  # 100 free credits
+    assert q["costs"] == {"claim": 3, "library": 8, "web": 25}
 
-    # a verdict with the exact words from the paper
+    # a verdict with the exact words from the paper: 3 credits per paper checked
     st, _, raw = call("POST", "/api/ai/judge", {"items": [ITEM]}, headers=me)
     assert st == 200, raw
     r = json.loads(raw)
     assert r["results"] == [dict(r["results"][0], id="0", paper="0", verdict="contradicts", passage=1)]
-    assert "halved that cost" in r["results"][0]["quote"] and r["quota"]["used"] == 1
+    assert "halved that cost" in r["results"][0]["quote"] and r["quota"]["credits"] == 97
     sent = claude[-1]
     assert sent["key"] == "test-key" and sent["body"]["model"] == "claude-sonnet-5-5"
     assert sent["body"]["output_config"]["format"]["type"] == "json_schema"  # a structured answer
     assert sent["body"]["fallbacks"] == "default"
 
-    # finding supporting papers in the library is for Pro: refused plainly, nothing sent to Claude
-    n = len(claude)
-    st, _, raw = call("POST", "/api/ai/judge", {"kind": "library", "items": [ITEM]}, headers=me)
-    assert st == 402 and json.loads(raw)["error"] == "pro_only" and len(claude) == n
+    # finding a better source in the library: 8 credits a sentence, open to everyone with credits
+    two = [dict(ITEM["papers"][0], ref=str(i)) for i in range(2)]
+    st, _, raw = call("POST", "/api/ai/judge", {"kind": "library", "items": [dict(ITEM, papers=two)]}, headers=me)
+    assert st == 200 and json.loads(raw)["quota"]["credits"] == 89
 
-    # the free verdicts: 3 for this test's free accounts (10 by default), then a plain message
-    assert call("POST", "/api/ai/judge", {"items": [ITEM]}, headers=me)[0] == 200
-    assert call("POST", "/api/ai/judge", {"items": [ITEM]}, headers=me)[0] == 200
-    st, _, raw = call("POST", "/api/ai/judge", {"items": [ITEM]}, headers=me)
-    assert st == 402 and "3 Claude checks a month" in json.loads(raw)["error_description"] and len(claude) == n + 2
-
-    # Pro (switched on by the admin until payments exist): a bigger allowance
+    # not enough credits left: a plain message, nothing sent to Claude
     email = json.loads(call("GET", "/api/me", headers=me)[2])["user"]["email"]
-    assert call("POST", "/admin/pro", {"email": email, "pro": True})[0] == 401
-    assert call("POST", "/admin/pro", {"email": email, "pro": True}, headers={"Authorization": "Bearer testadmin"})[0] == 200
-    q = json.loads(call("GET", "/api/ai/quota", headers=me)[2])
-    assert q["pro"] and q["limit"] > 3 and q["web_limit"] > 0
+    admin = {"Authorization": "Bearer testadmin"}
+    assert call("POST", "/admin/credits", {"email": email, "credits": -88})[0] == 401  # admin only
+    st, _, raw = call("POST", "/admin/credits", {"email": email, "credits": -88, "why": "test"}, headers=admin)
+    assert st == 200 and json.loads(raw)["balance"]["credits"] == 1
+    n = len(claude)
+    st, _, raw = call("POST", "/api/ai/judge", {"items": [ITEM]}, headers=me)
+    d = json.loads(raw)
+    assert st == 402 and d["error"] == "no_credits" and "Choose a plan" in d["error_description"] and len(claude) == n
+    # credits given by hand (support, testers)
+    assert json.loads(call("POST", "/admin/credits", {"email": email, "credits": 500}, headers=admin)[2])["balance"]["credits"] == 501
+    assert call("POST", "/admin/credits", {"email": "nobody@example.com", "credits": 5}, headers=admin)[0] == 404
     assert call("POST", "/api/ai/judge", {"items": [ITEM]}, headers=me)[0] == 200
-    # finding papers on the web is switched off, even with Pro (a web search can't show that none exists); finding
-    # better sources in the library is Pro, and counts as one check
+
+    # finding papers on the web is switched off (a web search can't show that none exists)
     n = len(claude)
     st, _, raw = call("POST", "/api/ai/find-web", {"claim": "Cable recovery is the costliest step."}, headers=me)
     assert st == 410 and json.loads(raw)["error"] == "not_offered" and len(claude) == n   # Claude wasn't asked
-    used = q["used"] + 1
-    two = [dict(ITEM["papers"][0], ref=str(i)) for i in range(2)]
-    st, _, raw = call("POST", "/api/ai/judge", {"kind": "library", "items": [dict(ITEM, papers=two)]}, headers=me)
-    assert st == 200 and json.loads(raw)["quota"]["used"] == used + 1
     assert call("POST", "/api/ai/judge", {"items": []}, headers=me)[0] == 400
 
 

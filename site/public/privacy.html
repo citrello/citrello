@@ -15,14 +15,14 @@
   <nav aria-label="Main"><a href="/app/">Web app</a><a href="/#problems">What it fixes</a><a href="https://github.com/citrello/citrello">GitHub</a><a class="nav-cta" href="/#download">Download</a></nav></header>
 <main class="wrap narrow policy">
 <h1>Privacy</h1>
-<p class="date">Last updated 11 November 2026</p>
+<p class="date">Last updated 15 November 2026</p>
 
 <h2>Your library stays on your computer</h2>
 <p>References, projects, documents and the text of your papers are stored on your own computer: by the Citrello app in the Citrello folder in your user folder, or, when you use Citrello in the browser (citrello.app/app), inside your browser's own storage. Citrello for desktop never uploads them. Documents you check are read on your computer, not uploaded.</p>
 
 <h2>The cloud copy (web app, when you're signed in)</h2>
 <p>When you're signed in to Citrello in the browser (citrello.app/app), Citrello keeps a copy of your library (references, projects and the text of your papers, compressed) on its server, so it isn't lost if the browser's data is cleared and it comes back when you sign in on another computer. It's stored with Cloudflare in the European Union, only for your account, and replaced each time your library changes. You can turn it off in Settings → Library, which deletes it from the server; deleting your account deletes it too. Documents you check are never part of it.</p>
-<p>"What your sources say" (Citrello Pro): when you choose to ask Claude for verdicts, Citrello sends each cited sentence and a few short passages of the cited paper's text (not your whole document, and never the PDFs) to Claude, made by Anthropic, through Citrello's server, signed in with your account. Anthropic doesn't use them to train its models, and Citrello's server doesn't keep them: only a monthly count of checks per account. "Find another reference" looks only in your own library, in the same way: the sentence and passages of your papers' text.</p>
+<p>"What your sources say" and "Check the claim": when you choose to ask Claude for verdicts, Citrello sends each cited sentence and a few short passages of the cited paper's text (not your whole document, and never the PDFs) to Claude, made by Anthropic, through Citrello's server, signed in with your account. Anthropic doesn't use them to train its models, and Citrello's server doesn't keep them: only your credit balance and a log of credits used (when, how many, and which kind of check). "Find another reference" looks only in your own library, in the same way: the sentence and passages of your papers' text.</p>
 
 <h2>Papers' full text</h2>
 <p>When you add a paper's PDF, or the browser button or extension finds the paper's text on its page, Citrello keeps only the text, next to the reference, on your computer (or in your browser). The PDF itself is not kept. ChatGPT or Claude read a paper's text only when you use them with Citrello and they ask for it, under their own privacy policies.</p>
@@ -50,6 +50,9 @@
 <p>The Citrello extension reads a web page only when you click its button on that page, or when it opens a paper you asked it to fetch. It asks for access to websites the first time you fetch papers in bulk, not when you install it. What it reads (the paper's details and text) goes to Citrello on your computer or in your browser, never to Citrello's servers. It keeps a list of the papers you asked it to fetch until it has finished, and your choice of web or desktop Citrello.</p>
 <p>Once you allow it to read websites, the extension can tell you when you open a paper that's in your library without its full text. For that it keeps, in your browser, a list of those papers (their DOI, title and Citrello key), and compares each page you open with it, on your computer. Nothing about the pages you visit is sent anywhere; the paper's text goes to Citrello only when you click "Add its text". You can turn this off in the extension's options.</p>
 
+<h2>Plans and payments</h2>
+<p>If you buy a plan, the payment is made on Stripe's page and sold to you by Link (Stripe's Managed Payments), which processes your payment details, tax and receipts under its own privacy policy. Citrello never sees your card. From Stripe, Citrello's server keeps your plan, its status and dates, and Stripe's customer and subscription IDs for your account, so your credits arrive and "Manage plan" works.</p>
+
 <h2>Emails</h2>
 <p>Sign-in codes are sent with Resend. Emails about new features are sent only if you agreed, and each one has an unsubscribe link. You can also turn them off in the app.</p>
 
@@ -57,13 +60,13 @@
 <p>Citrello works fully without an account. You can sign out of any computer, and delete your account and everything we store about you, in the app (Settings → Account).</p>
 
 <h2>Sharing</h2>
-<p>We don't sell or share your data. It is processed by Cloudflare (hosting) and Resend (email). There are no ads, no cookies for tracking, and no analytics on the website.</p>
+<p>We don't sell or share your data. It is processed by Cloudflare (hosting), Resend (email), Anthropic (Claude's checks, only what you ask Claude to check) and, for plans, Stripe and Link (payments). There are no ads, no cookies for tracking, and no analytics on the website.</p>
 
 <h2>Contact</h2>
 <p>Open an issue at <a href="https://github.com/citrello/citrello">github.com/citrello/citrello</a>, or email hello@citrello.app.</p>
 </main>
 <footer><div class="tiles" aria-hidden="true"></div><div class="wrap foot"><a class="logo" href="/">citr<span>ello</span></a><p>References, the sweet part.</p>
-<nav aria-label="Footer"><a href="https://github.com/citrello/citrello">GitHub</a><a href="/privacy">Privacy</a><a href="https://github.com/citrello/citrello/blob/main/LICENSE">Licence (AGPL)</a></nav>
+<nav aria-label="Footer"><a href="https://github.com/citrello/citrello">GitHub</a><a href="/privacy">Privacy</a><a href="/terms">Terms</a><a href="/pricing">Pricing</a><a href="https://github.com/citrello/citrello/blob/main/LICENSE">Licence (AGPL)</a></nav>
 <p class="small">© 2026 Armin Hosseinghorbani. Citrello™ is a trademark of Armin Hosseinghorbani.</p></div></footer>
 </body>
 </html>

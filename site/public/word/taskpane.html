@@ -56,6 +56,7 @@
   .verdict q { display: block; font-style: italic; color: var(--muted); margin-top: 3px; }
   .verdict .row { margin-top: 6px; } .verdict button { padding: 3px 10px; font-size: 12.5px; }
   .pro { border-color: var(--cobalt); box-shadow: 4px 4px 0 var(--lemon); } .pro ul { padding-left: 18px; margin: 6px 0; }
+  .plan { border: 1px solid #d5dbe8; border-radius: 10px; padding: 8px 10px; margin: 6px 0; } .plan b { color: var(--cobalt); } .plan .price { float: right; font-weight: 700; }
   a.btnlink { display: inline-block; border-radius: 99px; padding: 6px 14px; font-weight: 600; text-decoration: none; background: var(--cobalt); color: #fff; }
   #doc ul.issues { margin: 6px 0 0; padding-left: 18px; font-size: 13px; } #doc ul.issues li { margin: 4px 0; }
   #doc .lvl-problem { color: var(--err); } #doc .lvl-check { color: var(--warn); }
@@ -105,15 +106,16 @@
       <p class="small muted">To add a paper, search below and press Add. <button class="link" id="curDelete">Delete this citation</button></p>
     </div>
     <div id="proCard" class="card pro hidden" role="dialog" aria-labelledby="proTitle">
-      <h2 id="proTitle">Citrello Pro</h2>
+      <h2 id="proTitle">Plans</h2>
       <p class="small" id="proLead">Make sure every source says what you wrote.</p>
-      <ul class="small">
-        <li><b>Every citation checked</b> by Claude against the paper's full text, not just 10 a month</li>
-        <li><b>Find a better source in your library</b> when a paper doesn't clearly say it</li>
-        <li><b>Every verdict from the paper's full text</b>, with the exact sentence that shows it</li>
-      </ul>
-      <p class="small muted">Pro is opening soon. Tell us you'd like it and we'll switch it on for your account.</p>
-      <div class="row"><a class="primary btnlink" href="mailto:hello@citrello.app?subject=Citrello%20Pro" target="_blank" rel="noopener">I'd like Pro</a><button class="link" id="proLater">Not now</button></div>
+      <p class="small muted">A claim check costs 3 credits for each paper; finding another reference in your library costs 8.</p>
+      <div class="row small" id="planEvery" role="radiogroup" aria-label="Pay">
+        <label><input type="radio" name="planEvery" value="month" checked> Monthly</label>
+        <label><input type="radio" name="planEvery" value="year"> Yearly</label>
+      </div>
+      <div id="planList"></div>
+      <p class="small muted" id="planNote">Payment on Stripe's secure page (shown as "Sold through Link"). Cancel any time.</p>
+      <div class="row"><button class="link" id="proLater">Not now</button></div>
     </div>
     <input type="file" id="pdfPick" accept="application/pdf,.pdf" class="hidden">
     <input type="search" id="q" placeholder="Search your library (author, title, year…)" aria-label="Search your library" autocomplete="off">

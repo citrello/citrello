@@ -247,6 +247,18 @@ manifest: `site/public/word/manifest.xml` (id ef6ca1ae-67cf-48fb-89a7-189c074612
   check for Stripe "Managed Payments" (Stripe as merchant of record), else Stripe Tax + EU non-Union OSS. Model stays
   Sonnet 5.5 (Haiku 5.5 tested 15 Nov: 4/6, missed both contradictions). To build: credit ledger in the bridge
   (D1), per-task spend replacing the monthly quota, Stripe Checkout + webhook, pricing page, balance in the panels.
+- **Credits and plans built (15 Nov 2026).** Changed from packs to two subscriptions (Armin): **Student** (PhD and
+  Master's, 1,000 credits/month, £6/month or £50/year) and **Researcher** (4,000/month, £18/month or £150/year);
+  credits still per task (claim 3/paper, library find 8), 100 free once, plan credits first and not carried over.
+  Stripe Managed Payments (Stripe/Link is seller of record), Armin's new Citrello Stripe account, `STRIPE_SECRET_KEY`
+  GitHub secret (sandbox key first). Bridge: `src/credits.js`, `src/billing.js`, migration 0005, `/admin/credits`
+  replaces `/admin/pro`; `scripts/stripe-setup.mjs` creates products/prices/webhook/portal at deploy. Clients: Word
+  panel and web app show "N credits left · Student plan", a Plans window (monthly/yearly, prices from Stripe, Choose →
+  Stripe's page in the browser, Manage plan → portal; the balance refreshes by itself every 5 s for 15 min). Site:
+  /pricing, /thanks, /terms (draft written by Claude: Armin should read it; not legal advice), privacy names
+  Stripe/Link and Anthropic. Tests: billing e2e with a pretend Stripe, Word and web e2e updated.
+  **To do:** test-buy in the sandbox (card 4242 4242 4242 4242), then a live key; Word store listing says plans are
+  sold in the add-in ("additional purchase").
 - **Word add-in: "Try it with sample papers" (15 Nov 2026).** No account needed: six real papers
   (site/public/word/samples.json) go into the Word engine's library (only when it's empty); citing, styles, the
   list, the document check, converting and comments work; Claude's checks ask to sign in; signing in replaces the
