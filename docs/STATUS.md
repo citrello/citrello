@@ -239,6 +239,14 @@ manifest: `site/public/word/manifest.xml` (id ef6ca1ae-67cf-48fb-89a7-189c074612
   (`docconvert.notes`, WordApi 1.4 `insertComment`): retracted / not found / DOI problems on each citation of that
   paper, a typed [7] with no reference, [@Key] markers not in the library, entries never cited; problems that
   fixing corrects and minor notes (No DOI, preprint, web page) are left out; no duplicates on a second press.
+- **Business model decided (Armin, 15 Nov 2026): credits.** Free: everything without AI cost (library, online
+  checks, converting/fixing, Word add-in, extension, checker, connectors). Claude's checks cost credits: Check the
+  claim 3 credits per paper, Find another reference (library) 8. New accounts get **100 credits once** (no monthly
+  free allowance), usable for either task (so Find another is no longer Pro-only). Packs suggested £5 / £15 / £35
+  for 600 / 2,500 / 7,000 credits, valid 12 months (prices not final). Payments: Stripe (Armin has an account);
+  check for Stripe "Managed Payments" (Stripe as merchant of record), else Stripe Tax + EU non-Union OSS. Model stays
+  Sonnet 5.5 (Haiku 5.5 tested 15 Nov: 4/6, missed both contradictions). To build: credit ledger in the bridge
+  (D1), per-task spend replacing the monthly quota, Stripe Checkout + webhook, pricing page, balance in the panels.
 - **Word add-in: "Try it with sample papers" (15 Nov 2026).** No account needed: six real papers
   (site/public/word/samples.json) go into the Word engine's library (only when it's empty); citing, styles, the
   list, the document check, converting and comments work; Claude's checks ask to sign in; signing in replaces the
