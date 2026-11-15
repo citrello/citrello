@@ -242,7 +242,8 @@ manifest: `site/public/word/manifest.xml` (id ef6ca1ae-67cf-48fb-89a7-189c074612
 - **Extension published on the Chrome Web Store (15 Nov 2026):**
   https://chromewebstore.google.com/detail/gacnlcefeollfdigegohidlciicghpmf (Chrome, Edge, Brave… install from it).
   citrello.app/extension has "Add to Chrome" / "Add to Edge"; the web app's "Get the extension" links go to the store
-  (`EXT_URL` in ui.html; Firefox still goes to citrello.app/extension). Still to do (Armin): Edge Add-ons, Firefox Add-ons.
+  (`EXT_URL` in ui.html; Firefox still goes to citrello.app/extension). Edge users install from the Chrome Web Store (Armin did). Microsoft's Edge Add-ons store: later (optional).
+  Firefox Add-ons: postponed (Armin, 15 Nov); the Firefox package still builds; citrello.app/extension says "Coming soon".
 - **Finding papers on the web: switched off (Armin, 14 Nov 2026).** A web search can't show that no paper supports a
   sentence ("feels like a scam"), so "Find another reference" searches only the library, where Citrello has the full
   texts (results say "From the full text" or "From the abstract only"). Removed from the Word panel, the web app,
