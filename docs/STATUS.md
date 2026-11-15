@@ -239,6 +239,10 @@ manifest: `site/public/word/manifest.xml` (id ef6ca1ae-67cf-48fb-89a7-189c074612
   (`docconvert.notes`, WordApi 1.4 `insertComment`): retracted / not found / DOI problems on each citation of that
   paper, a typed [7] with no reference, [@Key] markers not in the library, entries never cited; problems that
   fixing corrects and minor notes (No DOI, preprint, web page) are left out; no duplicates on a second press.
+- **Extension published on the Chrome Web Store (15 Nov 2026):**
+  https://chromewebstore.google.com/detail/gacnlcefeollfdigegohidlciicghpmf (Chrome, Edge, Brave… install from it).
+  citrello.app/extension has "Add to Chrome" / "Add to Edge"; the web app's "Get the extension" links go to the store
+  (`EXT_URL` in ui.html; Firefox still goes to citrello.app/extension). Still to do (Armin): Edge Add-ons, Firefox Add-ons.
 - **Finding papers on the web: switched off (Armin, 14 Nov 2026).** A web search can't show that no paper supports a
   sentence ("feels like a scam"), so "Find another reference" searches only the library, where Citrello has the full
   texts (results say "From the full text" or "From the abstract only"). Removed from the Word panel, the web app,

@@ -786,6 +786,9 @@
 
 <script>
 const $ = (id) => document.getElementById(id);
+// the Citrello extension: the Chrome Web Store for Chrome, Edge, Brave… (they all install from it); its page otherwise
+const EXT_STORE = "https://chromewebstore.google.com/detail/gacnlcefeollfdigegohidlciicghpmf";
+const EXT_URL = /Firefox\//.test(navigator.userAgent) ? "https://citrello.app/extension" : EXT_STORE;
 const show = (el, on = true) => (typeof el === "string" ? $(el) : el).classList.toggle("hidden", !on);
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 let status = {}, styles = [], lib = {items: [], projects: []}, job = null, timer = null;
@@ -1816,7 +1819,7 @@ function renderPapersWays() {
       : `<p>Citrello finds legal free copies of your papers (Unpaywall, Europe PMC, arXiv) and keeps their text.</p>
          <button class="primary" id="ftGet">Get the free ones now</button>
          <p style="margin:10px 0 0">For the papers your university or library pays for, add the <b>Citrello browser extension</b>: it opens each one with your login, in the background.</p>
-         <a class="btn" href="https://citrello.app/extension" target="_blank" rel="noopener">Get the extension</a>`) +
+         <a class="btn" href="${EXT_URL}" target="_blank" rel="noopener">Get the extension</a>`) +
       `<p class="small ft-tip"><b>Tip:</b> first sign in to your university library in this browser (or turn on its VPN), so publishers recognise you and Citrello can read more papers.</p>
        <div class="bar hidden" id="ftFreeBarWrap"><div id="ftFreeBar"></div></div><div id="ftFreeMsg" class="small"></div>
        ${extVersion ? "" : `<p class="small muted web-only" style="margin:6px 0 0">Free PDFs come through Citrello's server, because most repositories don't let web pages download them. Only the DOI is sent and nothing is kept.</p>`}`) +
@@ -2158,7 +2161,7 @@ function sourcesPanel(c, r, newOnes) {
   if (missing.length) h += `<div class="src-get" id="srcGet"><b>${missing.length} cited paper${missing.length === 1 ? " has" : "s have"} no text yet.</b> Get ${missing.length === 1 ? "it" : "them"} here, and the sentences below fill in as the texts arrive.
       <div class="row" style="margin-top:8px">${extVersion
         ? `<button class="primary" id="srcFetch">Get their full texts with my access</button>`
-        : `<button class="primary" id="srcFetch">Get the free ones now</button><a class="btn" href="https://citrello.app/extension" target="_blank" rel="noopener">Get the extension for the rest</a>`}
+        : `<button class="primary" id="srcFetch">Get the free ones now</button><a class="btn" href="${EXT_URL}" target="_blank" rel="noopener">Get the extension for the rest</a>`}
         <label class="btn" for="srcPdfs">I have the PDFs…</label><input type="file" id="srcPdfs" accept=".pdf" multiple hidden></div>
       <p class="small muted" style="margin:6px 0 0">${extVersion ? `The extension opens each paper in a background tab with your login, about one every 15 seconds${missing.length > 3 ? ` (about ${Math.ceil(missing.length * 15 / 60)} minutes)` : ""}. Keep working meanwhile.`
         : "Without the browser extension, Citrello can only get legal free copies; the extension opens the others with your university login."}
@@ -2386,7 +2389,7 @@ async function srcFetchTexts() {
         if (st.error) return srcSay("err", esc(st.error));
         const r = st.result;
         srcNote = [r.found ? "ok" : "warn", `Free full text found for ${r.found} of ${r.checked}.` +
-          (r.missing ? ` ${r.missing} need your university access: get the <a href="https://citrello.app/extension" target="_blank" rel="noopener">Citrello extension</a>, or add their PDFs.` : "")];
+          (r.missing ? ` ${r.missing} need your university access: get the <a href="${EXT_URL}" target="_blank" rel="noopener">Citrello extension</a>, or add their PDFs.` : "")];
         loadLibrary();
         return runSources(false, true);
       }
@@ -2913,7 +2916,7 @@ async function wordFetchRun(wf) {
   if (!papers.length) return wordFetchDone(`${noLink.length === 1 ? "This paper has" : "These papers have"} no DOI or link, so they can't be opened: add ${noLink.length === 1 ? "its PDF" : "their PDFs"} in Word.`);
   if (!extVersion) {
     wfSay(`<p>To open ${papers.length === 1 ? "this paper" : `these ${papers.length} papers`} with your university or library access, add the free <b>Citrello browser extension</b> (one click). Then come back to this tab.</p>
-      <div class="row"><a class="btn primary" href="https://citrello.app/extension" target="_blank" rel="noopener">Add the extension</a><button class="link" id="wfAgain">I've added it</button></div>
+      <div class="row"><a class="btn primary" href="${EXT_URL}" target="_blank" rel="noopener">Add the extension</a><button class="link" id="wfAgain">I've added it</button></div>
       <p class="small muted">It opens each paper in a background tab with your login and keeps only the text.</p>`);
     $("wfAgain").onclick = () => location.reload();  // a newly added extension starts on a fresh page
     return;
