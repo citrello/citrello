@@ -100,6 +100,7 @@
   }
   async function signOut() {
     try { await post("/api/account/signout"); } catch {}
+    demo = false;
     show("main", false); show("stylePick", false); show("signin", true);
   }
   function siMsg(text, kind) { $("siMsg").innerHTML = text ? `<div class="notice ${kind || "err"}">${esc(text)}</div>` : ""; }
@@ -118,20 +119,50 @@
     $("siVerify").disabled = true; siMsg("");
     try {
       await post("/api/account/verify", { email: $("siEmail").value.trim(), code: $("siCode").value.trim() });
+      if (demo) { await post("/api/web/restore", { items: [], projects: [] }); demo = false; }  // the samples go
       await openMain();
     } catch (e) { siMsg(e.message); } finally { $("siVerify").disabled = false; }
   };
   $("siCode").addEventListener("keydown", (e) => { if (e.key === "Enter") $("siVerify").click(); });
   $("siEmail").addEventListener("keydown", (e) => { if (e.key === "Enter") $("siSend").click(); });
 
+  let demo = false, pulling = null;  // demo: trying the add-in with sample papers, without an account
   async function openMain() {
-    show("signin", false); show("main", true); show("stylePick", true);
+    show("signin", false); show("main", true); show("stylePick", true); show("demoBar", demo);
     await loadStyles();
-    await pullLibrary();
+    if (demo) {
+      const d = await get("/api/library?project=*");
+      $("libInfo").innerHTML = `${d.total} sample papers (not your library) · <button class="link" id="demoSignIn2">Sign in</button>`;
+      $("demoSignIn2").onclick = signInFromDemo;
+    } else await pullLibrary();
     search();
     checkDocument().catch((e) => docSay(e.message, "err"));
-    loadQuota();
-    setInterval(() => pullLibrary(true), 5 * 60 * 1000);  // new references added in Citrello arrive by themselves
+    if (!demo) loadQuota();
+    else $("quotaLine").innerHTML = 'Sign in for 10 free claim checks a month · <button class="link" id="quotaSignIn">Sign in</button>';
+    if ($("quotaSignIn")) $("quotaSignIn").onclick = signInFromDemo;
+    if (!demo && !pulling) pulling = setInterval(() => pullLibrary(true), 5 * 60 * 1000);  // new references arrive by themselves
+  }
+  // Try it with sample papers: six real papers in this Word engine's library (only while it has none of its own)
+  $("tryDemo").onclick = async () => {
+    $("tryDemo").disabled = true;
+    try {
+      const st = await get("/api/web/state");
+      if (!st.items) {
+        const r = await fetch("samples.json");
+        await api("POST", "/api/library/import", await r.arrayBuffer(), { "X-Filename": "samples.json" });
+      }
+      demo = true;
+      await openMain();
+    } catch (e) { siMsg(e.message); } finally { $("tryDemo").disabled = false; }
+  };
+  function signInFromDemo() {
+    show("main", false); show("stylePick", false); show("signin", true);
+    $("siEmail").focus();
+  }
+  $("demoSignIn").onclick = signInFromDemo;
+  function needAccount(what) {  // the Claude features need an account
+    claimSay(`<div class="notice">${esc(what)} needs a free Citrello account (10 claim checks a month free). <button class="link" id="needSignIn">Sign in</button></div>`);
+    $("needSignIn").onclick = signInFromDemo;
   }
 
   // ---------- style (stored in the document) ----------
@@ -167,7 +198,7 @@
   let searchTimer = null;
   $("q").addEventListener("input", () => { clearTimeout(searchTimer); searchTimer = setTimeout(search, 200); });
   async function search() {
-    if (!session || !session.signed_in) return;
+    if (!demo && (!session || !session.signed_in)) return;
     const q = $("q").value.trim();
     const d = await get("/api/library?project=*&q=" + encodeURIComponent(q));
     lastResults = d.items.slice(0, 40);
@@ -776,6 +807,7 @@
   }
   async function checkClaim() {
     if (!current || claimBusy) return;
+    if (!session || !session.signed_in) return needAccount("Checking a claim with Claude");
     claimBusy = true;
     const cit = current, items = cit.payload.citationItems;
     if (quota && !quota.pro && quota.used + items.length > quota.limit) {
@@ -872,6 +904,7 @@
   // (Not on the web: a web search can't show that no paper supports the sentence, so it was taken out, 14 Nov.)
   let found = { library: [] };
   $("findAnother").onclick = async () => {
+    if (!session || !session.signed_in) return needAccount("Finding another reference with Claude");
     if (!quota || !quota.pro) await loadQuota();  // just switched to Pro?
     if (!quota || !quota.pro) return showPro("Finding another reference in your library is part of Citrello Pro.");
     show("proCard", false);

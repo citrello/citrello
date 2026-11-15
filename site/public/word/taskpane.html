@@ -82,9 +82,12 @@
       <div class="row"><button class="primary" id="siVerify">Sign in</button><button class="link" id="siBack">Use a different email</button></div></div>
     <div id="siMsg"></div>
     <p class="small muted">New to Citrello? <a href="https://citrello.app/app" target="_blank" rel="noopener">Open Citrello</a>, sign in there and add your references; they appear here.</p>
+    <div class="row"><button id="tryDemo">Try it with sample papers</button></div>
+    <p class="small muted">No account needed: cite, change the style, build the reference list and check this document with six sample papers.</p>
   </div>
 
   <div id="main" class="hidden">
+    <div id="demoBar" class="notice warn hidden">You're trying Citrello with six sample papers. <button class="link" id="demoSignIn">Sign in</button> to use your own library and Claude's checks.</div>
     <div id="doc" class="card hidden" aria-live="polite">
       <h2>This document</h2>
       <div id="docBody"></div>

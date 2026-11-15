@@ -239,6 +239,12 @@ manifest: `site/public/word/manifest.xml` (id ef6ca1ae-67cf-48fb-89a7-189c074612
   (`docconvert.notes`, WordApi 1.4 `insertComment`): retracted / not found / DOI problems on each citation of that
   paper, a typed [7] with no reference, [@Key] markers not in the library, entries never cited; problems that
   fixing corrects and minor notes (No DOI, preprint, web page) are left out; no duplicates on a second press.
+- **Word add-in: "Try it with sample papers" (15 Nov 2026).** No account needed: six real papers
+  (site/public/word/samples.json) go into the Word engine's library (only when it's empty); citing, styles, the
+  list, the document check, converting and comments work; Claude's checks ask to sign in; signing in replaces the
+  samples with the person's library. This is how Microsoft's reviewers test it (a fixed-code reviewer login was
+  considered and not built). Store texts and reviewer notes: packaging/word-store-listing.md. Waiting for Microsoft's
+  business verification (ETA 18 Nov), then Armin submits.
 - **Extension published on the Chrome Web Store (15 Nov 2026):**
   https://chromewebstore.google.com/detail/gacnlcefeollfdigegohidlciicghpmf (Chrome, Edge, Brave… install from it).
   citrello.app/extension has "Add to Chrome" / "Add to Edge"; the web app's "Get the extension" links go to the store

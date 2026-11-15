@@ -567,3 +567,51 @@ def test_word_addin_fixes_its_own_citations_and_comments_the_rest(tmp_path):
         page.screenshot(path=os.path.join(shots, "word-comments.png"))
         assert not errors, errors
         b.close()
+
+
+def test_word_addin_try_it_without_an_account(tmp_path):
+    """No account: "Try it with sample papers" opens the panel with six real papers to cite (and the document check);
+    Claude's checks ask to sign in; signing in replaces the samples with the person's own library."""
+    from playwright.sync_api import expect, sync_playwright
+    email = f"worddemo-{int(time.time())}@example.com"
+    save_cloud_copy(email)
+    errors = []
+    with sync_playwright() as pw:
+        b = pw.chromium.launch()
+        page = b.new_page(viewport={"width": 360, "height": 1000})
+        page.route("https://appsforoffice.microsoft.com/**", lambda r: r.fulfill(path=MOCK, content_type="text/javascript"))
+        page.on("pageerror", lambda e: errors.append(str(e)))
+        page.goto(f"{BASE}/word/taskpane.html?bridge={urllib.parse.quote(B.bc.BRIDGE)}")
+        page.evaluate("d => __doc.load(d)", word_document(blank_docx(tmp_path)))
+        expect(page.locator("#tryDemo")).to_be_visible(timeout=LOAD)
+        page.click("#tryDemo")
+        expect(page.locator("#demoBar")).to_contain_text("six sample papers", timeout=60000)
+        expect(page.locator("#results li")).to_have_count(6, timeout=30000)
+        expect(page.locator("#libInfo")).to_contain_text("6 sample papers")
+        expect(page.locator("#doc")).to_contain_text("No citations in this document yet", timeout=60000)
+        page.evaluate("__doc.type('DNA is a double helix ')")
+        page.fill("#q", "nucleic")
+        expect(page.locator("#results li")).to_have_count(1)
+        expect(page.locator("#results li")).to_contain_text("Watson")
+        page.click("#results button:has-text('Cite')")
+        page.wait_for_function("__doc.controls().length === 1 && __doc.controls()[0].text.includes('Watson')", timeout=30000)
+        page.screenshot(path=os.path.join(os.environ.get("CITRELLO_E2E_SHOTS") or str(tmp_path), "word-demo.png"))
+        # Claude's checks need an account
+        page.evaluate("__doc.clickControl(0)")
+        expect(page.locator("#quotaLine")).to_contain_text("Sign in for 10 free claim checks", timeout=10000)
+        page.click("#claimCheck")
+        expect(page.locator("#claimOut")).to_contain_text("needs a free Citrello account")
+        # signing in: the person's own library replaces the samples
+        page.click("#needSignIn")
+        page.fill("#siEmail", email)
+        page.click("#siSend")
+        expect(page.locator("#siStep2")).to_be_visible(timeout=30000)
+        page.fill("#siCode", B.bc.start_sign_in(email)["dev_code"])
+        page.click("#siVerify")
+        expect(page.locator("#libInfo")).to_contain_text("3 references in your library", timeout=60000)
+        expect(page.locator("#demoBar")).to_be_hidden()
+        page.fill("#q", "")
+        page.fill("#q", " ")
+        expect(page.locator("#results li")).to_have_count(3, timeout=30000)
+        assert not errors, errors
+        b.close()
