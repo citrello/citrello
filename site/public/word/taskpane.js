@@ -398,6 +398,7 @@
     if (!current) return;
     renderClaim();
     const its = current.payload.citationItems;
+    $("claimCost").textContent = `${its.length * ((quota && quota.costs && quota.costs.claim) || 3)} credits`;  // 3 for each paper
     $("curList").innerHTML = its.map((ci, i) => {
       const c = ci.itemData || {};
       const a = (c.author || []).map((x) => x.family || x.literal).filter(Boolean);
@@ -440,7 +441,6 @@
       await updateContext();
     } catch (e) { say("Couldn't change the citation: " + e.message); }
   }
-  $("curDelete").onclick = () => editCurrent((p) => { p.citationItems.length = 0; });
 
   let lastSuggestFor = "";
   async function suggest(info) {
@@ -564,8 +564,7 @@
         `<div class="row"><button class="primary" id="docFix">Fix them</button></div>`;
     }
     html += problemsHtml();
-    if (docNotes.length && !p.citations) html += `<div class="row"><button id="docNotes">Add what needs you as comments</button></div>` +
-      `<p class="small muted">${docNotes.length} comment${docNotes.length === 1 ? "" : "s"} in the text, next to each problem, so you can find them (Review → Next).</p>`;
+    if (docNotes.length && !p.citations) html += `<div class="row"><button id="docNotes">Add what needs you as comments</button></div>`;
     html += '<div class="row"><button class="link" id="docAgain">Check again</button></div>';
     docSay(html);
     if ($("docConvert")) $("docConvert").onclick = () => convertDoc().catch((e) => { docBusy = false; renderDoc(); say("Couldn't convert: " + e.message); });
@@ -748,7 +747,7 @@
     const n = (quota.credits || 0).toLocaleString();
     $("quotaLine").innerHTML = quota.plan
       ? `${esc(quota.plan.name)} plan · <b>${n}</b> credits left · <button class="link" id="quotaPro">Manage plan</button>`
-      : `<b>${n}</b> credits left (about ${quota.checks_left} claim checks) · <button class="link" id="quotaPro">Plans</button>`;
+      : `<b>${n}</b> credits left · <button class="link" id="quotaPro">Plans</button>`;
     $("quotaPro").onclick = () => showPro();
   }
   // ----- plans: Student and Researcher, monthly or yearly, paid on Stripe's page in the browser -----
@@ -829,6 +828,9 @@
     loadPlans();
     $("proCard").scrollIntoView({ block: "nearest" });
   }
+  const openSettings = (which) => openOutside(`${location.origin}/app/?connect=${which}`);
+  $("connClaude").onclick = () => openSettings("claude");
+  $("connChatgpt").onclick = () => openSettings("chatgpt");
   $("proLater").onclick = () => show("proCard", false);
   const claimSay = (html) => { $("claimOut").innerHTML = html; };
   const spin = (t) => `<p class="small"><span class="spinner"></span>${esc(t)}</p>`;

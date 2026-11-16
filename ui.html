@@ -3028,7 +3028,11 @@ loadLibrary().then(() => {  // a new library starts on Home: what Citrello can d
   if (!lib.items.length && !tabChosen) goTab("home");
 });
 if (wordFetchKeys.length) setTimeout(() => wordFetchStart(wordFetchKeys), 0);
-if (params.get("plans")) setTimeout(() => openPro(), 400);  // citrello.app/pricing → "Choose a plan"
+if (params.get("plans")) setTimeout(() => openPro(), 400);
+if (["claude", "chatgpt"].includes(params.get("connect"))) setTimeout(() => {  // from Word's Settings: the connector guide
+  goTab("settings"); $("connCard").scrollIntoView({block: "start"});
+  const t = document.querySelector(`#connCard [data-guide="${params.get("connect")}"]`); if (t) t.click();
+}, 400);  // citrello.app/pricing → "Choose a plan"
 api("/api/account").then(renderSideConn).catch(() => {});
 setTimeout(() => status.web || checkUpdate(false), 3000);
 </script>

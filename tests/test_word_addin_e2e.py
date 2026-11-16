@@ -288,7 +288,13 @@ def test_word_addin_checks_a_claim_and_finds_another(tmp_path):
             page.evaluate("document.getElementById('quotaLine').textContent = ''")
             page.click("#claimCheck")
             expect(page.locator("#claimOut .verdict.supports")).to_contain_text("Supports it", timeout=60000)
-            expect(page.locator("#quotaLine")).to_contain_text("6 credits left (about 2 claim checks)")
+            expect(page.locator("#quotaLine")).to_contain_text("6 credits left")
+            expect(page.locator("#claimCheck")).to_contain_text("3 credits")           # what each button costs
+            expect(page.locator("#findAnother")).to_contain_text("8 credits")
+            # Settings: Claude and ChatGPT open the web app's connector guide in the browser
+            page.click("#settings summary")
+            page.click("#connChatgpt")
+            page.wait_for_function("__doc.opened.some((u) => u.endsWith('/app/?connect=chatgpt'))")
             sent = anthropic_mock.SEEN[-1]["body"]["messages"][0]["content"]
             assert "Removing the subsea export cables accounted for most of the decommissioning cost" in sent and "42%" in sent
             page.locator("#claimOut summary").first.click()

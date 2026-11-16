@@ -44,6 +44,8 @@
   .results button { flex: none; padding: 3px 12px; font-size: 12.5px; }
   .bar { position: sticky; bottom: 0; background: var(--bg); padding: 10px 0 4px; border-top: 1px solid var(--line); margin-top: 10px; }
   .bar .row { margin-top: 0; }
+  .cost { font-weight: 500; font-size: 12px; opacity: .8; margin-left: 4px; }
+  #settings summary { cursor: pointer; font-size: 13px; color: var(--muted); } #settings[open] summary { margin-bottom: 4px; }
   #status { min-height: 18px; }
   .sug { background: var(--lemon-soft); border-color: var(--lemon); }
   .sug p { margin: 0 0 2px; font-weight: 600; }
@@ -100,15 +102,13 @@
     <div id="current" class="card hidden">
       <h2>This citation</h2>
       <ul class="results" id="curList" aria-label="Papers in this citation"></ul>
-      <div class="row"><button class="primary" id="claimCheck">Check the claim</button><button id="findAnother">Find another reference</button></div>
+      <div class="row"><button class="primary" id="claimCheck">Check the claim <span class="cost" id="claimCost">3 credits</span></button><button id="findAnother">Find another reference <span class="cost">8 credits</span></button></div>
       <p class="small muted" id="quotaLine"></p>
       <div id="claimOut" aria-live="polite"></div>
-      <p class="small muted">To add a paper, search below and press Add. <button class="link" id="curDelete">Delete this citation</button></p>
     </div>
     <div id="proCard" class="card pro hidden" role="dialog" aria-labelledby="proTitle">
       <h2 id="proTitle">Plans</h2>
       <p class="small" id="proLead">Make sure every source says what you wrote.</p>
-      <p class="small muted">A claim check costs 3 credits for each paper; finding another reference in your library costs 8.</p>
       <div class="row small" id="planEvery" role="radiogroup" aria-label="Pay">
         <label><input type="radio" name="planEvery" value="month" checked> Monthly</label>
         <label><input type="radio" name="planEvery" value="year"> Yearly</label>
@@ -125,6 +125,10 @@
       <div class="row"><button id="bib">Insert the reference list</button><button id="refresh">Update citations</button></div>
       <p class="small muted" id="status" role="status"></p>
       <p class="small muted" id="libInfo"></p>
+      <details id="settings"><summary>Settings</summary>
+        <p class="small muted">Use your Citrello library in Claude and ChatGPT: they can search it, add papers and cite them. Citrello opens its settings in your browser.</p>
+        <div class="row"><button id="connClaude">Connect to Claude</button><button id="connChatgpt">Connect to ChatGPT</button></div>
+      </details>
     </div>
   </div>
 </main>

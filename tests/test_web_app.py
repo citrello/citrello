@@ -473,6 +473,12 @@ def test_web_app_connection_guides(browser_name, tmp_path):
         expect(page.locator("#gCount")).to_have_text("Step 2 of 5")
         page.keyboard.press("Escape")
         expect(page.locator("#guide")).to_be_hidden()
+        # Word's Settings → "Connect to ChatGPT" opens the web app straight on that guide
+        page.goto(BASE.rstrip("/") + "/app/?connect=chatgpt")
+        page.wait_for_selector("#webCover", state="detached", timeout=LOAD)
+        expect(page.locator("#guide")).to_be_visible(timeout=10000)
+        expect(page.locator("#gTitle")).to_have_text("Connect ChatGPT")
+        expect(page.locator("#tab-settings")).to_be_visible()
         assert not errors, errors
         b.close()
 
