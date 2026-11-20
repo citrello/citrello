@@ -386,3 +386,55 @@ def test_citrello_word_addin_document(tmp_path, monkeypatch):
     res = doccheck.fix(path, rep, out, "apa")
     assert res["entries"] == 2
     assert "CITRELLO_CITATION" not in docx.Document(out).element.xml
+
+
+def test_references_that_may_not_exist(monkeypatch):
+    """A made-up DOI, or a DOI of another paper, plus no paper with the reference's title anywhere: "this reference may
+    not exist" (seen in published papers with AI-written reference lists). A real paper with a wrong DOI gets its right
+    DOI instead, and a short title found by search isn't accepted when its first author isn't in the reference."""
+    import urllib.error
+    core = doccheck.core
+    works = {"10.1111/real.1": {"DOI": "10.1111/real.1", "title": ["Complete skin clearance and beyond"],
+                                "author": [{"family": "Nguyen", "given": "A"}], "issued": {"date-parts": [[2021]]}}}
+    search = {}
+
+    def fake_http_json(url, headers=None, **k):
+        if "/works?" in url:
+            q = urllib.parse.parse_qs(urllib.parse.urlparse(url).query)["query.bibliographic"][0]
+            return {"message": {"items": [v for key, v in search.items() if key in q]}}, None
+        if "/works/" in url:
+            doi = urllib.parse.unquote(url.split("/works/", 1)[1])
+            if doi in works:
+                return {"message": works[doi]}, None
+        raise urllib.error.HTTPError(url, 404, "Not Found", {}, None)
+    monkeypatch.setattr(core, "http_json", fake_http_json)
+
+    def run(text):
+        r = core.resolve_reference(1, text)
+        core.assess_references([r])
+        return " ".join(c["text"] for c in r["checks"]), r
+
+    fake = ("Marmot M. and Allen J., Health Equity and the Social Determinants of Health, International Journal of "
+            "Health Services. (2020) 50, no. 3, 309-315, https://doi.org/10.1177/0020731420915614.")
+    t, r = run(fake)
+    assert "does not exist, and no paper with this title was found online: this reference may not exist" in t
+    assert r["reliability"] == "problem"
+
+    elsewhere = ("Schmitt J., Haufe E., Trautmann F., Occupational UV Exposure and Risk of Non-Melanoma Skin Cancer: "
+                 "Systematic Review and Meta-Analysis, British Journal of Dermatology. (2021) 184, 1-9, "
+                 "https://doi.org/10.1111/real.1.")
+    t, _ = run(elsewhere)
+    assert "The DOI points to a different paper (“Complete skin clearance and beyond”), and no paper with this title" in t
+
+    # the same, but the paper exists under another DOI
+    search["Occupational UV Exposure"] = {"DOI": "10.1111/right.2", "title": [
+        "Occupational UV exposure and risk of non-melanoma skin cancer: systematic review and meta-analysis"],
+        "author": [{"family": "Schmitt", "given": "J"}], "issued": {"date-parts": [[2011]]}}
+    t, _ = run(elsewhere)
+    assert "this paper's DOI seems to be 10.1111/right.2" in t and "may not exist" not in t
+
+    # a short title contained in the reference, by someone else: not taken as the paper
+    search["relative age effect"] = {"DOI": "10.1111/other.3", "title": ["The relative age effect"],
+                                     "author": [{"family": "Musch", "given": "J"}], "issued": {"date-parts": [[1999]]}}
+    t, r = run("Lemoyne J, Valois P. The relative age effect: a review in youth soccer. J Sports Sci. 2021;39(2):1-9.")
+    assert r["source"] == "parsed" and "Found online by title search" not in t

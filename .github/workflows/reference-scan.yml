@@ -1,0 +1,43 @@
+name: Reference scan
+
+# Run by hand (Actions -> "Reference scan" -> Run workflow): checks the references of recent open-access papers with
+# Citrello's reference check and lists papers with references that may not exist (tools/reference_scan.py).
+# The report is attached to the run as "reference-scan-<seed>". Nothing is published or deployed.
+on:
+  workflow_dispatch:
+    inputs:
+      count:
+        description: "How many papers"
+        default: "200"
+      seed:
+        description: "Which random sample (use a new number for a new batch)"
+        default: "1"
+      date_from:
+        description: "Published from (YYYY-MM-DD)"
+        default: "2026-06-01"
+      date_to:
+        description: "Published until (YYYY-MM-DD)"
+        default: "2026-11-15"
+
+jobs:
+  scan:
+    runs-on: ubuntu-latest
+    timeout-minutes: 340
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install python-docx citeproc-py pypdf pybtex
+      - name: Scan
+        env:
+          COUNT: ${{ inputs.count }}
+          SEED: ${{ inputs.seed }}
+          FROM: ${{ inputs.date_from }}
+          TO: ${{ inputs.date_to }}
+        run: python tools/reference_scan.py --count "$COUNT" --seed "$SEED" --from "$FROM" --to "$TO" --out scan-out
+      - if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: reference-scan-${{ inputs.seed }}
+          path: scan-out

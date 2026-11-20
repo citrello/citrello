@@ -451,6 +451,37 @@ def _doi_org_csl(doi, headers):
         return None, "missing" if e.code == 404 else "unknown"
 
 
+def _title_search(raw, parsed, headers):
+    """The Crossref record whose title is the reference's own title, or None. Strict: the title must occur in the
+    reference (or nearly match it) and, unless it matches almost exactly, the first author must be in the reference
+    too, so a short or common title doesn't pick up an unrelated paper."""
+    q = urllib.parse.urlencode({"query.bibliographic": raw[:500], "rows": 1})
+    res, _ = http_json(CROSSREF + "/works?" + q, headers)
+    items = res["message"]["items"]
+    if not items:
+        return None
+    m = items[0]
+    title = _first(m.get("title"))
+    ratio = difflib.SequenceMatcher(None, norm(title), norm(parsed.get("title", raw))).ratio()
+    if not norm(title) or not (norm(title) in norm(raw) or ratio > 0.85):
+        return None
+    fam = norm(((m.get("author") or [{}])[0].get("family")) or "").split()
+    if ratio > 0.95 or not fam or f" {fam[-1]} " in f" {norm(raw)} ":
+        return m
+    return None
+
+
+def doi_points_elsewhere(csl, typed, raw):
+    """True when the DOI's record is clearly another paper: few title words in common and a different first author."""
+    if not typed.get("title"):
+        return False
+    rec_words = _words(csl.get("title", ""))
+    overlap = len(rec_words & _words(raw)) / len(rec_words) if rec_words else 1
+    fam = norm((csl.get("author") or [{}])[0].get("family", ""))
+    author_ok = not fam or f" {fam.split()[-1]} " in f" {norm(raw)} "
+    return overlap < 0.5 and not author_ok
+
+
 def crossref_lookup(raw, parsed, email):
     """Return (csl, source, meta). source: crossref-doi | doi-org | crossref-search | None."""
     headers = {"User-Agent": USER_AGENT.format(email=email or "anonymous@example.com")}
@@ -470,7 +501,14 @@ def crossref_lookup(raw, parsed, email):
                 meta = crossref_meta(m)
                 if cand != norm_doi(typed_doi):
                     meta["doi_cleaned"] = (typed_doi, cand)
-                return crossref_to_csl(m), "crossref-doi", meta
+                csl = crossref_to_csl(m)
+                if doi_points_elsewhere(csl, parsed, raw):  # is the paper as typed somewhere else, or nowhere?
+                    other = _title_search(raw, parsed, headers)
+                    if other and norm_doi(other.get("DOI")) != norm_doi(cand):
+                        meta["right_doi"] = other.get("DOI")
+                    elif not other:
+                        meta["title_not_found"] = True
+                return csl, "crossref-doi", meta
             statuses = []
             for cand in cands:  # not a Crossref DOI: try every agency through doi.org
                 csl, status = _doi_org_csl(cand, headers)
@@ -482,20 +520,14 @@ def crossref_lookup(raw, parsed, email):
                     return csl, "doi-org", meta
             doi_missing = bool(statuses) and all(st == "missing" for st in statuses)
             meta_extra = {"doi_not_found": typed_doi} if doi_missing else {"doi_unchecked": typed_doi}
-        q = urllib.parse.urlencode({"query.bibliographic": raw[:500], "rows": 1})
-        res, _ = http_json(CROSSREF + "/works?" + q, headers)
-        items = res["message"]["items"]
-        if not items:
-            return None, None, meta_extra
-        m = items[0]
-        title = _first(m.get("title"))
-        # accept only when the found title really occurs in the reference text
-        ratio = difflib.SequenceMatcher(None, norm(title), norm(parsed.get("title", raw))).ratio()
-        if norm(title) and (norm(title) in norm(raw) or ratio > 0.85):
+        m = _title_search(raw, parsed, headers)
+        if m:
             meta = crossref_meta(m)
             if typed_doi:
                 meta["doi_replaced"] = (typed_doi, m.get("DOI"))
             return crossref_to_csl(m), "crossref-search", meta
+        if doi_missing and parsed.get("title"):
+            meta_extra["title_not_found"] = True  # a made-up DOI and no such paper: it may not exist
         return None, None, meta_extra
     except (urllib.error.URLError, TimeoutError, OSError) as e:  # no connection: not the same as "not found"
         print(f"    Crossref lookup failed: {e}", file=sys.stderr)
@@ -541,7 +573,9 @@ def assess_references(refs):
         if meta.get("is_notice"):
             add("problem", "The DOI points to a retraction/withdrawal notice, not the paper")
         if meta.get("doi_not_found") and not meta.get("doi_replaced"):
-            add("problem", f"The DOI {meta['doi_not_found']} does not exist (checked at doi.org): typo?")
+            add("problem", f"The DOI {meta['doi_not_found']} does not exist, and no paper with this title was found "
+                           "online: this reference may not exist" if meta.get("title_not_found") else
+                           f"The DOI {meta['doi_not_found']} does not exist (checked at doi.org): typo?")
         if meta.get("doi_replaced"):
             old_doi, new_doi = meta["doi_replaced"]
             add("check", f"The DOI {old_doi} was not found; the paper was found by its title with DOI {new_doi}")
@@ -556,8 +590,15 @@ def assess_references(refs):
             if not typed_ref:
                 pass
             elif r["source"] == "crossref-doi" and overlap < 0.5 and not author_ok:
-                add("problem", f"The DOI seems to point to a different paper: “{c.get('title', '')[:90]}”. "
-                               "Your typed details are used instead; please correct the DOI")
+                if meta.get("title_not_found"):
+                    add("problem", f"The DOI points to a different paper (“{c.get('title', '')[:70]}”), and no paper "
+                                   "with this title was found online: this reference may not exist")
+                elif meta.get("right_doi"):
+                    add("problem", f"The DOI points to a different paper (“{c.get('title', '')[:70]}”); this paper's "
+                                   f"DOI seems to be {meta['right_doi']}")
+                else:
+                    add("problem", f"The DOI seems to point to a different paper: “{c.get('title', '')[:90]}”. "
+                                   "Your typed details are used instead; please correct the DOI")
                 r["csl"] = c = dict(typed)  # never import the wrong paper into Mendeley
             elif overlap < 0.5:
                 add("check", f"Title differs from the online record: “{c.get('title', '')[:90]}”")
