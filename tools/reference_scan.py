@@ -117,7 +117,8 @@ def crossref_reference_text(r):
         return t + (f" doi:{r['DOI']}" if r.get("DOI") and r["DOI"].lower() not in t.lower() else "")
     if not r.get("article-title"):
         return None  # a book or report listed by name only: too little to check
-    parts = [f"{r.get('author', '')} et al. ({r.get('year', '')}).", r["article-title"] + "."]
+    parts = [f"{r['author']} et al. ({r.get('year', '')})." if r.get("author") else f"({r.get('year', '')}).",
+             r["article-title"] + "."]
     src = ", ".join(x for x in (r.get("journal-title") or r.get("series-title") or r.get("volume-title"),
                                 r.get("volume"), r.get("first-page")) if x)
     if src:
@@ -189,6 +190,17 @@ def scan(paper, email):
                 maybe_nonexistent=maybe)
 
 
+def safe_scan(paper, email):
+    """One paper's check; an error in it is reported for that paper and the scan goes on."""
+    try:
+        return scan(dict(paper), email)
+    except Exception as e:  # noqa: BLE001
+        import traceback
+        traceback.print_exc(file=sys.__stderr__)
+        paper = {k: v for k, v in paper.items() if k != "crossref_refs"}
+        return dict(paper, error=f"check failed: {type(e).__name__}: {e}")
+
+
 def report(results, args):
     done = [r for r in results if "error" not in r and r["failed_lookups"] <= 2]
     flagged = sorted([r for r in done if len(r["maybe_nonexistent"]) >= 2], key=lambda r: -len(r["maybe_nonexistent"]))
@@ -235,7 +247,7 @@ def main():
     print(f"{len(papers)} papers picked", flush=True)
     results = []
     with open(os.path.join(args.out, "results.jsonl"), "w") as f, cf.ThreadPoolExecutor(args.workers) as ex:
-        for r in ex.map(lambda p: scan(p, args.email), papers):
+        for r in ex.map(lambda p: safe_scan(p, args.email), papers):
             results.append(r)
             f.write(json.dumps(r) + "\n")
             f.flush()

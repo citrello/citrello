@@ -174,7 +174,7 @@ def parse_authors(seg, style):
         if not any(initials.fullmatch(x) for x in toks):
             seg = _clean(seg)  # no initials at all: an organisation or a single full name
             if len(seg.split()) <= 3 and not re.search(r",|&|\band\b", seg):
-                return [parse_name(seg)]
+                return [n for n in [parse_name(seg)] if n]  # nothing left (only "et al."): no author
             return [{"literal": seg, "family": ""}] if seg else []
         names, i = [], 0
         while i < len(toks):

@@ -506,3 +506,12 @@ def test_dois_with_text_glued_on(monkeypatch):
     r = core.resolve_reference(1, "Kumar S, Singroha G. Multienvironmental evaluation of wheat germplasm. Genet Resour Crop "
                                   "Evol. 2019;66:797-808. doi:10.1007/s10722-019-00751-330311153")
     assert r["source"] != "crossref-doi"  # the shortened DOI is another paper: not taken
+
+
+def test_reference_with_only_et_al_as_author():
+    """'et al. (2021). Title...' (the authors' names lost): no author, and the check doesn't stop."""
+    core = doccheck.core
+    item = core.parse_reference("et al. (2021). Some title here about stuff. Energy, 12, 3.")
+    assert None not in (item.get("author") or [])
+    recs = [core.resolve_reference(1, "et al. (2021). Some title here about stuff. Energy, 12, 3.", offline=True)]
+    core.assess_references(recs)
