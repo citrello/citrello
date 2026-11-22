@@ -462,14 +462,14 @@ def test_references_that_may_not_exist(monkeypatch):
     alex.clear()
     assert "may not exist" in run(lynch)[0]
 
-    # OpenAlex can't be asked: say only what is known, not "may not exist"
+    # OpenAlex can't be asked (offline, or its daily allowance used up): Crossref's answer stands
     def no_openalex(url, headers=None, **k):
         if "openalex" in url:
             raise urllib.error.URLError("offline")
         return fake_http_json(url, headers, **k)
     monkeypatch.setattr(core, "http_json", no_openalex)
     t, _ = run(fake)
-    assert "does not exist" in t and "may not exist" not in t
+    assert "this reference may not exist" in t
 
 
 def test_dois_with_text_glued_on(monkeypatch):

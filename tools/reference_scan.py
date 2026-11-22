@@ -9,7 +9,6 @@ Run by hand from GitHub Actions ("Reference scan"); writes results.jsonl and rep
 """
 import argparse
 import concurrent.futures as cf
-import contextlib
 import html
 import io
 import json
@@ -17,6 +16,7 @@ import os
 import random
 import re
 import sys
+import threading
 import time
 import urllib.parse
 import urllib.request
@@ -88,6 +88,19 @@ def references(xml):
     return refs
 
 
+class _ThreadLog(io.TextIOBase):
+    """stderr per thread, so each paper counts its own failed lookups when several are checked at once."""
+    local = threading.local()
+
+    def write(self, s):
+        buf = getattr(self.local, "buf", None)
+        (buf if buf is not None else sys.__stderr__).write(s)
+        return len(s)
+
+
+sys.stderr = _ThreadLog()
+
+
 def scan(paper, email):
     try:
         refs = references(get(f"https://www.ebi.ac.uk/europepmc/webservices/rest/{paper['pmcid']}/fullTextXML"))
@@ -95,16 +108,20 @@ def scan(paper, email):
         return dict(paper, error=f"full text: {e}")
     if not 8 <= len(refs) <= 150:
         return dict(paper, error=f"{len(refs)} references (skipped)")
-    log = io.StringIO()
-    with contextlib.redirect_stderr(log):
+    log = _ThreadLog.local.buf = io.StringIO()
+    try:
         recs = [core.resolve_reference(i + 1, t, email=email) for i, t in enumerate(refs)]
         core.assess_references(recs)
-    failed = log.getvalue().count("lookup failed")
+    finally:
+        _ThreadLog.local.buf = None
+    failed = log.getvalue().count("Crossref lookup failed")
+    openalex_failed = log.getvalue().count("OpenAlex lookup failed")
     maybe = [{"n": r["number"], "ref": r["raw"],
               "why": " ".join(c["text"] for c in r["checks"] if MAYBE in c["text"])} for r in recs
              if any(MAYBE in c["text"] for c in r["checks"])]
     counts = {k: sum(r["reliability"] == k for r in recs) for k in ("verified", "check", "problem")}
-    return dict(paper, refs=len(refs), counts=counts, failed_lookups=failed, maybe_nonexistent=maybe)
+    return dict(paper, refs=len(refs), counts=counts, failed_lookups=failed, openalex_failed=openalex_failed,
+                maybe_nonexistent=maybe)
 
 
 def report(results, args):

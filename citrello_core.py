@@ -483,7 +483,8 @@ OPENALEX = os.environ.get("CITRELLO_OPENALEX", "https://api.openalex.org")
 
 def _found_elsewhere(raw, parsed, email):
     """Second opinion before saying a reference may not exist: is a work with this title in OpenAlex (which also
-    lists papers, books and reports that have no Crossref record)? True, False, or None when it can't be asked."""
+    lists papers, books and reports that have no Crossref record)? True, False, or None when it can't be asked (then
+    the Crossref result stands: missing a made-up reference is worse than one warning too many)."""
     title = parsed.get("title") or ""
     if len(norm(title).split()) < 4:  # the title couldn't be read from the reference: search with all of it
         title = re.sub(r"\s+", " ", URL_RE.sub(" ", DOI_RE.sub(" ", raw)))[:300]
@@ -554,7 +555,7 @@ def crossref_lookup(raw, parsed, email):
                     other = _title_search(raw, parsed, headers)
                     if other and norm_doi(other.get("DOI")) != norm_doi(cand):
                         meta["right_doi"] = other.get("DOI")
-                    elif not other and _found_elsewhere(raw, parsed, email) is False:
+                    elif not other and not _found_elsewhere(raw, parsed, email):
                         meta["title_not_found"] = True
                 return csl, "crossref-doi", meta
             statuses = []
@@ -576,7 +577,7 @@ def crossref_lookup(raw, parsed, email):
             if typed_doi:
                 meta["doi_replaced"] = (typed_doi, m.get("DOI"))
             return crossref_to_csl(m), "crossref-search", meta
-        if doi_missing and parsed.get("title") and _found_elsewhere(raw, parsed, email) is False:
+        if doi_missing and parsed.get("title") and not _found_elsewhere(raw, parsed, email):
             meta_extra["title_not_found"] = True  # a made-up DOI and no such paper: it may not exist
         return None, None, meta_extra
     except (urllib.error.URLError, TimeoutError, OSError) as e:  # no connection: not the same as "not found"
