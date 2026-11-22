@@ -396,9 +396,11 @@ def test_references_that_may_not_exist(monkeypatch):
     core = doccheck.core
     works = {"10.1111/real.1": {"DOI": "10.1111/real.1", "title": ["Complete skin clearance and beyond"],
                                 "author": [{"family": "Nguyen", "given": "A"}], "issued": {"date-parts": [[2021]]}}}
-    search = {}
+    search, alex = {}, []
 
     def fake_http_json(url, headers=None, **k):
+        if "openalex" in url:  # the second opinion: works with this title anywhere
+            return {"results": alex}, None
         if "/works?" in url:
             q = urllib.parse.parse_qs(urllib.parse.urlparse(url).query)["query.bibliographic"][0]
             return {"message": {"items": [v for key, v in search.items() if key in q]}}, None
@@ -438,3 +440,69 @@ def test_references_that_may_not_exist(monkeypatch):
                                      "author": [{"family": "Musch", "given": "J"}], "issued": {"date-parts": [[1999]]}}
     t, r = run("Lemoyne J, Valois P. The relative age effect: a review in youth soccer. J Sports Sci. 2021;39(2):1-9.")
     assert r["source"] == "parsed" and "Found online by title search" not in t
+
+    # Crossref has the author's name misspelt ("Bollenl"): still the same paper, so its right DOI is given
+    works["10.1016/wrong.4"] = {"DOI": "10.1016/wrong.4", "title": ["Photoactivated dentin bonding with acid"],
+                                "author": [{"family": "Okamoto"}]}
+    search["threshold surface roughness"] = {"DOI": "10.1016/right.4", "title": [
+        "Comparison of surface roughness of oral hard materials to the threshold surface roughness for bacterial "
+        "plaque retention: a review of the literature"], "author": [{"family": "Bollenl"}]}
+    t, _ = run("Bollen CM, Lambrechts P, Quirynen M. Comparison of surface roughness of oral hard materials to the "
+               "threshold surface roughness for bacterial plaque retention: a review of the literature. Dent Mater. "
+               "1997;13(4):258-69. doi:10.1016/wrong.4")
+    assert "this paper's DOI seems to be 10.1016/right.4" in t and "may not exist" not in t
+
+    # not in Crossref, but OpenAlex knows it (a magazine article, a book, a report): never "may not exist"
+    lynch = ("Lynch S. A., Simpson C. G. (2010). Social skills: laying the foundation for success. Dim. Early Child. "
+             "38, 3-12. doi: 10.1111/real.1")
+    alex.append({"title": "Social skills: Laying the foundation for success",
+                 "authorships": [{"author": {"display_name": "Sharon A. Lynch"}}]})
+    t, _ = run(lynch)
+    assert "different paper" in t and "may not exist" not in t
+    alex.clear()
+    assert "may not exist" in run(lynch)[0]
+
+    # OpenAlex can't be asked: say only what is known, not "may not exist"
+    def no_openalex(url, headers=None, **k):
+        if "openalex" in url:
+            raise urllib.error.URLError("offline")
+        return fake_http_json(url, headers, **k)
+    monkeypatch.setattr(core, "http_json", no_openalex)
+    t, _ = run(fake)
+    assert "does not exist" in t and "may not exist" not in t
+
+
+def test_dois_with_text_glued_on(monkeypatch):
+    """Reference lists sometimes glue a PubMed number or the page range onto the DOI
+    ('10.1007/s10722-019-00751-330311153', '10.1080/01944366908977225216-224'): the DOI without it is tried, and kept
+    only when that record is the paper of the reference."""
+    import urllib.error
+    core = doccheck.core
+    assert core.doi_candidates("10.1007/s10722-019-00751-330311153")[1] == "10.1007/s10722-019-00751-3"
+    assert core.doi_candidates("10.1016/j.cropro.2021.10571742574925")[1] == "10.1016/j.cropro.2021.105717"
+    assert core.doi_candidates("10.1080/01944366908977225216-224")[1] == "10.1080/01944366908977225"
+    assert core.doi_candidates("10.1080/14725843.2023.222735395-110")[1] == "10.1080/14725843.2023.2227353"
+    for ok in ("10.1371/journal.pone.0361978", "10.1063/1.4812391", "10.1007/s00784-026-07249-0", "10.1038/nature12373"):
+        assert core.doi_candidates(ok) == [ok]
+    works = {"10.1080/01944366908977225": {"DOI": "10.1080/01944366908977225", "title": ["A Ladder Of Citizen Participation"],
+                                           "author": [{"family": "Arnstein", "given": "Sherry R."}]},
+             "10.1007/s10722-019-00751-3": {"DOI": "10.1007/s10722-019-00751-3", "title": ["Something else entirely"],
+                                            "author": [{"family": "Other"}]}}
+
+    def fake_http_json(url, headers=None, **k):
+        if "/works/" in url:
+            doi = urllib.parse.unquote(url.split("/works/", 1)[1])
+            if doi in works:
+                return {"message": works[doi]}, None
+        if "/works?" in url:
+            return {"message": {"items": []}}, None
+        if "openalex" in url:
+            return {"results": []}, None
+        raise urllib.error.HTTPError(url, 404, "Not Found", {}, None)
+    monkeypatch.setattr(core, "http_json", fake_http_json)
+    r = core.resolve_reference(1, "Arnstein SR. A Ladder Of Citizen Participation. J Am Inst Planners. 1969;35(4):216-224. "
+                                  "doi:10.1080/01944366908977225216-224")
+    assert r["source"] == "crossref-doi" and r["csl"]["DOI"] == "10.1080/01944366908977225"
+    r = core.resolve_reference(1, "Kumar S, Singroha G. Multienvironmental evaluation of wheat germplasm. Genet Resour Crop "
+                                  "Evol. 2019;66:797-808. doi:10.1007/s10722-019-00751-330311153")
+    assert r["source"] != "crossref-doi"  # the shortened DOI is another paper: not taken

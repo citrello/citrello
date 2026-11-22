@@ -18,6 +18,9 @@ on:
       date_to:
         description: "Published until (YYYY-MM-DD)"
         default: "2026-11-15"
+      pmcids:
+        description: "Or check these papers only (PMC ids, comma separated)"
+        default: ""
 
 jobs:
   scan:
@@ -35,7 +38,8 @@ jobs:
           SEED: ${{ inputs.seed }}
           FROM: ${{ inputs.date_from }}
           TO: ${{ inputs.date_to }}
-        run: python tools/reference_scan.py --count "$COUNT" --seed "$SEED" --from "$FROM" --to "$TO" --out scan-out
+          PMCIDS: ${{ inputs.pmcids }}
+        run: python tools/reference_scan.py --count "$COUNT" --seed "$SEED" --from "$FROM" --to "$TO" --pmcids "$PMCIDS" --out scan-out
       - if: always()
         uses: actions/upload-artifact@v4
         with:

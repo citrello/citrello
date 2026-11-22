@@ -451,24 +451,61 @@ def _doi_org_csl(doi, headers):
         return None, "missing" if e.code == 404 else "unknown"
 
 
+def _family_in(fam, raw):
+    """Is this family name in the reference? Allows for a typo on either side ('Bollenl' / 'Bollen')."""
+    fam = norm(fam).split()
+    if not fam:
+        return False
+    fam, words = fam[-1], norm(raw).split()
+    return fam in words or (len(fam) >= 5 and any(
+        abs(len(w) - len(fam)) <= 1 and difflib.SequenceMatcher(None, w, fam).ratio() >= 0.83 for w in words))
+
+
 def _title_search(raw, parsed, headers):
     """The Crossref record whose title is the reference's own title, or None. Strict: the title must occur in the
-    reference (or nearly match it) and, unless it matches almost exactly, the first author must be in the reference
-    too, so a short or common title doesn't pick up an unrelated paper."""
-    q = urllib.parse.urlencode({"query.bibliographic": raw[:500], "rows": 1})
+    reference (or nearly match it) and, unless it matches almost exactly, one of the first authors must be in the
+    reference too, so a short or common title doesn't pick up an unrelated paper."""
+    q = urllib.parse.urlencode({"query.bibliographic": raw[:500], "rows": 3})
     res, _ = http_json(CROSSREF + "/works?" + q, headers)
-    items = res["message"]["items"]
-    if not items:
-        return None
-    m = items[0]
-    title = _first(m.get("title"))
-    ratio = difflib.SequenceMatcher(None, norm(title), norm(parsed.get("title", raw))).ratio()
-    if not norm(title) or not (norm(title) in norm(raw) or ratio > 0.85):
-        return None
-    fam = norm(((m.get("author") or [{}])[0].get("family")) or "").split()
-    if ratio > 0.95 or not fam or f" {fam[-1]} " in f" {norm(raw)} ":
-        return m
+    for m in res["message"]["items"]:
+        title = _first(m.get("title"))
+        ratio = difflib.SequenceMatcher(None, norm(title), norm(parsed.get("title", raw))).ratio()
+        if not norm(title) or not (norm(title) in norm(raw) or ratio > 0.85):
+            continue
+        fams = [a.get("family") for a in (m.get("author") or [])[:3] if a.get("family")]
+        if ratio > 0.95 or not fams or any(_family_in(f, raw) for f in fams):
+            return m
     return None
+
+
+OPENALEX = os.environ.get("CITRELLO_OPENALEX", "https://api.openalex.org")
+
+
+def _found_elsewhere(raw, parsed, email):
+    """Second opinion before saying a reference may not exist: is a work with this title in OpenAlex (which also
+    lists papers, books and reports that have no Crossref record)? True, False, or None when it can't be asked."""
+    title = parsed.get("title") or ""
+    if len(norm(title).split()) < 4:  # the title couldn't be read from the reference: search with all of it
+        title = re.sub(r"\s+", " ", URL_RE.sub(" ", DOI_RE.sub(" ", raw)))[:300]
+    if len(norm(title).split()) < 4:
+        return None
+    q = {"search": title[:300], "per-page": 5, "select": "title,authorships"}
+    if email:
+        q["mailto"] = email
+    try:
+        res, _ = http_json(OPENALEX + "/works?" + urllib.parse.urlencode(q), timeout=20)
+    except Exception as e:  # noqa: BLE001 - a second opinion that fails must never break the check
+        print(f"    OpenAlex lookup failed: {e}", file=sys.stderr)
+        return None
+    for w in (res or {}).get("results") or []:
+        t = norm(w.get("title") or "")
+        if not t or not ((len(t.split()) >= 4 and f" {t} " in f" {norm(raw)} ")
+                         or difflib.SequenceMatcher(None, t, norm(title)).ratio() >= 0.9):
+            continue
+        names = [((a.get("author") or {}).get("display_name") or "") for a in (w.get("authorships") or [])[:3]]
+        if not any(names) or any(_family_in(n, raw) for n in names if n):
+            return True
+    return False
 
 
 def doi_points_elsewhere(csl, typed, raw):
@@ -480,6 +517,15 @@ def doi_points_elsewhere(csl, typed, raw):
     fam = norm((csl.get("author") or [{}])[0].get("family", ""))
     author_ok = not fam or f" {fam.split()[-1]} " in f" {norm(raw)} "
     return overlap < 0.5 and not author_ok
+
+
+def _same_paper(csl, raw):
+    """Does this record look like the reference: (nearly) all of its title words are in it, or most of them and its
+    first author too?"""
+    rec_words = _words(csl.get("title", ""))
+    overlap = len(rec_words & _words(raw)) / len(rec_words) if rec_words else 0
+    fam = (csl.get("author") or [{}])[0].get("family", "")
+    return overlap >= 0.8 or (overlap >= 0.6 and (not fam or _family_in(fam, raw)))
 
 
 def crossref_lookup(raw, parsed, email):
@@ -502,17 +548,21 @@ def crossref_lookup(raw, parsed, email):
                 if cand != norm_doi(typed_doi):
                     meta["doi_cleaned"] = (typed_doi, cand)
                 csl = crossref_to_csl(m)
+                if cand != cands[0] and not _same_paper(csl, raw):
+                    continue  # a DOI we shortened that turns out to be another paper: not the one meant
                 if doi_points_elsewhere(csl, parsed, raw):  # is the paper as typed somewhere else, or nowhere?
                     other = _title_search(raw, parsed, headers)
                     if other and norm_doi(other.get("DOI")) != norm_doi(cand):
                         meta["right_doi"] = other.get("DOI")
-                    elif not other:
+                    elif not other and _found_elsewhere(raw, parsed, email) is False:
                         meta["title_not_found"] = True
                 return csl, "crossref-doi", meta
             statuses = []
             for cand in cands:  # not a Crossref DOI: try every agency through doi.org
                 csl, status = _doi_org_csl(cand, headers)
                 statuses.append(status)
+                if csl and cand != cands[0] and not _same_paper(csl, raw):
+                    continue
                 if csl:
                     meta = {"agency": "doi.org"}
                     if cand != norm_doi(typed_doi):
@@ -526,7 +576,7 @@ def crossref_lookup(raw, parsed, email):
             if typed_doi:
                 meta["doi_replaced"] = (typed_doi, m.get("DOI"))
             return crossref_to_csl(m), "crossref-search", meta
-        if doi_missing and parsed.get("title"):
+        if doi_missing and parsed.get("title") and _found_elsewhere(raw, parsed, email) is False:
             meta_extra["title_not_found"] = True  # a made-up DOI and no such paper: it may not exist
         return None, None, meta_extra
     except (urllib.error.URLError, TimeoutError, OSError) as e:  # no connection: not the same as "not found"
@@ -891,13 +941,27 @@ def clean_doi(doi):
 
 def doi_candidates(doi):
     """The cleaned DOI, then the same with trailing '/segments' removed
-    ('10.1063/1.4812391/138579' -> '10.1063/1.4812391')."""
+    ('10.1063/1.4812391/138579' -> '10.1063/1.4812391'), then with text that reference lists often glue onto the
+    end removed: a page range ('...225216-224' -> '...225') or a PubMed number ('...00751-330311153' -> '...00751-3')."""
     d = clean_doi(doi)
     out, parts = [d], d.split("/")
     while len(parts) > 2 and len("/".join(parts[:-1]).split("/", 1)[1]) >= 3:
         parts = parts[:-1]
         out.append("/".join(parts))
-    return [c for c in out if re.match(r"^10\.\d{4,9}/\S+$", c)]
+    m = re.match(r"^(10\.\d{4,9}/.*?)(\d{8,})[-\u2013](\d{2,5})$", d)  # pages glued on: '...225' + '216-224'
+    if m:
+        pre, run, last = m.groups()
+        for k in range(len(last), max(len(last) - 2, 0), -1):  # first page about as long as the last, and lower
+            if int(run[-k:]) <= int(last):
+                out.append(pre + run[:-k])
+    m = re.match(r"^(10\.\d{4,9}/.*?)(\d{9,})$", d)  # a PubMed number glued on: '...00751-3' + '30311153'
+    if m:
+        out += [d[:-k] for k in (8, 7) if len(m.group(2)) > k]
+    seen = []
+    for c in out:
+        if re.match(r"^10\.\d{4,9}/\S+$", c) and c not in seen:
+            seen.append(c)
+    return seen
 
 
 class LibraryIndex:

@@ -74,6 +74,10 @@ def references(xml):
     refs = []
     for r in re.findall(r"<ref[ >].*?</ref>", xml, re.S):
         r = re.sub(r"<label>.*?</label>", "", r, flags=re.S)
+        cits = re.findall(r"<(mixed-citation|element-citation|citation)[ >].*?</\1>", r, re.S)
+        if len(cits) > 1:  # the same reference twice (structured and as printed): keep the printed one
+            r = next((m.group(0) for m in re.finditer(r"<mixed-citation[ >].*?</mixed-citation>", r, re.S)),
+                     re.search(r"<(element-citation|citation)[ >].*?</\1>", r, re.S).group(0))
         r = re.sub(r'<pub-id pub-id-type="doi">(.*?)</pub-id>', r" https://doi.org/\1", r)
         r = re.sub(r"<pub-id[^>]*>.*?</pub-id>", "", r, flags=re.S)
         r = re.sub(r"<ext-link[^>]*>(.*?)</ext-link>", r" \1", r, flags=re.S)
@@ -129,10 +133,13 @@ def main():
     ap.add_argument("--workers", type=int, default=3)
     ap.add_argument("--skip", default="", help="file with PMC ids already scanned (one per line)")
     ap.add_argument("--out", default="scan-out")
+    ap.add_argument("--pmcids", default="", help="check these papers (PMC ids, comma separated) instead of a sample")
     args = ap.parse_args()
     os.makedirs(args.out, exist_ok=True)
     skip = open(args.skip).read().split() if args.skip and os.path.exists(args.skip) else []
-    papers = candidates(args.count, args.seed, args.date_from, args.date_to, skip)
+    ids = [x.strip() for x in args.pmcids.split(",") if x.strip()]
+    papers = ([{"pmcid": i, "doi": None, "journal": "", "title": i, "year": "", "topic": "chosen"} for i in ids]
+              if ids else candidates(args.count, args.seed, args.date_from, args.date_to, skip))
     print(f"{len(papers)} papers picked", flush=True)
     results = []
     with open(os.path.join(args.out, "results.jsonl"), "w") as f, cf.ThreadPoolExecutor(args.workers) as ex:
