@@ -28,6 +28,10 @@ UA = "Citrello-reference-scan/1.0 (https://citrello.app)"
 TOPICS = ["sport", "exercise", "education", "nursing", "public health", "psychology", "nutrition", "management",
           "environment", "dentistry", "pharmacy", "rehabilitation", "social", "cancer", "diabetes", "covid",
           "surgery", "mental health", "artificial intelligence", "ecology"]
+ENGINEERING = ["civil engineering", "mechanical engineering", "electrical engineering", "materials", "energy",
+               "construction", "chemical engineering", "environmental engineering", "manufacturing", "machine learning",
+               "structural", "transportation", "renewable energy", "concrete", "battery", "robotics", "water treatment",
+               "heat transfer", "composites", "power system"]
 MAYBE = "may not exist"
 
 
@@ -70,6 +74,59 @@ def candidates(count, seed, date_from, date_to, skip):
     return out[:count]
 
 
+def candidates_crossref(count, seed, date_from, date_to, skip, prefix, topics):
+    """Recent journal articles whose reference lists are in Crossref (Elsevier's are: prefix 10.1016)."""
+    rnd = random.Random(seed)
+    topics = topics[:]
+    rnd.shuffle(topics)
+    per = max(3, count // len(topics) + 2)
+    filt = f"from-pub-date:{date_from},until-pub-date:{date_to},has-references:true,type:journal-article"
+    if prefix:
+        filt += f",prefix:{prefix}"
+    out, seen = [], set(skip)
+    for t in topics:
+        u = "https://api.crossref.org/works?" + urllib.parse.urlencode(
+            {"filter": filt, "query": t, "sample": min(100, per * 2), "mailto": "hello@citrello.app",
+             "select": "DOI,title,container-title,issued,reference,publisher"})
+        try:
+            items = json.loads(get(u))["message"]["items"]
+        except Exception as e:
+            print(f"search failed for {t}: {e}", flush=True)
+            continue
+        n = 0
+        for it in items:
+            if it["DOI"] in seen or n >= per or not it.get("reference"):
+                continue
+            seen.add(it["DOI"])
+            n += 1
+            out.append({"pmcid": it["DOI"], "doi": it["DOI"], "journal": core._first(it.get("container-title")),
+                        "title": core._first(it.get("title")), "publisher": it.get("publisher"),
+                        "year": str(((it.get("issued") or {}).get("date-parts") or [[""]])[0][0]), "topic": t,
+                        "crossref_refs": it["reference"]})
+    rnd.shuffle(out)
+    return out[:count]
+
+
+def crossref_reference_text(r):
+    """A reference as Crossref lists it -> the text of a reference, or None when Crossref already matched its DOI
+    (a DOI Crossref found itself is a real paper: nothing to check)."""
+    if r.get("doi-asserted-by") == "crossref":
+        return None
+    if r.get("unstructured"):
+        t = r["unstructured"]
+        return t + (f" doi:{r['DOI']}" if r.get("DOI") and r["DOI"].lower() not in t.lower() else "")
+    if not r.get("article-title"):
+        return None  # a book or report listed by name only: too little to check
+    parts = [f"{r.get('author', '')} et al. ({r.get('year', '')}).", r["article-title"] + "."]
+    src = ", ".join(x for x in (r.get("journal-title") or r.get("series-title") or r.get("volume-title"),
+                                r.get("volume"), r.get("first-page")) if x)
+    if src:
+        parts.append(src + ".")
+    if r.get("DOI"):
+        parts.append(f"doi:{r['DOI']}")
+    return " ".join(parts)
+
+
 def references(xml):
     refs = []
     for r in re.findall(r"<ref[ >].*?</ref>", xml, re.S):
@@ -102,12 +159,20 @@ sys.stderr = _ThreadLog()
 
 
 def scan(paper, email):
-    try:
-        refs = references(get(f"https://www.ebi.ac.uk/europepmc/webservices/rest/{paper['pmcid']}/fullTextXML"))
-    except Exception as e:
-        return dict(paper, error=f"full text: {e}")
-    if not 8 <= len(refs) <= 150:
-        return dict(paper, error=f"{len(refs)} references (skipped)")
+    if "crossref_refs" in paper:  # the reference list came with the Crossref record
+        listed = paper.pop("crossref_refs")
+        refs = [t for t in map(crossref_reference_text, listed) if t]
+        paper = dict(paper, listed=len(listed), matched_by_crossref=sum(r.get("doi-asserted-by") == "crossref"
+                                                                        for r in listed))
+        if len(listed) < 8 or not refs:
+            return dict(paper, error=f"{len(listed)} references, {len(refs)} to check (skipped)")
+    else:
+        try:
+            refs = references(get(f"https://www.ebi.ac.uk/europepmc/webservices/rest/{paper['pmcid']}/fullTextXML"))
+        except Exception as e:
+            return dict(paper, error=f"full text: {e}")
+        if not 8 <= len(refs) <= 150:
+            return dict(paper, error=f"{len(refs)} references (skipped)")
     log = _ThreadLog.local.buf = io.StringIO()
     try:
         recs = [core.resolve_reference(i + 1, t, email=email) for i, t in enumerate(refs)]
@@ -134,8 +199,10 @@ def report(results, args):
              f"- Papers with 2 or more references that may not exist: **{len(flagged)}**",
              f"- Papers with exactly 1 (often a wrong DOI of a book or report; not counted): {len(one)}", ""]
     for r in flagged:
-        lines += [f"## {len(r['maybe_nonexistent'])} of {r['refs']}: {r['title']}",
-                  f"{r['journal']} ({r['year']}) · DOI {r['doi']} · https://europepmc.org/article/PMC/{r['pmcid']}", ""]
+        link = (f"https://europepmc.org/article/PMC/{r['pmcid']}" if str(r["pmcid"]).startswith("PMC")
+                else f"https://doi.org/{r['doi']}")
+        lines += [f"## {len(r['maybe_nonexistent'])} of {r.get('listed', r['refs'])}: {r['title']}",
+                  f"{r['journal']} ({r['year']}) · {r.get('publisher') or ''} · DOI {r['doi']} · {link}", ""]
         lines += [f"{m['n']}. {m['ref']}  \n   → {m['why']}" for m in r["maybe_nonexistent"]] + [""]
     return "\n".join(lines)
 
@@ -150,13 +217,21 @@ def main():
     ap.add_argument("--workers", type=int, default=3)
     ap.add_argument("--skip", default="", help="file with PMC ids already scanned (one per line)")
     ap.add_argument("--out", default="scan-out")
+    ap.add_argument("--source", default="europepmc", choices=["europepmc", "crossref"],
+                    help="europepmc: open-access full texts (mostly medicine); crossref: reference lists in Crossref")
+    ap.add_argument("--prefix", default="", help="crossref only: DOI prefix of a publisher (Elsevier: 10.1016)")
+    ap.add_argument("--topics", default="", help="engineering, or topics separated by commas (default: the medical list)")
     ap.add_argument("--pmcids", default="", help="check these papers (PMC ids, comma separated) instead of a sample")
     args = ap.parse_args()
     os.makedirs(args.out, exist_ok=True)
     skip = open(args.skip).read().split() if args.skip and os.path.exists(args.skip) else []
     ids = [x.strip() for x in args.pmcids.split(",") if x.strip()]
+    topics = (ENGINEERING if args.topics == "engineering" else
+              [t.strip() for t in args.topics.split(",") if t.strip()] or TOPICS)
     papers = ([{"pmcid": i, "doi": None, "journal": "", "title": i, "year": "", "topic": "chosen"} for i in ids]
-              if ids else candidates(args.count, args.seed, args.date_from, args.date_to, skip))
+              if ids else
+              candidates_crossref(args.count, args.seed, args.date_from, args.date_to, skip, args.prefix, topics)
+              if args.source == "crossref" else candidates(args.count, args.seed, args.date_from, args.date_to, skip))
     print(f"{len(papers)} papers picked", flush=True)
     results = []
     with open(os.path.join(args.out, "results.jsonl"), "w") as f, cf.ThreadPoolExecutor(args.workers) as ex:

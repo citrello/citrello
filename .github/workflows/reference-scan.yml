@@ -18,6 +18,18 @@ on:
       date_to:
         description: "Published until (YYYY-MM-DD)"
         default: "2026-11-15"
+      source:
+        description: "europepmc (open-access full texts, mostly medicine) or crossref (reference lists in Crossref)"
+        default: "europepmc"
+      prefix:
+        description: "crossref only: a publisher's DOI prefix (Elsevier: 10.1016), or empty for all"
+        default: ""
+      topics:
+        description: "engineering, or topics separated by commas (empty: the medical list)"
+        default: ""
+      workers:
+        description: "Papers checked at once (1 is gentlest on Crossref)"
+        default: "1"
       pmcids:
         description: "Or check these papers only (PMC ids, comma separated)"
         default: ""
@@ -39,9 +51,15 @@ jobs:
           FROM: ${{ inputs.date_from }}
           TO: ${{ inputs.date_to }}
           PMCIDS: ${{ inputs.pmcids }}
-        run: python tools/reference_scan.py --count "$COUNT" --seed "$SEED" --from "$FROM" --to "$TO" --pmcids "$PMCIDS" --out scan-out
+          SOURCE: ${{ inputs.source }}
+          PREFIX: ${{ inputs.prefix }}
+          TOPICS: ${{ inputs.topics }}
+          WORKERS: ${{ inputs.workers }}
+        run: >-
+          python tools/reference_scan.py --count "$COUNT" --seed "$SEED" --from "$FROM" --to "$TO" --pmcids "$PMCIDS"
+          --source "$SOURCE" --prefix "$PREFIX" --topics "$TOPICS" --workers "$WORKERS" --out scan-out
       - if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: reference-scan-${{ inputs.seed }}
+          name: reference-scan-${{ inputs.source }}-${{ inputs.seed }}
           path: scan-out

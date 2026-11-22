@@ -28,3 +28,15 @@ def test_report_counts_papers_with_two_or_more():
     md = rs.report(results, SimpleNamespace(seed=1, date_from="2026-06-01", date_to="2026-11-15"))
     assert "Papers checked fully: **2** of 4" in md
     assert "2 or more references that may not exist: **1**" in md and "## 2 of 40: A paper" in md
+
+
+def test_crossref_reference_lists():
+    """References as Crossref lists them: the ones whose DOI Crossref matched itself are skipped (real papers); the
+    others become reference text, with the DOI the publisher gave."""
+    assert rs.crossref_reference_text({"doi-asserted-by": "crossref", "DOI": "10.1/x", "article-title": "T"}) is None
+    t = rs.crossref_reference_text({"doi-asserted-by": "publisher", "DOI": "10.1016/j.x.2020.1", "author": "Lee",
+                                    "year": "2020", "article-title": "A study of things", "journal-title": "J Eng",
+                                    "volume": "5", "first-page": "12"})
+    assert t == "Lee et al. (2020). A study of things. J Eng, 5, 12. doi:10.1016/j.x.2020.1"
+    assert rs.crossref_reference_text({"unstructured": "Smith J. Title. J. 2020.", "DOI": "10.2/y"}).endswith("doi:10.2/y")
+    assert rs.crossref_reference_text({"author": "Org", "year": "2020"}) is None
