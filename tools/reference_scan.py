@@ -202,8 +202,10 @@ def safe_scan(paper, email):
 
 
 def report(results, args):
-    done = [r for r in results if "error" not in r and r["failed_lookups"] <= 2]
-    flagged = sorted([r for r in done if len(r["maybe_nonexistent"]) >= 2], key=lambda r: -len(r["maybe_nonexistent"]))
+    checked = [r for r in results if "error" not in r]
+    done = [r for r in checked if r["failed_lookups"] <= 2]
+    # a paper whose other lookups failed still counts when 2+ references were found to be missing
+    flagged = sorted([r for r in checked if len(r["maybe_nonexistent"]) >= 2], key=lambda r: -len(r["maybe_nonexistent"]))
     one = [r for r in done if len(r["maybe_nonexistent"]) == 1]
     lines = [f"# Reference scan (seed {args.seed}, papers published {args.date_from} to {args.date_to})", "",
              f"- Papers checked fully: **{len(done)}** of {len(results)} picked",
@@ -213,7 +215,8 @@ def report(results, args):
     for r in flagged:
         link = (f"https://europepmc.org/article/PMC/{r['pmcid']}" if str(r["pmcid"]).startswith("PMC")
                 else f"https://doi.org/{r['doi']}")
-        lines += [f"## {len(r['maybe_nonexistent'])} of {r.get('listed', r['refs'])}: {r['title']}",
+        failed = f" ({r['failed_lookups']} lookups failed)" if r["failed_lookups"] > 2 else ""
+        lines += [f"## {len(r['maybe_nonexistent'])} of {r.get('listed', r['refs'])}: {r['title']}{failed}",
                   f"{r['journal']} ({r['year']}) · {r.get('publisher') or ''} · DOI {r['doi']} · {link}", ""]
         lines += [f"{m['n']}. {m['ref']}  \n   → {m['why']}" for m in r["maybe_nonexistent"]] + [""]
     return "\n".join(lines)

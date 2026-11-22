@@ -24,10 +24,13 @@ def test_report_counts_papers_with_two_or_more():
                                               {"n": 9, "ref": "Fake B.", "why": "may not exist"}]),
                dict(paper, pmcid="PMC2", maybe_nonexistent=[{"n": 1, "ref": "Book.", "why": "may not exist"}]),
                dict(paper, pmcid="PMC3", failed_lookups=9, maybe_nonexistent=[]),
+               dict(paper, pmcid="PMC5", title="Other", failed_lookups=6,
+                    maybe_nonexistent=[{"n": 2, "ref": "Fake C.", "why": "x"}, {"n": 5, "ref": "Fake D.", "why": "x"}]),
                {"pmcid": "PMC4", "error": "full text"}]
     md = rs.report(results, SimpleNamespace(seed=1, date_from="2026-06-01", date_to="2026-11-15"))
-    assert "Papers checked fully: **2** of 4" in md
-    assert "2 or more references that may not exist: **1**" in md and "## 2 of 40: A paper" in md
+    assert "Papers checked fully: **2** of 5" in md
+    assert "2 or more references that may not exist: **2**" in md and "## 2 of 40: A paper\n" in md
+    assert "## 2 of 40: Other (6 lookups failed)" in md
 
 
 def test_crossref_reference_lists():
