@@ -421,8 +421,8 @@ TOOLS = {
     "format_references": (t_format, "Format references (by keys or a whole project) in a citation style: "
                           "in-text citations and the bibliography as plain text.",
                           S({"keys": {"type": "array", "items": STR}, "project": PROJECT, "style": STYLE})),
-    "check_citations": (t_check_text, "Check that every [@Key] marker in a text exists in the library. "
-                        "Use before delivering text or documents.", S({"text": STR}, ["text"])),
+    "check_citations": (t_check_text, "Check that every [@Key] marker in a text exists in the library, and list "
+                        "the ones that don't.", S({"text": STR}, ["text"])),
     "create_word_document": (t_create_doc, "Create a Word (.docx) file from text with [@Key] markers. Supports "
                              "# headings, paragraphs, - bullets, **bold**, *italic*. Citations become live fields and "
                              "a bibliography is added in the chosen style. Saved to ~/Citrello/Documents unless a path is given.",
@@ -431,12 +431,13 @@ TOOLS = {
                                ["text"])),
     "update_word_document": (t_update_doc, "Update a .docx: turn [@Key] markers and typed-in markers into live citations "
                              "and re-render every citation and the bibliography in a style. Overwrites the file unless "
-                             "output_path is given.",
+                             "output_path is given. The file is on the user's computer, opened by the Citrello app "
+                             "(https://citrello.app/connect).",
                              S({"path": STR, "style": STYLE, "output_path": STR}, ["path"])),
     "read_paper": (t_read_paper, "Read the full text of a paper in the user's library (Citrello keeps the text of papers "
                    "the user added). With a query (e.g. the sentence that cites it), returns the passages that match best; "
-                   "without, the text from the start. Use it to check whether a cited paper really says what a sentence "
-                   "claims, quoting the passage. search_references shows which references have full_text.",
+                   "without, the text from the start. Shows whether a cited paper really says what a sentence claims, "
+                   "with the passage to quote. Only for references whose full text Citrello has (full_text: true).",
                    S({"key": STR, "query": {"type": "string", "description": "What to look for, e.g. the citing sentence"},
                       "max_chars": {"type": "integer", "description": "Without a query: how much text (default 12000)"}},
                      ["key"])),
@@ -454,13 +455,13 @@ TOOLS = {
     "check_latex_project": (t_check_latex, "Check a LaTeX project on disk (a .tex file, a folder, or an Overleaf "
                             "source .zip): cited keys missing from the .bib (and whether they are in the library), "
                             "unused and duplicate entries, unreliable references (retracted, wrong DOI, no DOI...), "
-                            "and hand-typed bibliographies.",
+                            "and hand-typed bibliographies. The project is on the user's computer, read by the Citrello app (https://citrello.app/connect).",
                             S({"path": STR}, ["path"])),
     "prepare_arxiv": (t_prepare_arxiv, "Make an arXiv-ready .zip from a LaTeX project on disk (folder, Overleaf "
                       "source .zip or main .tex): adds the .bbl arXiv needs (it never runs BibTeX), removes comments "
                       "and build files, adds \\pdfoutput=1, and reports what would make arXiv fail (missing figures, "
                       "case mismatches, biblatex, citations missing from the .bib, bad file names, >50 MB). Writes "
-                      "<name>_arxiv.zip next to the project unless output_path is given; the project is not changed.",
+                      "<name>_arxiv.zip next to the project unless output_path is given; the project is not changed. The project is on the user's computer, read by the Citrello app (https://citrello.app/connect).",
                       S({"path": STR, "output_path": STR, "remove_comments": {"type": "boolean"}}, ["path"])),
     "import_zotero_library": (t_import_zotero, "Import the user's Zotero library from Zotero on this computer (no account "
                               "or key needed). Zotero collections become projects; duplicates are skipped.",

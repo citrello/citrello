@@ -196,7 +196,7 @@
   {
    "name": "check_citations",
    "title": "Check citation markers",
-   "description": "Check that every [@Key] marker in a text exists in the library. Use before delivering text or documents.",
+   "description": "Check that every [@Key] marker in a text exists in the library, and list the ones that don't.",
    "inputSchema": {
     "type": "object",
     "properties": {
@@ -253,7 +253,7 @@
   {
    "name": "update_word_document",
    "title": "Update a Word document",
-   "description": "Update a .docx: turn [@Key] markers and typed-in markers into live citations and re-render every citation and the bibliography in a style. Overwrites the file unless output_path is given.",
+   "description": "Update a .docx: turn [@Key] markers and typed-in markers into live citations and re-render every citation and the bibliography in a style. Overwrites the file unless output_path is given. The file is on the user's computer, opened by the Citrello app (https://citrello.app/connect).",
    "inputSchema": {
     "type": "object",
     "properties": {
@@ -283,7 +283,7 @@
   {
    "name": "read_paper",
    "title": "Read a paper's full text",
-   "description": "Read the full text of a paper in the user's library (Citrello keeps the text of papers the user added). With a query (e.g. the sentence that cites it), returns the passages that match best; without, the text from the start. Use it to check whether a cited paper really says what a sentence claims, quoting the passage. search_references shows which references have full_text.",
+   "description": "Read the full text of a paper in the user's library (Citrello keeps the text of papers the user added). With a query (e.g. the sentence that cites it), returns the passages that match best; without, the text from the start. Shows whether a cited paper really says what a sentence claims, with the passage to quote. Only for references whose full text Citrello has (full_text: true).",
    "inputSchema": {
     "type": "object",
     "properties": {
@@ -389,7 +389,7 @@
   {
    "name": "check_latex_project",
    "title": "Check a LaTeX project",
-   "description": "Check a LaTeX project on disk (a .tex file, a folder, or an Overleaf source .zip): cited keys missing from the .bib (and whether they are in the library), unused and duplicate entries, unreliable references (retracted, wrong DOI, no DOI...), and hand-typed bibliographies.",
+   "description": "Check a LaTeX project on disk (a .tex file, a folder, or an Overleaf source .zip): cited keys missing from the .bib (and whether they are in the library), unused and duplicate entries, unreliable references (retracted, wrong DOI, no DOI...), and hand-typed bibliographies. The project is on the user's computer, read by the Citrello app (https://citrello.app/connect).",
    "inputSchema": {
     "type": "object",
     "properties": {
@@ -412,7 +412,7 @@
   {
    "name": "prepare_arxiv",
    "title": "Make an arXiv-ready .zip",
-   "description": "Make an arXiv-ready .zip from a LaTeX project on disk (folder, Overleaf source .zip or main .tex): adds the .bbl arXiv needs (it never runs BibTeX), removes comments and build files, adds \\pdfoutput=1, and reports what would make arXiv fail (missing figures, case mismatches, biblatex, citations missing from the .bib, bad file names, >50 MB). Writes <name>_arxiv.zip next to the project unless output_path is given; the project is not changed.",
+   "description": "Make an arXiv-ready .zip from a LaTeX project on disk (folder, Overleaf source .zip or main .tex): adds the .bbl arXiv needs (it never runs BibTeX), removes comments and build files, adds \\pdfoutput=1, and reports what would make arXiv fail (missing figures, case mismatches, biblatex, citations missing from the .bib, bad file names, >50 MB). Writes <name>_arxiv.zip next to the project unless output_path is given; the project is not changed. The project is on the user's computer, read by the Citrello app (https://citrello.app/connect).",
    "inputSchema": {
     "type": "object",
     "properties": {
