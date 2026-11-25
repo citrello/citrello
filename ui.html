@@ -1010,10 +1010,10 @@ const keepOpen = IS_WEB ? "Keep a Citrello tab open while you use it (it can sta
 const GUIDES = {
   claude: () => ({title: "Connect Claude", steps: [
     signInStep(),
-    {title: "Open Claude's connector settings", art: A.menu("Claude", ["General", "Account", "Privacy", "Connectors", "Billing"], "Connectors"),
-     html: `<p>On <b>claude.ai</b> (or in the Claude app), open <b>Settings</b>, then <b>Connectors</b>.</p>`},
-    {title: "Add Citrello as a custom connector", art: A.form("Claude", "Add custom connector", [["Name", "Citrello"], ["URL", CONNECTOR]], "Add"),
-     html: `<p>Click <b>Add custom connector</b>. Name: <b>Citrello</b>. URL:</p>${copyRow(CONNECTOR)}<p>Then click <b>Add</b>.</p>`},
+    {title: "Find Citrello in Claude's directory", art: A.menu("Claude", ["General", "Account", "Privacy", "Connectors", "Billing"], "Connectors"),
+     html: `<p>Open <a href="https://claude.ai/directory/connectors/citrello" target="_blank" rel="noopener">Citrello in Claude's connector directory</a>.
+            Or, on <b>claude.ai</b> or in the Claude app: <b>Settings → Connectors → Browse connectors</b>, and search for <b>Citrello</b>.</p>
+            <p class="small muted">Can't find it (some work accounts)? <b>Add custom connector</b> with the name Citrello and this URL:</p>${copyRow(CONNECTOR)}`},
     {title: "Connect and sign in", art: A.signin(),
      html: `<p>Click <b>Connect</b> next to Citrello. Sign in with the <b>same email</b> as here, and type the code we email you.</p>`},
     {title: "Ask Claude", art: A.chat("Claude", "What's in my Citrello library?"),

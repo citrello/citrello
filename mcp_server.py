@@ -13,6 +13,7 @@ or, without the .exe:
   {"mcpServers": {"citrello": {"command": "python", "args": ["C:\\\\path\\\\to\\\\mcp_server.py"]}}}
 """
 import contextlib
+import html
 import io
 import json
 import os
@@ -200,8 +201,8 @@ def t_get(key, style=None):
     if style:
         r = citeformat.Renderer(style, {it["key"]: it["csl"]})
         i = r.add([{"key": it["key"]}])
-        out["formatted_citation"] = core.re.sub(r"<[^>]+>", "", r.render(i))
-        out["formatted_reference"] = core.re.sub(r"<[^>]+>", "", r.bibliography()[0])
+        out["formatted_citation"] = _plain(r.render(i))
+        out["formatted_reference"] = _plain(r.bibliography()[0])
     return out
 
 
@@ -257,10 +258,14 @@ def t_format(keys=None, project=None, style=None):
         raise ValueError("Give keys or a project.")
     r = citeformat.Renderer(style or citeformat.DEFAULT_STYLE, {it["key"]: it["csl"] for it in items})
     cites = {it["key"]: r.add([{"key": it["key"]}]) for it in items}
-    strip = lambda s: core.re.sub(r"<[^>]+>", "", s)
     return {"style": r.info["title"],
-            "in_text": {k: strip(r.render(i)) for k, i in cites.items()},
-            "bibliography": [strip(e) for e in r.bibliography()]}
+            "in_text": {k: _plain(r.render(i)) for k, i in cites.items()},
+            "bibliography": [_plain(e) for e in r.bibliography()]}
+
+
+def _plain(rendered):
+    """The renderer's HTML (<i>, &amp;...) as plain text: "Watson & Crick", not "Watson &amp; Crick"."""
+    return html.unescape(core.re.sub(r"<[^>]+>", "", rendered))
 
 
 def t_check_text(text):

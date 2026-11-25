@@ -386,3 +386,19 @@ def test_http_json_waits_and_retries_once_when_told_too_many_requests(monkeypatc
         return Resp(429, b"slow down") if len(calls) == 1 else Resp(200, b'{"ok": 1}')
     monkeypatch.setattr(core.urllib.request, "urlopen", urlopen)
     assert core.http_json("https://api.crossref.org/works/x")[0] == {"ok": 1} and waits == [3.0] and len(calls) == 2
+
+
+def test_connector_formats_plain_text():
+    """format_references and get_reference give plain text: "Watson & Crick", not the renderer's "&amp;"."""
+    import mcp_server
+    with library.editing() as data:
+        library.add_csl(data, {"type": "article-journal", "title": "Molecular structure of nucleic acids",
+                               "author": [{"family": "Watson", "given": "J. D."}, {"family": "Crick", "given": "F. H. C."}],
+                               "issued": {"date-parts": [[1953]]}, "container-title": "Nature", "volume": "171"},
+                        source="test")
+    key = next(it["key"] for it in library.load()["items"] if it["csl"].get("title") == "Molecular structure of nucleic acids")
+    out = mcp_server.t_format(keys=[key], style="apa")
+    assert out["in_text"][key] == "(Watson & Crick, 1953)" and "&amp;" not in out["bibliography"][0]
+    assert "Watson, J. D., & Crick" in out["bibliography"][0] and "<i>" not in out["bibliography"][0]
+    got = mcp_server.t_get(key, style="apa")
+    assert "&amp;" not in got["formatted_reference"] and "&" in got["formatted_citation"]

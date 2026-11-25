@@ -1,4 +1,4 @@
-# Citrello status (updated 12 November 2026)
+# Citrello status (updated 25 November 2026)
 
 ## Released
 - **Citrello 1.0.1** is the latest GitHub release (Windows `Citrello-windows.zip`, Mac beta `Citrello-mac.zip`,
@@ -48,9 +48,16 @@
   `https://citrello.app/app/mendeley.html`, and the ID must be in GitHub as `MENDELEY_CLIENT_ID` (a variable or
   a secret; site.yml reads both). Re-run "Deploy website" after changing it. Until then the button stays
   hidden and the export instructions show. The web app never uses the Mendeley secret.
-- **Apply to the directories** (steps were given in the session of 6 Nov 2026): Claude at claude.ai/directory/manage
-  (MCP connector, URL https://mcp.citrello.app/mcp); ChatGPT at platform.openai.com/apps-manage. Both want a privacy
-  policy (citrello.app/privacy), a test account for reviewers and example prompts.
+- **Directories** (25 Nov 2026): **Claude: published** as a community connector,
+  https://claude.ai/directory/connectors/citrello (automated review; "Verified" later, Anthropic asks for test
+  access). **ChatGPT: in progress**: package `packaging/build_chatgpt_plugin.py` (texts and 5+3 test cases in
+  `packaging/chatgpt-plugin/plugin.json`); Armin: OpenAI organisation verification, demo video, upload at
+  platform.openai.com/plugins, then send the domain-verification token (→ `OPENAI_APPS_CHALLENGE` in
+  bridge/wrangler.toml). All steps, reviewer instructions and the video script: `packaging/connector-listing.md`.
+  Reviewer account: reviewer@citrello.app with the 8-digit `REVIEWER_CODE` GitHub secret (Armin adds it; no email
+  sent; its empty web-app library fills with the sample papers). The bridge lists the tools for accounts whose app
+  never connected (`bridge/src/tools.json`, `packaging/build_bridge_tools.py`), serves the icon, and
+  citrello.app/connect is the connectors' documentation page.
 - **Edit docs/VALUE_PROPOSITION.html** (the value-proposition report, written 6 Nov 2026 before the web app plan).
   Remind him at the start of the first session in the new account. Update it once the web app exists (no-install,
   "what AI can't do without Citrello", claim checking).

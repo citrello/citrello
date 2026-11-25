@@ -6,7 +6,7 @@ name: Deploy bridge (mcp.citrello.app)
 #   RESEND_API_KEY (or RESEND_API_KEY_CITRELLO)    sends the sign-in emails
 #   BRIDGE_ADMIN_TOKEN                             protects /admin (user numbers, feature emails, giving credits)
 #   STRIPE_SECRET_KEY (optional)                   plans and payments (a restricted key; test key in the sandbox)
-#   REVIEWER_CODE (optional)                       fixed sign-in code (8+ digits) for reviewer@citrello.app, the
+#   REVIEWER_CODE (optional)                       fixed sign-in code, exactly 8 digits (the code boxes take 8), for reviewer@citrello.app, the
 #                                                  account Claude's, ChatGPT's and Microsoft's reviewers test with
 on:
   push:

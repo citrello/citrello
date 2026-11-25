@@ -1,0 +1,113 @@
+{
+  "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
+  "name": "citrello",
+  "version": "1.0.0",
+  "description": "Use your own Citrello reference library in ChatGPT: search, add and verify references, read your papers' full text, and cite in Word or LaTeX in 10,000+ styles.",
+  "author": {
+    "name": "Citrello",
+    "email": "hello@citrello.app",
+    "url": "https://citrello.app"
+  },
+  "homepage": "https://citrello.app/connect",
+  "repository": "https://github.com/citrello/citrello",
+  "license": "AGPL-3.0-or-later",
+  "keywords": [
+    "references",
+    "citations",
+    "bibliography",
+    "research",
+    "academic writing",
+    "Zotero",
+    "Mendeley",
+    "BibTeX",
+    "LaTeX",
+    "Word"
+  ],
+  "extensions": {
+    "com.openai": {
+      "interface": {
+        "displayName": "Citrello",
+        "shortDescription": "Cite real papers you have",
+        "longDescription": "Citrello is a free, open-source reference manager built for writing with AI. Connect it and ChatGPT works with your own Citrello library, so it cites real papers you have instead of made-up ones.\n\nWhat ChatGPT can do with it:\n- Search your library and cite with keys that stay linked to each reference.\n- Add references from a DOI, a link or a typed reference. Each is looked up on Crossref and rated verified, check or problem (for example retracted, or a DOI that doesn't exist).\n- Verify existing references online and fix their details from the publisher record.\n- Read the full text of papers in your library and find the passage that supports a sentence, so you can check a paper really says what you cite it for.\n- Format references in any of 10,000+ citation styles (APA, Vancouver, IEEE, Harvard, journal styles).\n- Write Word documents with live citations and a bibliography, or update an existing one.\n- Give BibTeX for LaTeX and Overleaf, check a LaTeX project's citations, and make an arXiv-ready .zip.\n- Import from Zotero, Mendeley or EndNote (RIS, BibTeX, CSL-JSON) and organise references into projects.\n\nWho it's for: students, researchers and anyone writing with references.\n\nHow it works: your library lives on your computer (the Citrello desktop app) or in your browser (citrello.app/app), not on Citrello's servers. ChatGPT's requests pass through Citrello's server to your open Citrello and back; their contents aren't kept. You sign in with your email and a code; there's no password.\n\nLimitations: Citrello must be open while you use it (the desktop app for Windows or Mac, or citrello.app/app in a browser tab, which can stay in the background). Tools that work with files on your computer (checking a LaTeX project, making an arXiv .zip, updating an existing Word file) need the desktop app. Reading a paper's full text works for papers whose text you've added to Citrello.",
+        "developerName": "Citrello",
+        "category": "Productivity",
+        "capabilities": [
+          "Search your reference library",
+          "Add and verify references",
+          "Read your papers' full text",
+          "Format citations in 10,000+ styles",
+          "Create Word documents with live citations",
+          "BibTeX and LaTeX checks"
+        ],
+        "websiteURL": "https://citrello.app",
+        "supportURL": "https://citrello.app/connect",
+        "privacyPolicyURL": "https://citrello.app/privacy",
+        "termsOfServiceURL": "https://citrello.app/terms",
+        "defaultPrompt": [
+          "What's in my Citrello library?",
+          "Add 10.1038/nature14539 to my library and check it's reliable.",
+          "Format my references in APA 7."
+        ],
+        "brandColor": "#1d3f8f",
+        "brandColorDark": "#f6d646",
+        "logo": "./assets/logo.png"
+      },
+      "review": {
+        "test_cases": {
+          "positive": [
+            {
+              "description": "Search the library and write a cited paragraph from papers in it",
+              "prompt": "Find my papers on offshore wind decommissioning and use them to write a short cited paragraph about end-of-life costs.",
+              "tools_triggered": "search_references",
+              "expected_behavior": "Calls search_references (for example with 'offshore wind decommissioning' or 'offshore wind'), finds the sample paper by Topham & McMillan (2017, Renewable Energy) and, with a broader search, Vetters et al. (2024), and writes a paragraph citing only papers from the library with markers such as [@Topham2017]. No made-up references."
+            },
+            {
+              "description": "Add a reference by DOI and report its reliability",
+              "prompt": "Add 10.1038/nature14539 to my Citrello library and tell me whether it's reliable.",
+              "tools_triggered": "add_reference",
+              "expected_behavior": "Calls add_reference with the DOI. The sample library already has this paper (LeCun, Bengio & Hinton 2015, Deep learning, Nature), so Citrello answers that it is already in the library (same DOI) with its key LeCun2015 and reliability 'verified', and ChatGPT reports it as reliable."
+            },
+            {
+              "description": "Format references in a named citation style",
+              "prompt": "Format all the references in my library in APA 7th edition.",
+              "tools_triggered": "search_references, format_references",
+              "expected_behavior": "Gets the six keys with search_references and calls format_references with style 'apa', returning in-text citations such as (Watson & Crick, 1953) and an APA 7th edition reference list of the six sample papers (He 2016, LeCun 2015, Shanks 2016, Topham 2017, Vetters 2024, Watson 1953) with DOIs."
+            },
+            {
+              "description": "Find the citation style a journal uses",
+              "prompt": "Which citation style does the Journal of Cleaner Production use? Find it in Citrello.",
+              "tools_triggered": "list_styles",
+              "expected_behavior": "Calls list_styles with the journal name and returns the 'Journal of Cleaner Production' style (author-date) from Citrello's catalogue of 10,000+ styles, with its id journal-of-cleaner-production to use for formatting."
+            },
+            {
+              "description": "Give BibTeX entries for LaTeX",
+              "prompt": "Give me BibTeX entries for the deep learning papers in my Citrello library.",
+              "tools_triggered": "search_references, get_bibtex",
+              "expected_behavior": "Finds the two deep learning papers (LeCun2015 and He2016) with search_references and calls get_bibtex with those keys, returning a @article and an @inproceedings BibTeX entry whose keys match the library keys."
+            }
+          ],
+          "negative": [
+            {
+              "description": "Writing without asking for references or the library: the plugin isn't needed",
+              "prompt": "Write a short poem about autumn leaves."
+            },
+            {
+              "description": "A general knowledge question that doesn't involve the user's references",
+              "prompt": "What is the capital of Australia?"
+            },
+            {
+              "description": "A request about a different product's data (email), which Citrello can't do",
+              "prompt": "Summarise the unread emails in my inbox."
+            }
+          ]
+        },
+        "demo_recording_url": "",
+        "commerce": false,
+        "commerce_description": "Citrello's plugin doesn't sell anything or process payments."
+      },
+      "publication": {
+        "release_notes": "First release: search, add, verify and format references from your Citrello library; read papers' full text; Word documents with live citations; BibTeX and LaTeX checks."
+      }
+    }
+  }
+}
