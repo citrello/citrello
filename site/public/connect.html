@@ -1,0 +1,152 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Citrello for ChatGPT and Claude</title>
+<meta name="description" content="Use your Citrello reference library in Claude and ChatGPT: search, add and verify references, read your papers' full text, and cite in Word or LaTeX.">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Gloock&family=Figtree:wght@400;500;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/site.css">
+<style>
+.c-hero{padding:40px 0 20px}
+.c-hero h1{font-size:clamp(38px,5vw,60px);margin-bottom:12px}
+.c-hero p{font-size:19px;max-width:40em;margin:0}
+.c-sec{padding:28px 0}
+.c-sec h2{font-size:clamp(28px,3.4vw,40px);margin-bottom:14px}
+.c-sec h3{font-size:22px;margin:22px 0 8px;color:var(--cobalt)}
+.c-sec ol,.c-sec ul{max-width:46em;padding-left:1.3em}.c-sec li{margin:6px 0}
+.c-sec p{max-width:46em}
+.c-url{display:inline-block;font:600 16px ui-monospace,Menlo,Consolas,monospace;background:var(--lemon-soft);border-radius:10px;padding:6px 12px;word-break:break-all}
+.c-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:20px}
+.c-card{border:2px solid var(--line);border-radius:20px;padding:22px;background:#fff}
+.c-card h3{margin-top:0}
+.c-sec dl{margin:0}.c-sec dt{font-weight:700;margin-top:14px}.c-sec dd{margin:4px 0 0;max-width:46em}
+.c-last{padding-bottom:80px}
+@media (max-width:900px){.c-grid{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+<div class="tiles" aria-hidden="true"></div>
+<header class="wrap nav">
+  <a class="logo" href="/" aria-label="Citrello home">citr<span>ello</span></a>
+  <nav aria-label="Main">
+    <a href="/app/">Web app</a>
+    <a href="/word/">Word</a>
+    <a href="https://github.com/citrello/citrello">GitHub</a>
+    <a class="nav-cta" href="/app/">Open Citrello</a>
+  </nav>
+</header>
+
+<main id="main">
+<section class="wrap c-hero">
+  <h1>Citrello for ChatGPT and Claude</h1>
+  <p>Give Claude or ChatGPT your own reference library, so they cite real papers you have, check them online, read
+    their full text, and write Word or LaTeX documents with live citations. Free, and your library stays with you.</p>
+</section>
+
+<section class="wrap c-sec">
+  <h2>Before you start</h2>
+  <ol>
+    <li><b>Citrello, with a free account.</b> Use the <a href="/download">desktop app</a> (Windows or Mac) or
+      <a href="/app/">Citrello in your browser</a>, and sign in with your email under <b>Settings</b>. There's no
+      password: Citrello emails you a code.</li>
+    <li><b>Keep Citrello open while you use the connector.</b> Your library lives on your computer or in your browser,
+      not on our servers, so Claude and ChatGPT reach it through your open Citrello (the app running, or a
+      citrello.app tab, which can stay in the background). It works from your phone too, while Citrello is open on
+      a computer.</li>
+  </ol>
+  <p>The connector's address is <span class="c-url">https://mcp.citrello.app/mcp</span></p>
+</section>
+
+<section class="wrap c-sec">
+  <h2>Connect</h2>
+  <div class="c-grid">
+    <article class="c-card"><h3>Claude</h3>
+      <ol>
+        <li>On claude.ai or in the Claude app, open <b>Settings → Connectors</b>.</li>
+        <li>Find <b>Citrello</b> in the directory and click <b>Connect</b>. (Or: <b>Add custom connector</b>, name
+          <b>Citrello</b>, URL above.)</li>
+        <li>Sign in with the same email as in Citrello and type the code we email you.</li>
+        <li>In a chat, ask <i>“What's in my Citrello library?”</i></li>
+      </ol></article>
+    <article class="c-card"><h3>ChatGPT</h3>
+      <ol>
+        <li>In ChatGPT, open <b>Settings → Apps</b> (or Plugins) and find <b>Citrello</b>. Until it's listed there:
+          turn on <b>Developer mode</b> under Advanced settings (paid plans) and create a connector with the URL above
+          and OAuth.</li>
+        <li>Sign in with the same email as in Citrello and type the code we email you.</li>
+        <li>In a chat, ask <i>“What's in my Citrello library?”</i></li>
+      </ol></article>
+    <article class="c-card"><h3>Claude Code</h3>
+      <ol>
+        <li>In a terminal: <code>claude mcp add --transport http citrello https://mcp.citrello.app/mcp</code></li>
+        <li>In Claude Code, type <b>/mcp</b>, choose <b>citrello</b> and sign in.</li>
+      </ol></article>
+  </div>
+</section>
+
+<section class="wrap c-sec">
+  <h2>What you can ask</h2>
+  <ul>
+    <li><i>“Find my papers on offshore wind decommissioning and cite two of them in this paragraph.”</i></li>
+    <li><i>“Add 10.1038/171737a0 to my library and check it's reliable.”</i></li>
+    <li><i>“Does Topham 2017 really say decommissioning costs are underestimated? Quote the passage.”</i></li>
+    <li><i>“Format the references in my ‘Thesis’ project in APA 7.”</i> · <i>“Find the style for Journal of Cleaner Production.”</i></li>
+    <li><i>“Write this section as a Word document with live citations in Vancouver style.”</i></li>
+    <li><i>“Give me BibTeX for my project”</i> · <i>“Check my LaTeX project's citations”</i> · <i>“Make an arXiv-ready zip.”</i></li>
+  </ul>
+</section>
+
+<section class="wrap c-sec">
+  <h2>The tools</h2>
+  <dl>
+    <dt>Your library</dt><dd>Search the library, show a reference, list projects, put references into a project.</dd>
+    <dt>Adding and checking</dt><dd>Add references from a DOI, a link or a typed reference (looked up on Crossref, duplicates
+      avoided, rated verified / check / problem, e.g. retracted or a DOI that doesn't exist); verify references online;
+      import RIS, BibTeX or CSL-JSON files, or your Zotero library from this computer.</dd>
+    <dt>Papers' full text</dt><dd>Read a paper's text and search inside your papers, for the papers whose text Citrello keeps
+      (only the text, never the PDF). Add texts with the <a href="/extension">browser extension</a> or by dropping PDFs into Citrello.</dd>
+    <dt>Citing and documents</dt><dd>Format references in 10,000+ citation styles; find a journal's style; check that every
+      citation exists in the library; create a Word document with live citations and a bibliography, or update one.</dd>
+    <dt>LaTeX</dt><dd>BibTeX / biblatex entries; check a LaTeX project on your computer (missing, unused, unreliable
+      references); make an arXiv-ready .zip. These work with files on your computer, so they need the desktop app.
+      Tools that change things (adding, updating a Word file) ask before they run.</dd>
+  </dl>
+</section>
+
+<section class="wrap c-sec c-last">
+  <h2>Privacy and help</h2>
+  <p>Claude's or ChatGPT's requests pass through Citrello's server (mcp.citrello.app) to your open Citrello and the
+    answer passes back; we don't keep their contents. Anthropic and OpenAI handle your chats under their own privacy
+    policies. Details: <a href="/privacy">privacy policy</a>, <a href="/terms">terms</a>.</p>
+  <dl>
+    <dt>“Citrello isn't open on the user's computer”</dt><dd>Open the Citrello app, or citrello.app/app in a browser tab,
+      signed in with the same email you used to connect, and ask again.</dd>
+    <dt>Signed in with a different email?</dt><dd>Disconnect Citrello in Claude's or ChatGPT's settings and connect again with the right one.</dd>
+    <dt>To stop using it</dt><dd>Disconnect Citrello in Claude's or ChatGPT's settings. To delete your account, use
+      Settings → Account in Citrello.</dd>
+  </dl>
+  <p>Questions or problems: <a href="mailto:hello@citrello.app">hello@citrello.app</a>.</p>
+</section>
+</main>
+
+<footer>
+  <div class="tiles" aria-hidden="true"></div>
+  <div class="wrap foot">
+    <a class="logo" href="/">citr<span>ello</span></a>
+    <p>References, the sweet part.</p>
+    <nav aria-label="Footer">
+      <a href="/check">Check a paper</a>
+      <a href="https://github.com/citrello/citrello">GitHub</a>
+      <a href="/privacy">Privacy</a><a href="/terms">Terms</a><a href="/pricing">Pricing</a>
+      <a href="https://github.com/citrello/citrello/blob/main/LICENSE">Licence (AGPL)</a>
+    </nav>
+    <p class="small">© 2026 Armin Hosseinghorbani. Citrello™ is a trademark of Armin Hosseinghorbani.</p>
+  </div>
+</footer>
+</body>
+</html>

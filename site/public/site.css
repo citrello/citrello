@@ -114,7 +114,7 @@ footer{background:var(--cobalt);color:#fff}
 .foot{padding:40px 24px;display:grid;grid-template-columns:auto 1fr auto;gap:12px 28px;align-items:center}
 .foot .logo{color:#fff}.foot .logo span{color:var(--lemon)}
 .foot p{margin:0;font:20px Gloock,serif;color:var(--lemon)}
-.foot nav{display:flex;gap:22px}.foot nav a{color:#fff}
+.foot nav{display:flex;flex-wrap:wrap;gap:10px 22px}.foot nav a{color:#fff}
 .foot .small{grid-column:1/-1;font:14px Figtree,sans-serif;color:#c8d3ef}
 
 @media (max-width:900px){

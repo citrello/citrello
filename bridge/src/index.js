@@ -9,6 +9,7 @@
 //   /device/connect            the app's WebSocket
 //   /admin/stats|broadcast     user counts and feature emails (ADMIN_TOKEN)
 import { Relay } from "./relay.js";
+import { ICON_PNG_B64, ICON_SVG } from "./icon.js";
 import * as pages from "./pages.js";
 import * as ai from "./ai.js";
 import * as billing from "./billing.js";
@@ -834,6 +835,11 @@ async function route(request, env, ctx) {
   if (path === "/unsubscribe") return unsubscribe(request, env);
   if (path === "/privacy") return pages.privacy();
   if (path === "/") return pages.home(url.origin);
+  if (path === "/favicon.svg") return new Response(ICON_SVG, { headers: { "Content-Type": "image/svg+xml", "Cache-Control": "public, max-age=86400" } });
+  if (path === "/favicon.ico" || path === "/icon.png" || path === "/apple-touch-icon.png") {
+    const png = Uint8Array.from(atob(ICON_PNG_B64), (c) => c.charCodeAt(0));
+    return new Response(png, { headers: { "Content-Type": "image/png", "Cache-Control": "public, max-age=86400" } });
+  }
   return json({ error: "not_found" }, 404);
 }
 

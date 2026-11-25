@@ -31,6 +31,7 @@ padding:1px 6px;word-break:break-all}a{color:inherit}ol{padding-left:20px}`;
 export function page(title, body, status = 200) {
   const html = `<!doctype html><html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1"><title>${esc(title)}</title>
+<link rel="icon" href="/favicon.svg" type="image/svg+xml"><link rel="icon" href="/icon.png" type="image/png" sizes="192x192"><link rel="apple-touch-icon" href="/icon.png">
 <style>${CSS}</style></head><body><main><div class="brand"><div class="logo">C</div>Citrello</div>
 ${body}</main></body></html>`;
   return new Response(html, { status, headers: {
