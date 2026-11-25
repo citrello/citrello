@@ -135,6 +135,13 @@ function normEmail(email) {
   return e;
 }
 
+// The directories' reviewers (Claude, ChatGPT, Microsoft) sign in as one account with a fixed code, kept in the
+// REVIEWER_CODE secret: their test accounts may not need an emailed code. No email is sent for it, wrong codes
+// count as for anyone, and without the secret the address is an ordinary one.
+const reviewerEmail = (env) => String(env.REVIEWER_EMAIL || "reviewer@citrello.app").toLowerCase();
+const reviewerCode = (env) => String(env.REVIEWER_CODE || "").replace(/\D/g, "");
+const isReviewer = (env, email) => reviewerCode(env).length >= 8 && email === reviewerEmail(env);
+
 async function sendLoginCode(env, rawEmail) {
   const email = normEmail(rawEmail);
   const t = now();
@@ -143,6 +150,12 @@ async function sendLoginCode(env, rawEmail) {
   if (row && row.window_start > t - 3600) { sent = row.sent_count; windowStart = row.window_start; }
   if (sent >= MAX_CODES_PER_HOUR) {
     throw new HttpError(429, "too_many_codes", "Too many codes requested. Please wait an hour and try again.");
+  }
+  if (isReviewer(env, email)) {  // the code is the fixed one: nothing to send; asking counts like sending
+    await env.DB.prepare(`INSERT INTO login_codes (email, code_hash, expires_at, attempts, sent_count, window_start)
+        VALUES (?1, '', 0, 0, ?2, ?3) ON CONFLICT(email) DO UPDATE SET attempts = 0, sent_count = ?2, window_start = ?3`)
+      .bind(email, sent + 1, windowStart).run();
+    return { email };
   }
   const n = crypto.getRandomValues(new Uint32Array(1))[0] % 1_000_000;
   const code = String(n).padStart(6, "0");
@@ -170,17 +183,24 @@ async function checkLoginCode(env, rawEmail, rawCode) {
   const t = now();
   const row = await env.DB.prepare("SELECT code_hash, expires_at, attempts FROM login_codes WHERE email = ?")
     .bind(email).first();
-  if (!row || !row.code_hash || row.expires_at < t) {
+  if (isReviewer(env, email)) {
+    if (row && row.attempts >= MAX_CODE_ATTEMPTS) {
+      throw new HttpError(400, "too_many_attempts", "Too many wrong codes. Please ask for a new one.");
+    }
+    if (!safeEqual(await hashHex(code), await hashHex(reviewerCode(env)))) {
+      await env.DB.prepare(`INSERT INTO login_codes (email, code_hash, expires_at, attempts, sent_count, window_start)
+          VALUES (?1, '', 0, 1, 0, ?2) ON CONFLICT(email) DO UPDATE SET attempts = attempts + 1`).bind(email, t).run();
+      throw new HttpError(400, "wrong_code", "That code isn't right.");
+    }
+  } else if (!row || !row.code_hash || row.expires_at < t) {
     throw new HttpError(400, "code_expired", "This code has expired. Please ask for a new one.");
-  }
-  if (row.attempts >= MAX_CODE_ATTEMPTS) {
+  } else if (row.attempts >= MAX_CODE_ATTEMPTS) {
     throw new HttpError(400, "too_many_attempts", "Too many wrong codes. Please ask for a new one.");
-  }
-  if (!safeEqual(row.code_hash, await hashHex(`${email}:${code}`))) {
+  } else if (!safeEqual(row.code_hash, await hashHex(`${email}:${code}`))) {
     await env.DB.prepare("UPDATE login_codes SET attempts = attempts + 1 WHERE email = ?").bind(email).run();
     throw new HttpError(400, "wrong_code", "That code isn't right. Check the latest email from Citrello.");
   }
-  await env.DB.prepare("UPDATE login_codes SET code_hash = '', expires_at = 0 WHERE email = ?").bind(email).run();
+  await env.DB.prepare("UPDATE login_codes SET code_hash = '', expires_at = 0, attempts = 0 WHERE email = ?").bind(email).run();
   await env.DB.prepare("INSERT INTO users (id, email, created_at, last_seen) VALUES (?, ?, ?, ?) ON CONFLICT(email) DO NOTHING")
     .bind("u_" + randomToken(12), email, t, t).run();
   await env.DB.prepare("UPDATE users SET last_seen = ? WHERE email = ?").bind(t, email).run();
@@ -753,6 +773,11 @@ async function route(request, env, ctx) {
   if (m === "OPTIONS") return new Response(null, { status: 204, headers: { ...CORS, "Access-Control-Max-Age": "86400" } });
 
   if (path === "/mcp") return mcp(request, env);
+  // OpenAI's check that the plugin's server is ours: the token its submission page shows, as plain text
+  if (path === "/.well-known/openai-apps-challenge" && (m === "GET" || m === "HEAD")) {
+    const t = String(env.OPENAI_APPS_CHALLENGE || "").trim();
+    return new Response(t || "Not found", { status: t ? 200 : 404, headers: { "Content-Type": "text/plain; charset=utf-8" } });
+  }
   if (path === "/.well-known/oauth-protected-resource" || path === "/.well-known/oauth-protected-resource/mcp") {
     return json({ resource: `${url.origin}/mcp`, authorization_servers: [url.origin], scopes_supported: [SCOPE],
                   bearer_methods_supported: ["header"], resource_name: "Citrello" });
@@ -789,7 +814,9 @@ async function route(request, env, ctx) {
   if (path === "/api/billing/portal" && m === "POST") return billingCall(request, env, (d) => billing.portal(env, d));
   if (path === "/api/stripe/webhook" && m === "POST") return stripeWebhook(request, env);
   if (path === "/api/cloud/available" && m === "GET") return json({ ready: !!env.CLOUD });  // is the cloud copy switched on?
-  if (path === "/api/cloud" && m === "GET") return cloudCall(request, env, (d) => cloud.info(env, d.user_id));
+  // reviewer: the web app fills an empty library with sample papers for the directories' reviewers
+  if (path === "/api/cloud" && m === "GET") return cloudCall(request, env, async (d) =>
+    ({ ...(await cloud.info(env, d.user_id)), ...(isReviewer(env, d.email) ? { reviewer: true } : {}) }));
   if (path === "/api/cloud" && m === "PUT") return cloudCall(request, env, (d) => cloud.save(env, d.user_id, request));
   if (path === "/api/cloud" && m === "DELETE") return cloudCall(request, env, async (d) => { await cloud.remove(env, d.user_id); return { ok: true }; });
   if (path === "/api/cloud/data" && m === "GET") {

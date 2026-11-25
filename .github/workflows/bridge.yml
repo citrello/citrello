@@ -6,10 +6,12 @@ name: Deploy bridge (mcp.citrello.app)
 #   RESEND_API_KEY (or RESEND_API_KEY_CITRELLO)    sends the sign-in emails
 #   BRIDGE_ADMIN_TOKEN                             protects /admin (user numbers, feature emails, giving credits)
 #   STRIPE_SECRET_KEY (optional)                   plans and payments (a restricted key; test key in the sandbox)
+#   REVIEWER_CODE (optional)                       fixed sign-in code (8+ digits) for reviewer@citrello.app, the
+#                                                  account Claude's, ChatGPT's and Microsoft's reviewers test with
 on:
   push:
     branches: [main]
-    paths: ["bridge/**", ".github/workflows/bridge.yml", "tests/test_bridge_e2e.py", "tests/test_web_bridge_e2e.py",
+    paths: ["bridge/**", ".github/workflows/bridge.yml", "tests/test_bridge_e2e.py", "tests/test_bridge_directory_e2e.py", "tests/test_web_bridge_e2e.py",
             # Claude checks: the bridge's AI endpoints and the screen that uses them
             "tests/test_bridge_ai_e2e.py", "tests/anthropic_mock.py", "tests/test_bridge_billing_e2e.py", "tests/stripe_mock.py", "ui.html", "sources.py",
             # Citrello for Word: its panel, the stand-in for Word and the engine's endpoints
@@ -52,12 +54,13 @@ jobs:
           # Claude checks go to a pretend Claude API (tests/anthropic_mock.py, started by the tests): nothing is paid for
           npx wrangler dev --port 8787 --var DEV_RETURN_CODES:1 --var ADMIN_TOKEN:testadmin --var PUBLIC_URL:http://localhost:8787 \
             --var ANTHROPIC_BASE_URL:http://127.0.0.1:8799 --var ANTHROPIC_API_KEY:test-key \
-            --var STRIPE_API_BASE:http://127.0.0.1:8798 --var STRIPE_SECRET_KEY:rk_test_mock > wrangler.log 2>&1 &
+            --var STRIPE_API_BASE:http://127.0.0.1:8798 --var STRIPE_SECRET_KEY:rk_test_mock \
+            --var REVIEWER_CODE:24681357 --var OPENAI_APPS_CHALLENGE:tok123 > wrangler.log 2>&1 &
           for i in $(seq 60); do curl -sf http://localhost:8787/ > /dev/null && break; sleep 1; done
           (cd ../site/public && python -m http.server 8099 > /dev/null 2>&1 &)
           sleep 1
           cd .. && CITRELLO_BRIDGE_E2E=1 CITRELLO_BRIDGE=http://localhost:8787 CITRELLO_WEB_CHECK=http://localhost:8099 \
-            pytest -q tests/test_bridge_e2e.py tests/test_bridge_ai_e2e.py tests/test_bridge_billing_e2e.py tests/test_web_bridge_e2e.py tests/test_word_addin_e2e.py || { cat bridge/wrangler.log; exit 1; }
+            pytest -q tests/test_bridge_e2e.py tests/test_bridge_directory_e2e.py tests/test_bridge_ai_e2e.py tests/test_bridge_billing_e2e.py tests/test_web_bridge_e2e.py tests/test_word_addin_e2e.py || { cat bridge/wrangler.log; exit 1; }
 
   deploy:
     needs: check
@@ -72,6 +75,7 @@ jobs:
       BRIDGE_ADMIN_TOKEN: ${{ secrets.BRIDGE_ADMIN_TOKEN }}
       ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
       STRIPE_SECRET_KEY: ${{ secrets.STRIPE_SECRET_KEY }}
+      REVIEWER_CODE: ${{ secrets.REVIEWER_CODE }}
     steps:
       - name: Skip when Cloudflare isn't set up yet
         id: ready
@@ -123,6 +127,7 @@ jobs:
           [ -n "$BRIDGE_ADMIN_TOKEN" ] && printf '%s' "$BRIDGE_ADMIN_TOKEN" | npx wrangler secret put ADMIN_TOKEN
           [ -n "$ANTHROPIC_API_KEY" ] && printf '%s' "$ANTHROPIC_API_KEY" | npx wrangler secret put ANTHROPIC_API_KEY
           [ -n "$STRIPE_SECRET_KEY" ] && printf '%s' "$STRIPE_SECRET_KEY" | npx wrangler secret put STRIPE_SECRET_KEY
+          [ -n "$REVIEWER_CODE" ] && printf '%s' "$REVIEWER_CODE" | npx wrangler secret put REVIEWER_CODE
           true
       - name: Plans in Stripe (creates the four prices, the webhook and the customer portal if missing)
         if: steps.ready.outputs.go == 'true' && env.STRIPE_SECRET_KEY != ''

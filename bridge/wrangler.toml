@@ -12,6 +12,9 @@ MAIL_FROM = "Citrello <hello@citrello.app>"
 # switched off (Armin, 14 Nov; AI_WEB_FIND = "1" would turn it back on, with Haiku doing the search)
 AI_MODEL = "claude-sonnet-5-5"
 AI_WEB_MODEL = "claude-haiku-5-5"
+# ChatGPT's plugin submission: the token its "Connect MCP server" step shows, served at
+# /.well-known/openai-apps-challenge (empty: that address answers 404)
+OPENAI_APPS_CHALLENGE = ""
 
 [[d1_databases]]
 binding = "DB"

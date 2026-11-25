@@ -1,0 +1,543 @@
+{
+ "instructions": "Citrello is the user's reference manager. Its library is shared across all chats and projects.\n\nHow to cite:\n- Before citing, call search_references to find the reference and its key. If it is not there, call add_reference\n  with the DOI (best) or the full reference text. Never invent keys or reference details.\n- In any text you write (chat answers, drafts, documents), cite with markers: [@Key], several as [@Key1; @Key2],\n  with a page as [@Key, p. 12], with a prefix as [see @Key], and after the author's name in a sentence as\n  Smith et al. [-@Key] (shows only the year).\n- To give the user a Word file, call create_word_document with your text containing markers: citations become live\n  (Mendeley-compatible) fields with a formatted bibliography. Use update_word_document to restyle or refresh a .docx.\n- When editing existing text, keep every citation marker exactly as it is unless asked to change citations.\n- Check add_reference's reliability result and tell the user about problems (retracted paper, wrong DOI, ...).\n- Use a project name (e.g. the paper's title) to keep references of one paper together.\n\nFull texts:\n- Citrello keeps the text of papers the user added (search_references shows full_text: true). To check whether a\n  cited paper supports a sentence, call read_paper with the sentence as the query and quote the passage you rely on.\n  find_in_papers searches inside all the user's papers. When a paper has no full text, say so instead of guessing\n  from the title, and tell the user how to add it (the Citrello browser button on the paper's page, or its PDF).\n\nLaTeX / Overleaf:\n- Cite with the library keys: \\cite{Key}, \\citep{Key1,Key2}, \\citet{Key}, or the biblatex commands \\parencite / \\textcite.\n  Keys are the same as in [@Key] markers and never change.\n- Give the user the bibliography with get_bibtex (a project or keys; format bibtex or biblatex) to save as references.bib.\n- check_citations also checks \\cite commands. check_latex_project checks a .tex file, folder or Overleaf .zip on disk:\n  cited keys missing from the .bib, unused and duplicate entries, unreliable references, hand-typed bibliographies.\n- prepare_arxiv turns a LaTeX project into an arXiv-ready .zip (with the .bbl arXiv needs) and lists what to fix.",
+ "tools": [
+  {
+   "name": "search_references",
+   "title": "Search the library",
+   "description": "Search the user's reference library (all chats share it) by author, title, year, DOI, key or tag. Empty query lists recent references. Returns keys to cite as [@Key].",
+   "inputSchema": {
+    "type": "object",
+    "properties": {
+     "query": {
+      "type": "string"
+     },
+     "project": {
+      "type": "string",
+      "description": "Project name, e.g. the paper's title (optional)"
+     },
+     "limit": {
+      "type": "integer"
+     }
+    },
+    "required": []
+   },
+   "annotations": {
+    "title": "Search the library",
+    "readOnlyHint": true,
+    "destructiveHint": false,
+    "idempotentHint": true,
+    "openWorldHint": false
+   }
+  },
+  {
+   "name": "get_reference",
+   "title": "Show a reference",
+   "description": "Full details of one reference, optionally formatted in a citation style.",
+   "inputSchema": {
+    "type": "object",
+    "properties": {
+     "key": {
+      "type": "string"
+     },
+     "style": {
+      "type": "string",
+      "description": "Citation style id, e.g. apa, ieee, nature, vancouver, harvard-cite-them-right, chicago-author-date, or any id from zotero.org/styles. Default: apa"
+     }
+    },
+    "required": [
+     "key"
+    ]
+   },
+   "annotations": {
+    "title": "Show a reference",
+    "readOnlyHint": true,
+    "destructiveHint": false,
+    "idempotentHint": true,
+    "openWorldHint": true
+   }
+  },
+  {
+   "name": "add_reference",
+   "title": "Add a reference",
+   "description": "Add a reference to the library from a DOI, a link to the paper (publisher page, arXiv, ScienceDirect, doi.org...) or a web page, or a full typed reference. Looks it up on Crossref, avoids duplicates, and returns its key plus a reliability check (verified / check / problem, e.g. retracted or wrong DOI).",
+   "inputSchema": {
+    "type": "object",
+    "properties": {
+     "reference": {
+      "type": "string",
+      "description": "DOI, link, or full reference text"
+     },
+     "project": {
+      "type": "string",
+      "description": "Project name, e.g. the paper's title (optional)"
+     }
+    },
+    "required": [
+     "reference"
+    ]
+   },
+   "annotations": {
+    "title": "Add a reference",
+    "readOnlyHint": false,
+    "destructiveHint": false,
+    "idempotentHint": false,
+    "openWorldHint": true
+   }
+  },
+  {
+   "name": "add_references",
+   "title": "Add several references",
+   "description": "Add several references at once (DOIs or typed references).",
+   "inputSchema": {
+    "type": "object",
+    "properties": {
+     "references": {
+      "type": "array",
+      "items": {
+       "type": "string"
+      }
+     },
+     "project": {
+      "type": "string",
+      "description": "Project name, e.g. the paper's title (optional)"
+     }
+    },
+    "required": [
+     "references"
+    ]
+   },
+   "annotations": {
+    "title": "Add several references",
+    "readOnlyHint": false,
+    "destructiveHint": false,
+    "idempotentHint": false,
+    "openWorldHint": true
+   }
+  },
+  {
+   "name": "list_projects",
+   "title": "List projects",
+   "description": "List the user's projects (groups of references, e.g. one per paper).",
+   "inputSchema": {
+    "type": "object",
+    "properties": {},
+    "required": []
+   },
+   "annotations": {
+    "title": "List projects",
+    "readOnlyHint": true,
+    "destructiveHint": false,
+    "idempotentHint": true,
+    "openWorldHint": false
+   }
+  },
+  {
+   "name": "add_to_project",
+   "title": "Put references into a project",
+   "description": "Put references into a project.",
+   "inputSchema": {
+    "type": "object",
+    "properties": {
+     "keys": {
+      "type": "array",
+      "items": {
+       "type": "string"
+      }
+     },
+     "project": {
+      "type": "string"
+     }
+    },
+    "required": [
+     "keys",
+     "project"
+    ]
+   },
+   "annotations": {
+    "title": "Put references into a project",
+    "readOnlyHint": false,
+    "destructiveHint": false,
+    "idempotentHint": false,
+    "openWorldHint": false
+   }
+  },
+  {
+   "name": "format_references",
+   "title": "Format references",
+   "description": "Format references (by keys or a whole project) in a citation style: in-text citations and the bibliography as plain text.",
+   "inputSchema": {
+    "type": "object",
+    "properties": {
+     "keys": {
+      "type": "array",
+      "items": {
+       "type": "string"
+      }
+     },
+     "project": {
+      "type": "string",
+      "description": "Project name, e.g. the paper's title (optional)"
+     },
+     "style": {
+      "type": "string",
+      "description": "Citation style id, e.g. apa, ieee, nature, vancouver, harvard-cite-them-right, chicago-author-date, or any id from zotero.org/styles. Default: apa"
+     }
+    },
+    "required": []
+   },
+   "annotations": {
+    "title": "Format references",
+    "readOnlyHint": true,
+    "destructiveHint": false,
+    "idempotentHint": true,
+    "openWorldHint": true
+   }
+  },
+  {
+   "name": "check_citations",
+   "title": "Check citation markers",
+   "description": "Check that every [@Key] marker in a text exists in the library. Use before delivering text or documents.",
+   "inputSchema": {
+    "type": "object",
+    "properties": {
+     "text": {
+      "type": "string"
+     }
+    },
+    "required": [
+     "text"
+    ]
+   },
+   "annotations": {
+    "title": "Check citation markers",
+    "readOnlyHint": true,
+    "destructiveHint": false,
+    "idempotentHint": true,
+    "openWorldHint": false
+   }
+  },
+  {
+   "name": "create_word_document",
+   "title": "Create a Word document",
+   "description": "Create a Word (.docx) file from text with [@Key] markers. Supports # headings, paragraphs, - bullets, **bold**, *italic*. Citations become live fields and a bibliography is added in the chosen style. Saved to ~/Citrello/Documents unless a path is given.",
+   "inputSchema": {
+    "type": "object",
+    "properties": {
+     "text": {
+      "type": "string"
+     },
+     "title": {
+      "type": "string"
+     },
+     "style": {
+      "type": "string",
+      "description": "Citation style id, e.g. apa, ieee, nature, vancouver, harvard-cite-them-right, chicago-author-date, or any id from zotero.org/styles. Default: apa"
+     },
+     "output_path": {
+      "type": "string",
+      "description": "Absolute .docx path (optional)"
+     }
+    },
+    "required": [
+     "text"
+    ]
+   },
+   "annotations": {
+    "title": "Create a Word document",
+    "readOnlyHint": false,
+    "destructiveHint": false,
+    "idempotentHint": false,
+    "openWorldHint": true
+   }
+  },
+  {
+   "name": "update_word_document",
+   "title": "Update a Word document",
+   "description": "Update a .docx: turn [@Key] markers and typed-in markers into live citations and re-render every citation and the bibliography in a style. Overwrites the file unless output_path is given.",
+   "inputSchema": {
+    "type": "object",
+    "properties": {
+     "path": {
+      "type": "string"
+     },
+     "style": {
+      "type": "string",
+      "description": "Citation style id, e.g. apa, ieee, nature, vancouver, harvard-cite-them-right, chicago-author-date, or any id from zotero.org/styles. Default: apa"
+     },
+     "output_path": {
+      "type": "string"
+     }
+    },
+    "required": [
+     "path"
+    ]
+   },
+   "annotations": {
+    "title": "Update a Word document",
+    "readOnlyHint": false,
+    "destructiveHint": true,
+    "idempotentHint": false,
+    "openWorldHint": true
+   }
+  },
+  {
+   "name": "read_paper",
+   "title": "Read a paper's full text",
+   "description": "Read the full text of a paper in the user's library (Citrello keeps the text of papers the user added). With a query (e.g. the sentence that cites it), returns the passages that match best; without, the text from the start. Use it to check whether a cited paper really says what a sentence claims, quoting the passage. search_references shows which references have full_text.",
+   "inputSchema": {
+    "type": "object",
+    "properties": {
+     "key": {
+      "type": "string"
+     },
+     "query": {
+      "type": "string",
+      "description": "What to look for, e.g. the citing sentence"
+     },
+     "max_chars": {
+      "type": "integer",
+      "description": "Without a query: how much text (default 12000)"
+     }
+    },
+    "required": [
+     "key"
+    ]
+   },
+   "annotations": {
+    "title": "Read a paper's full text",
+    "readOnlyHint": true,
+    "destructiveHint": false,
+    "idempotentHint": true,
+    "openWorldHint": false
+   }
+  },
+  {
+   "name": "find_in_papers",
+   "title": "Search inside papers",
+   "description": "Search inside the full texts of the papers in the user's library (all, a project, or given keys) and return the best passage of each matching paper. Good for 'which of my papers says X?' and for finding a source for a claim.",
+   "inputSchema": {
+    "type": "object",
+    "properties": {
+     "query": {
+      "type": "string"
+     },
+     "project": {
+      "type": "string",
+      "description": "Project name, e.g. the paper's title (optional)"
+     },
+     "keys": {
+      "type": "array",
+      "items": {
+       "type": "string"
+      }
+     },
+     "limit": {
+      "type": "integer"
+     }
+    },
+    "required": [
+     "query"
+    ]
+   },
+   "annotations": {
+    "title": "Search inside papers",
+    "readOnlyHint": true,
+    "destructiveHint": false,
+    "idempotentHint": true,
+    "openWorldHint": false
+   }
+  },
+  {
+   "name": "get_bibtex",
+   "title": "Get BibTeX",
+   "description": "BibTeX or biblatex entries for references (by keys, a project, or the whole library), with the same stable keys as [@Key] markers, for LaTeX / Overleaf (\\cite{Key}). Returns the .bib text, or saves it when output_path is given.",
+   "inputSchema": {
+    "type": "object",
+    "properties": {
+     "keys": {
+      "type": "array",
+      "items": {
+       "type": "string"
+      }
+     },
+     "project": {
+      "type": "string",
+      "description": "Project name, e.g. the paper's title (optional)"
+     },
+     "format": {
+      "type": "string",
+      "enum": [
+       "bibtex",
+       "biblatex"
+      ]
+     },
+     "output_path": {
+      "type": "string",
+      "description": "Absolute .bib path (optional)"
+     }
+    },
+    "required": []
+   },
+   "annotations": {
+    "title": "Get BibTeX",
+    "readOnlyHint": false,
+    "destructiveHint": false,
+    "idempotentHint": false,
+    "openWorldHint": false
+   }
+  },
+  {
+   "name": "check_latex_project",
+   "title": "Check a LaTeX project",
+   "description": "Check a LaTeX project on disk (a .tex file, a folder, or an Overleaf source .zip): cited keys missing from the .bib (and whether they are in the library), unused and duplicate entries, unreliable references (retracted, wrong DOI, no DOI...), and hand-typed bibliographies.",
+   "inputSchema": {
+    "type": "object",
+    "properties": {
+     "path": {
+      "type": "string"
+     }
+    },
+    "required": [
+     "path"
+    ]
+   },
+   "annotations": {
+    "title": "Check a LaTeX project",
+    "readOnlyHint": true,
+    "destructiveHint": false,
+    "idempotentHint": true,
+    "openWorldHint": true
+   }
+  },
+  {
+   "name": "prepare_arxiv",
+   "title": "Make an arXiv-ready .zip",
+   "description": "Make an arXiv-ready .zip from a LaTeX project on disk (folder, Overleaf source .zip or main .tex): adds the .bbl arXiv needs (it never runs BibTeX), removes comments and build files, adds \\pdfoutput=1, and reports what would make arXiv fail (missing figures, case mismatches, biblatex, citations missing from the .bib, bad file names, >50 MB). Writes <name>_arxiv.zip next to the project unless output_path is given; the project is not changed.",
+   "inputSchema": {
+    "type": "object",
+    "properties": {
+     "path": {
+      "type": "string"
+     },
+     "output_path": {
+      "type": "string"
+     },
+     "remove_comments": {
+      "type": "boolean"
+     }
+    },
+    "required": [
+     "path"
+    ]
+   },
+   "annotations": {
+    "title": "Make an arXiv-ready .zip",
+    "readOnlyHint": false,
+    "destructiveHint": false,
+    "idempotentHint": false,
+    "openWorldHint": false
+   }
+  },
+  {
+   "name": "import_zotero_library",
+   "title": "Import from Zotero",
+   "description": "Import the user's Zotero library from Zotero on this computer (no account or key needed). Zotero collections become projects; duplicates are skipped.",
+   "inputSchema": {
+    "type": "object",
+    "properties": {
+     "project": {
+      "type": "string",
+      "description": "Also put everything into this project (optional)"
+     }
+    },
+    "required": []
+   },
+   "annotations": {
+    "title": "Import from Zotero",
+    "readOnlyHint": false,
+    "destructiveHint": false,
+    "idempotentHint": false,
+    "openWorldHint": false
+   }
+  },
+  {
+   "name": "list_styles",
+   "title": "Find a citation style",
+   "description": "Find a citation style: with no query, the styles ready offline; with a journal, publisher or style name (e.g. 'Journal of Cleaner Production', 'IEEE'), matching styles from the full set of 10,000+.",
+   "inputSchema": {
+    "type": "object",
+    "properties": {
+     "query": {
+      "type": "string"
+     }
+    },
+    "required": []
+   },
+   "annotations": {
+    "title": "Find a citation style",
+    "readOnlyHint": true,
+    "destructiveHint": false,
+    "idempotentHint": true,
+    "openWorldHint": true
+   }
+  },
+  {
+   "name": "verify_references",
+   "title": "Verify references online",
+   "description": "Check references online against Crossref (all not-yet-verified ones, or given keys or a project): fixes their details from the publisher record and re-rates them as verified / check / problem (retracted, wrong DOI...). Takes about a second per reference.",
+   "inputSchema": {
+    "type": "object",
+    "properties": {
+     "keys": {
+      "type": "array",
+      "items": {
+       "type": "string"
+      }
+     },
+     "project": {
+      "type": "string",
+      "description": "Project name, e.g. the paper's title (optional)"
+     },
+     "include_verified": {
+      "type": "boolean"
+     }
+    },
+    "required": []
+   },
+   "annotations": {
+    "title": "Verify references online",
+    "readOnlyHint": false,
+    "destructiveHint": false,
+    "idempotentHint": false,
+    "openWorldHint": true
+   }
+  },
+  {
+   "name": "import_references",
+   "title": "Import a reference file",
+   "description": "Import a RIS, BibTeX or CSL-JSON file (exported from Zotero, Mendeley, EndNote...) into the library, skipping duplicates.",
+   "inputSchema": {
+    "type": "object",
+    "properties": {
+     "file_path": {
+      "type": "string"
+     },
+     "project": {
+      "type": "string",
+      "description": "Project name, e.g. the paper's title (optional)"
+     }
+    },
+    "required": [
+     "file_path"
+    ]
+   },
+   "annotations": {
+    "title": "Import a reference file",
+    "readOnlyHint": false,
+    "destructiveHint": false,
+    "idempotentHint": false,
+    "openWorldHint": false
+   }
+  }
+ ]
+}

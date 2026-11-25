@@ -301,7 +301,14 @@
       const st = await (await fetch("/api/web/state")).json();
       const changedHere = st.stamp !== st.cloud_stamp;
       const changedThere = info.exists && info.device !== st.cloud_device && info.saved_at > (st.cloud_at || 0);
-      if (info.exists && st.items === 0) await cloudRestore(sess, info);       // a new browser: it comes back
+      if (!info.exists && st.items === 0 && info.reviewer) {                   // the directories' reviewers: sample papers
+        const r = await fetch("/word/samples.json");
+        if (r.ok) {
+          await fetch("/api/library/import", { method: "POST", body: await r.arrayBuffer(), headers: { "X-Filename": "samples.json" } });
+          await cloudSave(sess);
+          if (typeof loadLibrary === "function") loadLibrary();
+        }
+      } else if (info.exists && st.items === 0) await cloudRestore(sess, info); // a new browser: it comes back
       else if (changedThere && !changedHere) await cloudRestore(sess, info);  // another browser saved newer work
       else if (changedThere && changedHere) {                                  // both changed: the person chooses
         const when = new Date(info.saved_at * 1000).toLocaleString();

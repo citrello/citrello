@@ -4,13 +4,13 @@
 // claude.ai arrive as HTTP calls, are passed down that WebSocket, and the app's reply is returned.
 // The WebSocket uses the hibernation API, so an idle connection costs nothing.
 import { DurableObject } from "cloudflare:workers";
+// the connector's tools and instructions, for accounts whose app hasn't connected yet (packaging/build_bridge_tools.py)
+import BUILT_IN from "./tools.json";
 
 const PROTOCOL_VERSIONS = ["2025-06-18", "2025-03-26", "2024-11-05"];
 const RPC_TIMEOUT_MS = 115_000;
 
-const DEFAULT_INSTRUCTIONS =
-  "Citrello is the user's reference manager. Search the library before citing, add missing references " +
-  "by DOI, and cite with [@Key] markers.";
+const DEFAULT_INSTRUCTIONS = BUILT_IN.instructions;
 
 const OFFLINE_TEXT =
   "Citrello isn't open on the user's computer, so the library can't be reached right now. " +
@@ -140,13 +140,13 @@ export class Relay extends DurableObject {
       });
     }
     if (method === "ping") return ok({});
-    if (method === "tools/list" && !this.openSockets().length) return ok({ tools: hello.tools || [] });
+    if (method === "tools/list" && !this.openSockets().length) return ok({ tools: (hello.tools && hello.tools.length ? hello.tools : BUILT_IN.tools) });
     if (method === "resources/list") return ok({ resources: [] });
     if (method === "prompts/list") return ok({ prompts: [] });
 
     const reply = await this.forward(msg);
     if (reply) return reply;
-    if (method === "tools/list") return ok({ tools: hello.tools || [] });
+    if (method === "tools/list") return ok({ tools: (hello.tools && hello.tools.length ? hello.tools : BUILT_IN.tools) });
     if (method === "tools/call") {
       return ok({ content: [{ type: "text", text: OFFLINE_TEXT.replace("{who}", email || "the same email") }], isError: true });
     }
