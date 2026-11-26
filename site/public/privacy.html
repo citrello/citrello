@@ -15,7 +15,8 @@
   <nav aria-label="Main"><a href="/app/">Web app</a><a href="/#problems">What it fixes</a><a href="https://github.com/citrello/citrello">GitHub</a><a class="nav-cta" href="/#download">Download</a></nav></header>
 <main class="wrap narrow policy">
 <h1>Privacy</h1>
-<p class="date">Last updated 25 November 2026</p>
+<p class="date">Last updated 26 November 2026</p>
+<p>This policy covers Citrello, the reference manager, in all its forms: Citrello for desktop (the app for Windows and Mac), Citrello in the browser (citrello.app/app), <b>Citrello for Word</b> (the Word add-in), the Citrello browser extension, and the Citrello connectors for ChatGPT and Claude. It's made by Armin Hosseinghorbani (contact below).</p>
 
 <h2>Your library stays on your computer</h2>
 <p>References, projects, documents and the text of your papers are stored on your own computer: by the Citrello app in the Citrello folder in your user folder, or, when you use Citrello in the browser (citrello.app/app), inside your browser's own storage. Citrello for desktop never uploads them. Documents you check are read on your computer, not uploaded.</p>
@@ -45,6 +46,10 @@
 
 <h2>Connectors (ChatGPT, Claude on the web)</h2>
 <p>When a connector uses your library, its request passes through our server to your open Citrello (the app on your computer, or citrello.app in your browser), and the answer passes back. We don't keep the contents of these requests or answers. To keep you connected, we store the connection's sign-in tokens (only as one-way hashes), which connector they belong to (its name, for example "Claude" or "ChatGPT") and when they expire: one hour for the short-lived token, 180 days for the one that renews it. They're deleted within a day after they expire, when a connector tells us you disconnected, and when you delete your account. The connector's provider (for example OpenAI or Anthropic) handles what you send it under its own privacy policy.</p>
+
+<h2>Citrello for Word (the Word add-in)</h2>
+<p>Citrello for Word runs inside Word: its engine runs in the add-in's own storage on your computer, as Citrello in the browser does. It reads your document only to find, insert and update citations and the reference list, and to check the citations when you ask; the document's text is not sent to Citrello's servers. Citations are kept inside the document itself, with the papers' details, so the document works on any computer.</p>
+<p>Without an account, it works with six sample papers, and nothing about you is stored. When you sign in (with your email and a code), it reads your library from your cloud copy (see above), and when it finds the free full text of a paper you cite, it adds that text to your library, so your cloud copy has it too. Checking references looks up their details (title, authors, DOI) on Crossref, doi.org and OpenAlex, and new citation styles are downloaded from the open CSL styles repository. "Check the claim" and "Find another reference" send Claude the cited sentence and short passages of the papers, as described above for "What your sources say"; to find a paper's free full text, its DOI is looked up on Unpaywall through Citrello's server (nothing is kept), and their results are remembered in the add-in's storage on your computer.</p>
 
 <h2>Browser extension</h2>
 <p>The Citrello extension reads a web page only when you click its button on that page, or when it opens a paper you asked it to fetch. It asks for access to websites the first time you fetch papers in bulk, not when you install it. What it reads (the paper's details and text) goes to Citrello on your computer or in your browser, never to Citrello's servers. It keeps a list of the papers you asked it to fetch until it has finished, and your choice of web or desktop Citrello.</p>
