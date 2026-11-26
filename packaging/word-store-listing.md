@@ -89,7 +89,7 @@ panel explains when a paper has no text yet.)
 Additional purchases: the add-in is free; the optional Student and Researcher plans only add monthly credits for
 Claude's checks ("Check the claim", "Find another reference"). Test account to validate them without paying: email
 reviewer@citrello.app, code <REVIEWER_CODE>; it always has at least 1,000 credits (a Researcher plan's worth), so
-every paid feature works. The plans themselves are shown under Settings → Plan in the panel and bought on
-citrello.app/pricing through Stripe; no licence key is involved.
+every paid feature works. The plans are shown by the "Plans" link next to the credit count in the panel (also
+citrello.app/pricing); paying happens on Stripe's own page in the browser. No licence key is involved.
 
 Support: hello@citrello.app
