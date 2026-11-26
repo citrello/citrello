@@ -58,6 +58,11 @@
   sent; its empty web-app library fills with the sample papers). The bridge lists the tools for accounts whose app
   never connected (`bridge/src/tools.json`, `packaging/build_bridge_tools.py`), serves the icon, and
   citrello.app/connect is the connectors' documentation page.
+- **Citrello for Word submitted to Microsoft's add-in store (AppSource), 26 Nov 2026**: Partner Center offer
+  `citrello-word` (Office add-in), categories Productivity + Reference, industry Education, all markets, "offers
+  in-app purchases" (Stripe plans). Manifest icons fixed to 32/64 px for the store. Reviewer notes and testing guide:
+  `packaging/word-store-listing.md` (the reviewer account keeps 4,000 credits so testers can try the paid plans).
+  Publisher Attestation (voluntary) not done yet. Waiting for certification (up to 5 working days).
 - **Edit docs/VALUE_PROPOSITION.html** (the value-proposition report, written 6 Nov 2026 before the web app plan).
   Remind him at the start of the first session in the new account. Update it once the web app exists (no-install,
   "what AI can't do without Citrello", claim checking).
