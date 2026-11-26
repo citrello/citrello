@@ -451,7 +451,7 @@ def test_web_app_connection_guides(browser_name, tmp_path):
         page.click('.side button.navb[data-tab="library"]')  # a new library opens on Home
         tab(page, "settings")
         expect(page.locator("#webDocsBox")).to_be_hidden()  # nothing to download yet: not shown
-        for name, title, steps in (("claude", "Connect Claude", 5), ("chatgpt", "Connect ChatGPT", 5),
+        for name, title, steps in (("claude", "Connect Claude", 4), ("chatgpt", "Connect ChatGPT", 5),
                                    ("code", "Connect Claude Code", 2), ("button", "The browser button", 3)):
             page.click(f'[data-guide="{name}"]')
             dialog = page.locator("#guide")
@@ -463,14 +463,15 @@ def test_web_app_connection_guides(browser_name, tmp_path):
                 assert page.locator("#gArt svg").get_attribute("aria-label")  # the picture is described
                 if i == steps - 1:
                     expect(page.locator("#gNext")).to_have_text("Done")
-                if name == "claude" and i == 2:
+                if name == "claude" and i == 1:  # Claude's directory, and the address for "Add custom connector"
+                    expect(page.locator("#gText")).to_contain_text("claude.ai/directory/connectors/citrello")
                     expect(page.locator("#gText")).to_contain_text("https://mcp.citrello.app/mcp")
                     page.screenshot(path=os.path.join(shots, f"web-app-{browser_name}-guide.png"))
                 page.click("#gNext")
             expect(dialog).to_be_hidden()  # Done closes it
         page.click('[data-guide="claude"]')
         page.keyboard.press("ArrowRight")
-        expect(page.locator("#gCount")).to_have_text("Step 2 of 5")
+        expect(page.locator("#gCount")).to_have_text("Step 2 of 4")
         page.keyboard.press("Escape")
         expect(page.locator("#guide")).to_be_hidden()
         # Word's Settings → "Connect to ChatGPT" opens the web app straight on that guide
@@ -548,7 +549,7 @@ def test_web_app_home_and_tours(browser_name, tmp_path):
         tip.locator("button", has_text="Ask Claude").click()
         expect(page.locator("#guide")).to_be_visible()
         expect(page.locator("#gTitle")).to_have_text("Connect Claude")
-        for _ in range(4):
+        for _ in range(3):
             page.click("#gNext")
         expect(page.locator("#guide .g-ask")).to_contain_text("Write the introduction of my paper")
         page.context.route("https://claude.ai/**", lambda r: r.fulfill(body="claude"))
