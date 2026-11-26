@@ -12,8 +12,8 @@
   <DefaultLocale>en-US</DefaultLocale>
   <DisplayName DefaultValue="Citrello"/>
   <Description DefaultValue="Cite from your Citrello library while you write: type an author's name and Citrello suggests their papers, in any of 10,000+ citation styles, with a reference list that keeps itself up to date."/>
-  <IconUrl DefaultValue="https://citrello.app/word/icon-64.png"/>
-  <HighResolutionIconUrl DefaultValue="https://citrello.app/word/icon-128.png"/>
+  <IconUrl DefaultValue="https://citrello.app/word/icon-32.png"/>
+  <HighResolutionIconUrl DefaultValue="https://citrello.app/word/icon-64.png"/>
   <SupportUrl DefaultValue="https://citrello.app/word/"/>
   <AppDomains>
     <AppDomain>https://citrello.app</AppDomain>
