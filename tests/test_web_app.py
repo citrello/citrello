@@ -464,7 +464,7 @@ def test_web_app_connection_guides(browser_name, tmp_path):
                 if i == steps - 1:
                     expect(page.locator("#gNext")).to_have_text("Done")
                 if name == "claude" and i == 1:  # Claude's directory, and the address for "Add custom connector"
-                    expect(page.locator("#gText")).to_contain_text("claude.ai/directory/connectors/citrello")
+                    expect(page.locator('#gText a[href="https://claude.ai/directory/connectors/citrello"]')).to_be_visible()
                     expect(page.locator("#gText")).to_contain_text("https://mcp.citrello.app/mcp")
                     page.screenshot(path=os.path.join(shots, f"web-app-{browser_name}-guide.png"))
                 page.click("#gNext")
