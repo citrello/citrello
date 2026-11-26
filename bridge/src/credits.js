@@ -3,6 +3,8 @@
 // (src/billing.js). A plan's credits are spent first (they don't carry over to the next month), then the bonus.
 // Yearly plans get their credits month by month too.
 
+import { isReviewer, REVIEWER_CREDITS, REVIEWER_TOP_UP_BELOW } from "./reviewer.js";
+
 export const COST = { claim: 3, library: 8, web: 25 };  // credits per paper checked / per library find / per web find
 export const PLANS = {
   student: { name: "Student", credits: 1000 },
@@ -49,7 +51,15 @@ async function user(env, userId) {
 
 // What the account can spend, for the app and the Word add-in
 export async function balance(env, userId) {
-  const u = await user(env, userId);
+  let u = await user(env, userId);
+  if (isReviewer(env, u.email) && (u.bonus_credits || 0) < REVIEWER_TOP_UP_BELOW) {  // testers never run out
+    const add = REVIEWER_CREDITS - (u.bonus_credits || 0);
+    await env.DB.batch([
+      env.DB.prepare("UPDATE users SET bonus_credits = ? WHERE id = ?").bind(REVIEWER_CREDITS, userId),
+      env.DB.prepare("INSERT INTO credit_log (user_id, at, delta, what) VALUES (?, ?, ?, ?)").bind(userId, now(), add, "reviewer top-up"),
+    ]);
+    u = await user(env, userId);
+  }
   const a = allowance(u);
   const bonus = Math.max(0, u.bonus_credits || 0);
   const credits = (a ? a.left : 0) + bonus;

@@ -10,6 +10,7 @@
 //   /admin/stats|broadcast     user counts and feature emails (ADMIN_TOKEN)
 import { Relay } from "./relay.js";
 import { ICON_PNG_B64, ICON_SVG } from "./icon.js";
+import { isReviewer, reviewerCode } from "./reviewer.js";
 import * as pages from "./pages.js";
 import * as ai from "./ai.js";
 import * as billing from "./billing.js";
@@ -136,12 +137,7 @@ function normEmail(email) {
   return e;
 }
 
-// The directories' reviewers (Claude, ChatGPT, Microsoft) sign in as one account with a fixed code, kept in the
-// REVIEWER_CODE secret: their test accounts may not need an emailed code. No email is sent for it, wrong codes
-// count as for anyone, and without the secret the address is an ordinary one.
-const reviewerEmail = (env) => String(env.REVIEWER_EMAIL || "reviewer@citrello.app").toLowerCase();
-const reviewerCode = (env) => String(env.REVIEWER_CODE || "").replace(/\D/g, "");
-const isReviewer = (env, email) => reviewerCode(env).length >= 8 && email === reviewerEmail(env);
+
 
 async function sendLoginCode(env, rawEmail) {
   const email = normEmail(rawEmail);

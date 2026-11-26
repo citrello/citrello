@@ -62,3 +62,17 @@ def test_a_new_account_sees_every_tool(monkeypatch):
     _, _, raw = rpc(access, "tools/call", {"name": "search_references", "arguments": {"query": "x"}})
     res = json.loads(raw)["result"]
     assert res["isError"] and "open Citrello" in res["content"][0]["text"]  # a clear message, not a bare error
+
+
+def test_reviewer_never_runs_out_of_credits():
+    """Microsoft's testers must be able to try what the paid plans give (credits for Claude's checks) without paying."""
+    import json
+    call("POST", "/api/auth/start", {"email": REVIEWER})
+    token = json.loads(call("POST", "/api/auth/verify", {"email": REVIEWER, "code": "24681357"})[2])["token"]
+    st, _, raw = call("GET", "/api/ai/quota", headers={"Authorization": "Bearer " + token})
+    assert st == 200 and json.loads(raw)["credits"] >= 1000
+    # an ordinary account keeps the usual 100 free credits
+    email = f"normal{__import__('time').time_ns()}@example.com"
+    code = json.loads(call("POST", "/api/auth/start", {"email": email})[2])["dev_code"]
+    t2 = json.loads(call("POST", "/api/auth/verify", {"email": email, "code": code})[2])["token"]
+    assert json.loads(call("GET", "/api/ai/quota", headers={"Authorization": "Bearer " + t2})[2])["credits"] == 100
