@@ -28,6 +28,13 @@ BIB = """@article{Vetters2024,
 """
 
 
+
+
+def bridge_blip(e):
+    """WebKit reports a failed request to the real bridge (mcp.citrello.app unreachable for a moment from the test
+    machine) as an "access control checks" page error. That's the network, not the page: the page carries on."""
+    return "mcp.citrello.app" in str(e) and "access control checks" in str(e)
+
 def open_app(page):
     page.goto(BASE.rstrip("/") + "/app/")
     page.wait_for_selector("#webCover", state="detached", timeout=LOAD)
@@ -53,7 +60,7 @@ def test_web_app(browser_name, tmp_path):
         ctx = b.new_context(viewport={"width": 1280, "height": 860}, accept_downloads=True)
         page = ctx.new_page()
         errors = []
-        page.on("pageerror", lambda e: errors.append(str(e)))
+        page.on("pageerror", lambda e: None if bridge_blip(e) else errors.append(str(e)))
         page.on("dialog", lambda d: d.accept())
         open_app(page)
 
@@ -207,7 +214,7 @@ def test_web_app_documents_and_styles(browser_name, tmp_path):
         ctx = b.new_context(viewport={"width": 1280, "height": 860}, accept_downloads=True)
         page = ctx.new_page()
         errors = []
-        page.on("pageerror", lambda e: errors.append(str(e)))
+        page.on("pageerror", lambda e: None if bridge_blip(e) else errors.append(str(e)))
         page.on("dialog", lambda d: d.accept())
         open_app(page)
         page.click("#wWebStart")
@@ -324,7 +331,7 @@ def test_web_app_browser_button_and_zotero(browser_name, tmp_path):
         ctx = b.new_context(viewport={"width": 1280, "height": 860})
         page = ctx.new_page()
         errors = []
-        page.on("pageerror", lambda e: errors.append(str(e)))
+        page.on("pageerror", lambda e: None if bridge_blip(e) else errors.append(str(e)))
         open_app(page)
         page.click("#wWebStart")
         page.click('.side button.navb[data-tab="library"]')  # a new library opens on Home
@@ -359,7 +366,7 @@ def test_web_app_browser_button_and_zotero(browser_name, tmp_path):
 
         # both are in the library; then Zotero's own file, with its collections as projects
         page = ctx.new_page()
-        page.on("pageerror", lambda e: errors.append(str(e)))
+        page.on("pageerror", lambda e: None if bridge_blip(e) else errors.append(str(e)))
         open_app(page)
         expect(page.locator("#libRows .ref")).to_have_count(2, timeout=30000)
         db = tmp_path / "zotero.sqlite"
@@ -413,7 +420,7 @@ def test_web_app_mendeley_import(browser_name, tmp_path):
             ctx.route("https://mendeley.test/**", mendeley_sign_in)
             page = ctx.new_page()
             errors = []
-            page.on("pageerror", lambda e: errors.append(str(e)))
+            page.on("pageerror", lambda e: None if bridge_blip(e) else errors.append(str(e)))
             page.goto(BASE.rstrip("/") + "/app/?" + urllib.parse.urlencode(
                 {"mendeley_auth": "https://mendeley.test/oauth/authorize", "mendeley_api": api}))
             page.wait_for_selector("#webCover", state="detached", timeout=LOAD)
@@ -445,7 +452,7 @@ def test_web_app_connection_guides(browser_name, tmp_path):
         b = getattr(pw, browser_name).launch()
         page = b.new_context(viewport={"width": 1280, "height": 860}).new_page()
         errors = []
-        page.on("pageerror", lambda e: errors.append(str(e)))
+        page.on("pageerror", lambda e: None if bridge_blip(e) else errors.append(str(e)))
         open_app(page)
         page.click("#wWebStart")
         page.click('.side button.navb[data-tab="library"]')  # a new library opens on Home
@@ -496,7 +503,7 @@ def test_web_app_import_endnote_xml(browser_name, tmp_path):
         b = getattr(pw, browser_name).launch()
         page = b.new_context(viewport={"width": 1280, "height": 860}).new_page()
         errors = []
-        page.on("pageerror", lambda e: errors.append(str(e)))
+        page.on("pageerror", lambda e: None if bridge_blip(e) else errors.append(str(e)))
         open_app(page)
         page.click("#wWebStart")
         page.click('.side button.navb[data-tab="library"]')  # a new library opens on Home
@@ -524,7 +531,7 @@ def test_web_app_home_and_tours(browser_name, tmp_path):
         b = getattr(pw, browser_name).launch()
         page = b.new_context(viewport={"width": 1280, "height": 860}).new_page()
         errors = []
-        page.on("pageerror", lambda e: errors.append(str(e)))
+        page.on("pageerror", lambda e: None if bridge_blip(e) else errors.append(str(e)))
         open_app(page)
         page.click("#wWebStart")
         expect(page.locator("#tab-home")).to_be_visible(timeout=30000)
@@ -639,7 +646,7 @@ def test_web_app_full_texts(browser_name, tmp_path):
         b = getattr(pw, browser_name).launch()
         page = b.new_context(viewport={"width": 1280, "height": 900}, accept_downloads=True).new_page()
         errors = []
-        page.on("pageerror", lambda e: errors.append(str(e)))
+        page.on("pageerror", lambda e: None if bridge_blip(e) else errors.append(str(e)))
         page.on("dialog", lambda d: d.accept())
         open_app(page)
         page.click("#wWebStart")
@@ -752,7 +759,7 @@ def test_web_app_browser_button_takes_the_full_text(browser_name, tmp_path):
             ctx = b.new_context(viewport={"width": 1280, "height": 860})
             page = ctx.new_page()
             errors = []
-            page.on("pageerror", lambda e: errors.append(str(e)))
+            page.on("pageerror", lambda e: None if bridge_blip(e) else errors.append(str(e)))
             open_app(page)
             page.click("#wWebStart")
             page.click('.side button.navb[data-tab="library"]')  # a new library opens on Home
@@ -811,7 +818,7 @@ def test_full_texts_correct_wrong_dois_first(browser_name, tmp_path):
         b = getattr(pw, browser_name).launch()
         page = b.new_context(viewport={"width": 1280, "height": 900}).new_page()
         errors = []
-        page.on("pageerror", lambda e: errors.append(str(e)))
+        page.on("pageerror", lambda e: None if bridge_blip(e) else errors.append(str(e)))
         open_app(page)
         page.click("#wWebStart")
         page.click('.side button.navb[data-tab="library"]')  # a new library opens on Home
