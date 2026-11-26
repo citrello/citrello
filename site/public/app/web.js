@@ -305,6 +305,13 @@
         const r = await fetch("/word/samples.json");
         if (r.ok) {
           await fetch("/api/library/import", { method: "POST", body: await r.arrayBuffer(), headers: { "X-Filename": "samples.json" } });
+          // the openly licensed ones' full text, so "Check the claim" and read_paper have a paper to read
+          const texts = await fetch("/word/samples-text.json").then((x) => x.ok ? x.json() : {}).catch(() => ({}));
+          for (const [key, t] of Object.entries(texts)) {
+            if (key.startsWith("_") || !t.text) continue;
+            await fetch("/api/clip/fulltext", { method: "POST", headers: { "Content-Type": "application/json", "X-Key": key },
+              body: JSON.stringify({ text: t.text }) }).catch(() => {});
+          }
           await cloudSave(sess);
           if (typeof loadLibrary === "function") loadLibrary();
         }

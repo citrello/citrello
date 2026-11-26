@@ -80,7 +80,10 @@ No account is needed to test the main features:
    the "This document" card counts them and lists problems; "Make them Citrello citations" converts them with
    tracked changes.
 
-"Check the claim" and "Find another reference" use Claude and need a free Citrello account (sign-in with a code
-emailed to you); they are explained in the panel when not signed in.
+"Check the claim" and "Find another reference" use Claude and need a free Citrello account. To test them, sign in
+in the panel (Settings → Sign in) with the test account: email reviewer@citrello.app, code <REVIEWER_CODE>
+(no email is sent for this address; type the code directly). Its library holds the same six sample papers. Then
+click a citation and press "Check the claim". (Claim checks need a paper's full text; with the sample papers the
+panel explains when a paper has no text yet.)
 
 Support: hello@citrello.app

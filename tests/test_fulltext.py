@@ -263,3 +263,28 @@ def test_a_pdf_for_another_paper_is_refused_when_checked(lib, tmp_path):
     with pytest.raises(ValueError, match="different paper"):
         fulltext.attach_pdf(pdf_bytes(tmp_path), key, check_title=True)
     assert fulltext.attach_pdf(pdf_bytes(tmp_path), key)["how"] == "chosen"  # chosen by hand: no check
+
+
+def test_sample_library_full_text():
+    """The reviewers' sample library: the openly licensed sample's text attaches to its key, credit included, and
+    the connector reads passages from it."""
+    import json
+    import os
+    import library
+    import mcp_server
+    here = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "site", "public", "word")
+    with open(os.path.join(here, "samples-text.json"), encoding="utf-8") as f:
+        texts = json.load(f)
+    with open(os.path.join(here, "samples.json"), encoding="utf-8") as f:
+        samples = json.load(f)
+    with library.editing() as data:
+        for it in samples:
+            library.add_csl(data, dict(it), source="sample")
+    for key, t in texts.items():
+        if key.startswith("_"):
+            continue
+        assert "CC BY" in t["credit"] and t["text"].startswith(t["credit"])
+        assert library.get(library.load(), key), key  # the key the import gives
+        fulltext.attach(key, fulltext.clean_page(t["text"]), "page")
+    res = mcp_server.t_read_paper("Topham2017", query="decommissioning costs")
+    assert "decommission" in json.dumps(res).lower()
