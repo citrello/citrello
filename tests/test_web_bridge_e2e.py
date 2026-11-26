@@ -352,3 +352,80 @@ def test_cloud_copy_keeps_the_library(browser_name, tmp_path):
         expect(bb.locator("#webCloudInfo")).to_contain_text("The cloud copy is off", timeout=30000)
         assert not errors, errors
         b.close()
+
+
+@pytest.mark.parametrize("browser_name", BROWSERS)
+def test_other_account_in_the_same_browser(browser_name, tmp_path):
+    """Someone signs out and signs in as someone else in the same browser (Armin, recording the reviewers' demo): the
+    first account's library is never copied into the second account's cloud copy. Citrello asks; Cancel leaves both
+    alone, OK opens the second account's library and the first one's stays in its own cloud copy."""
+    from playwright.sync_api import expect, sync_playwright
+    t = int(time.time())
+    first, second = f"first-{browser_name}-{t}@example.com", f"second-{browser_name}-{t}@example.com"
+    bib = tmp_path / "two.bib"
+    bib.write_text("@article{topham2017, title={Sustainable decommissioning of an offshore wind farm}, author={Topham, Eva}, year={2017}}\n"
+                   "@article{lee2021, title={Export cable recovery costs}, author={Lee, Ann}, year={2021}}\n", encoding="utf-8")
+    errors, dialogs, answer = [], [], {"accept": False}
+
+    def on_dialog(d):
+        dialogs.append(d.message)
+        d.accept() if answer["accept"] else d.dismiss()
+
+    def sign_in(page, email):
+        page.click('.side button.navb[data-tab="settings"]')
+        page.fill("#acctEmail", email)
+        page.click("#acctSend")
+        expect(page.locator("#acctCodeRow")).to_be_visible(timeout=30000)
+        page.fill("#acctCode", B.bc.start_sign_in(email)["dev_code"])
+        page.click("#acctVerify")
+        expect(page.locator("#acctSignOut")).to_be_visible(timeout=30000)
+
+    def cloud_items(page, email):  # what the account's cloud copy holds, asked with that account's token
+        return page.evaluate("""async ([bridge, token]) => (await (await fetch(bridge + '/api/cloud',
+            {headers: {Authorization: 'Bearer ' + token}})).json())""", [B.bc.BRIDGE, token_of(email)])
+
+    def token_of(email):
+        return json.loads(B.call("POST", "/api/auth/verify", {"email": email, "code": B.bc.start_sign_in(email)["dev_code"]})[2])["token"]
+
+    with sync_playwright() as pw:
+        b = getattr(pw, browser_name).launch()
+        page = b.new_context(viewport={"width": 1280, "height": 900}).new_page()
+        page.on("pageerror", lambda e: errors.append(str(e)))
+        page.on("dialog", on_dialog)
+        page.goto(f"{BASE}/app/?bridge={urllib.parse.quote(B.bc.BRIDGE)}")
+        page.wait_for_selector("#webCover", state="detached", timeout=LOAD)
+        page.click("#wWebStart")
+        page.click('.side button.navb[data-tab="library"]')
+        page.click("#openImport")
+        page.click('[data-guide="imp-file"]')
+        page.set_input_files("#importFile", str(bib))
+        expect(page.locator("#gResult")).to_contain_text("2 added", timeout=60000)
+        page.keyboard.press("Escape")
+        sign_in(page, first)
+        expect(page.locator("#webCloudInfo")).to_contain_text("2 references", timeout=60000)
+        page.click("#acctSignOut")
+        expect(page.locator("#acctSend")).to_be_visible(timeout=30000)
+
+        sign_in(page, second)  # Cancel: nothing moves
+        page.wait_for_function("() => true")
+        for _ in range(60):
+            if dialogs:
+                break
+            page.wait_for_timeout(500)
+        assert dialogs and first in dialogs[-1] and second in dialogs[-1], dialogs
+        page.wait_for_timeout(3000)
+        assert cloud_items(page, second).get("exists") is False  # the first account's library wasn't saved there
+        page.click('.side button.navb[data-tab="library"]')
+        expect(page.locator("#libRows .ref")).to_have_count(2)
+
+        answer["accept"] = True  # signing in again, OK: the second account's (empty) library opens here
+        dialogs.clear()
+        page.click('.side button.navb[data-tab="settings"]')
+        page.click("#acctSignOut")
+        sign_in(page, second)
+        page.click('.side button.navb[data-tab="library"]')
+        expect(page.locator("#libRows .ref")).to_have_count(0, timeout=60000)
+        assert dialogs and first in dialogs[-1]
+        assert cloud_items(page, first)["items"] == 2  # the first account's library is safe in its cloud copy
+        assert not errors, errors
+        b.close()

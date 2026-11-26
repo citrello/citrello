@@ -1,4 +1,6 @@
 import json
+
+import pytest
 import os
 import sys
 import zipfile
@@ -11,6 +13,7 @@ import build_chatgpt_plugin as b  # noqa: E402
 def test_package_meets_openais_limits(tmp_path):
     plugin, mcp = b.load()
     assert b.check(plugin, mcp) == []
+    pytest.importorskip("PIL")  # the logo is drawn with Pillow (a build-time dependency)
     out = b.build(str(tmp_path / "p.zip"), demo_url="https://example.com/demo")
     with zipfile.ZipFile(out) as z:
         assert sorted(z.namelist()) == ["assets/logo.png", "mcp.json", "plugin.json"]

@@ -277,14 +277,25 @@ def test_sample_library_full_text():
         texts = json.load(f)
     with open(os.path.join(here, "samples.json"), encoding="utf-8") as f:
         samples = json.load(f)
+    before = {it["key"] for it in library.load()["items"]}
     with library.editing() as data:
         for it in samples:
             library.add_csl(data, dict(it), source="sample")
-    for key, t in texts.items():
-        if key.startswith("_"):
-            continue
-        assert "CC BY" in t["credit"] and t["text"].startswith(t["credit"])
-        assert library.get(library.load(), key), key  # the key the import gives
-        fulltext.attach(key, fulltext.clean_page(t["text"]), "page")
-    res = mcp_server.t_read_paper("Topham2017", query="decommissioning costs")
-    assert "decommission" in json.dumps(res).lower()
+    added = [it["key"] for it in library.load()["items"] if it["key"] not in before]
+    attached = []
+    try:
+        for key, t in texts.items():
+            if key.startswith("_"):
+                continue
+            assert "CC BY" in t["credit"] and t["text"].startswith(t["credit"])
+            it = library.get(library.load(), key)
+            assert it, key  # the key the import gives
+            if not fulltext.read(it):
+                attached.append(key)
+            fulltext.attach(key, fulltext.clean_page(t["text"]), "page")
+        res = mcp_server.t_read_paper("Topham2017", query="decommissioning costs")
+        assert "decommission" in json.dumps(res).lower()
+    finally:  # the tests share one library: leave it as it was
+        for key in set(added) | set(attached):  # also a paper an earlier test added: its text goes again
+            fulltext.remove(key)
+        library.delete(added)

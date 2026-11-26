@@ -64,6 +64,11 @@ def _device_id():
     return "browser-" + secrets.token_hex(6)
 
 
+def _signed_in_email():
+    a = bridge_client.load_account()
+    return (a or {}).get("email") or None
+
+
 def _save_web_state(**values):
     st = _web_state()
     st.update(values)
@@ -260,6 +265,7 @@ class WebHandler(app.Handler):
             return self.send(200, {"items": len(data["items"]), "last_backup": st.get("last_backup"),
                                    "backup_count": st.get("backup_count", 0), "stamp": library_stamp(),
                                    "cloud_stamp": st.get("cloud_stamp"), "cloud_at": st.get("cloud_at"),
+                                   "cloud_owner": st.get("cloud_owner"),  # whose cloud copy this library goes with
                                    "cloud_device": st.get("device_id") or _save_web_state(device_id=_device_id())})
         if path == "/api/web/cloud-bundle":  # the cloud copy to save (the page sends it to Citrello's server)
             body, items, texts = cloud_bundle()
@@ -277,14 +283,17 @@ class WebHandler(app.Handler):
             return self.send(*import_zotero_file(self._body, self.headers.get("X-Project", "")))
         if path == "/api/web/cloud-saved":  # the page saved the cloud copy: remember what was saved
             b = self.json_body()
-            _save_web_state(cloud_stamp=str(b.get("stamp", ""))[:40], cloud_at=time.time())
+            _save_web_state(cloud_stamp=str(b.get("stamp", ""))[:40], cloud_at=time.time(), cloud_owner=_signed_in_email())
+            return self.send(200, {"ok": True})
+        if path == "/api/web/cloud-owner":  # in step with this account's cloud copy (an older browser learns whose it is)
+            _save_web_state(cloud_owner=_signed_in_email())
             return self.send(200, {"ok": True})
         if path == "/api/web/cloud-restore":  # a cloud copy replaces this browser's library
             try:
                 n = cloud_restore(self._body)
             except ValueError as e:
                 return self.send(400, {"error": str(e)})
-            _save_web_state(cloud_stamp=library_stamp(), cloud_at=time.time())
+            _save_web_state(cloud_stamp=library_stamp(), cloud_at=time.time(), cloud_owner=_signed_in_email())
             return self.send(200, {"items": n})
         if path == "/api/web/restore":
             try:

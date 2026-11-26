@@ -298,7 +298,25 @@
       const ir = await cloudCall(sess, "GET", "/api/cloud");
       const info = await ir.json().catch(() => ({}));
       if (!ir.ok || !info.ready) return;
-      const st = await (await fetch("/api/web/state")).json();
+      let st = await (await fetch("/api/web/state")).json();
+      // another account's library in this browser (someone signed out and in as someone else): never copy one
+      // account's library into another's cloud copy. Ask, and either open this account's library or leave both alone.
+      const me = String(sess.email || ""), owner = String(st.cloud_owner || "");
+      if (st.items > 0 && owner && me && owner.toLowerCase() !== me.toLowerCase()) {
+        const unsaved = st.stamp !== st.cloud_stamp
+          ? ` Changes made since it was last saved to ${owner}'s cloud copy stay only in this browser's backups.` : "";
+        if (!confirm(`This browser has the library of ${owner} (${st.items} references), and you're now signed in as ${me}.\n\n` +
+                     `OK: open ${me}'s library here. ${owner}'s library stays in its own cloud copy.${unsaved}\n` +
+                     `Cancel: leave this browser's library as it is, and don't save it to ${me}'s cloud copy.`)) {
+          cloudLast = null; return;
+        }
+        if (info.exists) { await cloudRestore(sess, info); return; }
+        await fetch("/api/web/restore", { method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ items: [], projects: [] }) });
+        await fetch("/api/web/cloud-owner", { method: "POST" });
+        if (typeof loadLibrary === "function") loadLibrary();
+        st = await (await fetch("/api/web/state")).json();
+      }
       const changedHere = st.stamp !== st.cloud_stamp;
       const changedThere = info.exists && info.device !== st.cloud_device && info.saved_at > (st.cloud_at || 0);
       if (!info.exists && st.items === 0 && info.reviewer) {                   // the directories' reviewers: sample papers
@@ -320,10 +338,11 @@
       else if (changedThere && changedHere) {                                  // both changed: the person chooses
         const when = new Date(info.saved_at * 1000).toLocaleString();
         if (confirm(`Your cloud copy (${info.items} references, saved ${when} in another browser) is different from ` +
-                    `the library in this browser (${st.items} references).\n\nOK: use the cloud copy here.\n` +
-                    "Cancel: keep this browser's library and save it to the cloud.")) await cloudRestore(sess, info);
+                    `the library in this browser (${st.items} references).\n\nOK: use ${me ? me + "'s" : "the"} cloud copy here.\n` +
+                    `Cancel: keep this browser's library and save it to ${me ? me + "'s" : "the"} cloud copy.`)) await cloudRestore(sess, info);
         else await cloudSave(sess, st);
       } else if (changedHere) await cloudSave(sess, st);
+      else if (!owner && me && info.exists && !changedThere) await fetch("/api/web/cloud-owner", { method: "POST" });  // in step: an older browser learns whose it is
       cloudLast = null;
       backupState().catch(() => {});
     } catch (e) {
