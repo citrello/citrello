@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "Citrello",
   "short_name": "Citrello",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "Add papers to your Citrello library with one click, and give ChatGPT and Claude the full text of the papers you have access to.",
   "homepage_url": "https://citrello.app",
   "icons": {

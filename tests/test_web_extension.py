@@ -568,3 +568,55 @@ def test_check_detection_ignores_captcha_boxes_on_the_article():
             page.add_script_tag(content=grab)
             assert page.evaluate("isChallenge()") is expected, name
         b.close()
+
+
+def test_pdf_link_named_like_the_page(tmp_path):
+    """Computer Optics keeps a paper's PDF next to its page under the same number (…/410305.html → …/410305.pdf, linked
+    by an image): that's this paper's PDF. Another paper's PDF on the same page is still left alone."""
+    import threading
+    from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+    from playwright.sync_api import sync_playwright
+    sys.path.insert(0, os.path.dirname(__file__))
+    import test_doccheck as T
+    mine, other = str(tmp_path / "mine.pdf"), str(tmp_path / "other.pdf")
+    T.make_pdf(mine, [["Analysis of focusing light by a harmonic diffractive lens"] + [f"Section {i}: dispersion of the lens." for i in range(40)]])
+    T.make_pdf(other, [["A different paper about something else"] + [f"Part {i}." for i in range(40)]])
+
+    class H(BaseHTTPRequestHandler):
+        def log_message(self, *a):
+            pass
+
+        def do_GET(self):
+            files = {"/KO/PDF/KO41-3/410305.pdf": mine, "/KO/PDF/KO41-3/410306.pdf": other}
+            if self.path in files:
+                body, ctype = open(files[self.path], "rb").read(), "application/pdf"
+            elif self.path == "/eng/KO/Annot/KO41-3/410305.html":
+                body, ctype = ("<html><head><title>Journal Computer optics</title></head><body><p>Abstract: focusing light.</p>"
+                               '<a href="../../../../KO/PDF/KO41-3/410306.pdf">Next article</a>'
+                               '<a href="../../../../KO/PDF/KO41-3/410305.pdf"><img alt="" src="pdf.gif"></a></body></html>').encode(), "text/html"
+            else:
+                self.send_response(404)
+                self.end_headers()
+                return
+            self.send_response(200)
+            self.send_header("Content-Type", ctype)
+            self.end_headers()
+            self.wfile.write(body)
+
+    srv = ThreadingHTTPServer(("127.0.0.1", 0), H)
+    threading.Thread(target=srv.serve_forever, daemon=True).start()
+    grab = open(os.path.join(ROOT, "extension", "grab.js"), encoding="utf-8").read()
+    try:
+        with sync_playwright() as pw:
+            b = pw.chromium.launch()
+            page = b.new_page()
+            page.goto(f"http://127.0.0.1:{srv.server_address[1]}/eng/KO/Annot/KO41-3/410305.html")
+            page.add_script_tag(content=grab)
+            g = page.evaluate("grabPaper('10.18287/2412-6179-2017-41-3-338-347', 'article-journal', "
+                              "'Analysis of focusing light by a harmonic diffractive lens')")
+            assert g["status"] == "ok" and g["how"] == "pdf", g
+            import base64
+            assert base64.b64decode(g["pdf"]) == open(mine, "rb").read()  # this paper's PDF, not the next article's
+            b.close()
+    finally:
+        srv.shutdown()

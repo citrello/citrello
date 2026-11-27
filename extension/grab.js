@@ -144,7 +144,9 @@ async function grabPaper(expectDoi, kind, refTitle) {
   if (meta("citation_pdf_url")) add(meta("citation_pdf_url"));
   for (const u of publisherPdfUrls(location.href, doi || cleanDoi(expectDoi))) add(u);
   // this paper's own identifiers, as they appear in its links (ScienceDirect's PII, the page's last path part, the DOI)
-  const ids = [location.pathname.split("/").filter(Boolean).pop() || "", ...((doi || cleanDoi(expectDoi)).split("/").slice(1))]
+  // (without the page's file ending: Computer Optics' 410305.html keeps its PDF at …/410305.pdf)
+  const ids = [(location.pathname.split("/").filter(Boolean).pop() || "").replace(/\.(s?html?|php|aspx?|jsp|cfm)$/i, ""),
+               ...((doi || cleanDoi(expectDoi)).split("/").slice(1))]
     .map((x) => decodeURIComponent(x).toLowerCase()).filter((x) => x.length >= 6);
   const OTHER = /related|recommend|cited|citing|reference|similar|sidebar|more-?like|popular|also-?read|trending|teaser|toc/i;
   const elsewhere = (el) => { for (let e = el; e && e !== document.body; e = e.parentElement) if (OTHER.test((e.id || "") + " " + (e.className && e.className.baseVal === undefined ? e.className : ""))) return true; return false; };
