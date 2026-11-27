@@ -1,4 +1,4 @@
-# Citrello status (updated 25 November 2026)
+# Citrello status (updated 27 November 2026)
 
 ## Released
 - **Citrello 1.0.1** is the latest GitHub release (Windows `Citrello-windows.zip`, Mac beta `Citrello-mac.zip`,
@@ -58,6 +58,11 @@
   sent; its empty web-app library fills with the sample papers). The bridge lists the tools for accounts whose app
   never connected (`bridge/src/tools.json`, `packaging/build_bridge_tools.py`), serves the icon, and
   citrello.app/connect is the connectors' documentation page.
+- **27 Nov 2026: ChatGPT plugin submitted for review** (platform.openai.com/plugins, package 1.0.3 with the demo video
+  https://youtu.be/yGFXrq08eZ0 on the @citrelloapp YouTube channel, unlisted; domain verified through
+  OPENAI_APPS_CHALLENGE; tool scan clean after marking overwriting tools destructive). **Chrome extension 1.0.2
+  published** (science.org: a CAPTCHA box on the article's own page is no longer taken for a check; Computer
+  Optics PDFs named like the page). Chrome listing: non-trader, "Offered by Citrello", contact hello@citrello.app.
 - **Citrello for Word submitted to Microsoft's add-in store (AppSource), 26 Nov 2026**: Partner Center offer
   `citrello-word` (Office add-in), categories Productivity + Reference, industry Education, all markets, "offers
   in-app purchases" (Stripe plans). Manifest icons fixed to 32/64 px for the store. Reviewer notes and testing guide:
