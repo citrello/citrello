@@ -494,16 +494,16 @@ ANNOTATIONS = {
     "add_to_project": ("Put references into a project", False, False, False),
     "format_references": ("Format references", True, False, True),
     "check_citations": ("Check citation markers", True, False, False),
-    "create_word_document": ("Create a Word document", False, False, True),
+    "create_word_document": ("Create a Word document", False, True, True),   # can replace a file at output_path
     "update_word_document": ("Update a Word document", False, True, True),  # rewrites the file unless told not to
     "read_paper": ("Read a paper's full text", True, False, False),
     "find_in_papers": ("Search inside papers", True, False, False),
-    "get_bibtex": ("Get BibTeX", False, False, False),                      # can save a .bib file
+    "get_bibtex": ("Get BibTeX", False, True, False),                       # can save over a .bib file
     "check_latex_project": ("Check a LaTeX project", True, False, True),
-    "prepare_arxiv": ("Make an arXiv-ready .zip", False, False, False),
+    "prepare_arxiv": ("Make an arXiv-ready .zip", False, True, False),      # can replace an earlier _arxiv.zip
     "import_zotero_library": ("Import from Zotero", False, False, False),
     "list_styles": ("Find a citation style", True, False, True),
-    "verify_references": ("Verify references online", False, False, True),  # corrects details from Crossref
+    "verify_references": ("Verify references online", False, True, True),   # overwrites details with Crossref's
     "import_references": ("Import a reference file", False, False, False),
 }
 

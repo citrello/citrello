@@ -245,7 +245,7 @@
    "annotations": {
     "title": "Create a Word document",
     "readOnlyHint": false,
-    "destructiveHint": false,
+    "destructiveHint": true,
     "idempotentHint": false,
     "openWorldHint": true
    }
@@ -381,7 +381,7 @@
    "annotations": {
     "title": "Get BibTeX",
     "readOnlyHint": false,
-    "destructiveHint": false,
+    "destructiveHint": true,
     "idempotentHint": false,
     "openWorldHint": false
    }
@@ -433,7 +433,7 @@
    "annotations": {
     "title": "Make an arXiv-ready .zip",
     "readOnlyHint": false,
-    "destructiveHint": false,
+    "destructiveHint": true,
     "idempotentHint": false,
     "openWorldHint": false
    }
@@ -507,7 +507,7 @@
    "annotations": {
     "title": "Verify references online",
     "readOnlyHint": false,
-    "destructiveHint": false,
+    "destructiveHint": true,
     "idempotentHint": false,
     "openWorldHint": true
    }
