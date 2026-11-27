@@ -65,7 +65,11 @@ def build_app():
         page = f.read()
     head = ('<meta name="description" content="Citrello in your browser: your reference library, checks and '
             'citation styles, with nothing to install.">\n'
-            '<link rel="icon" href="/favicon.svg" type="image/svg+xml">\n<script src="web.js"></script>\n')
+            '<link rel="icon" href="/favicon.svg" type="image/svg+xml">\n'
+            # installable as an app (its own window and icon): manifest.webmanifest and the icons next to it
+            '<link rel="manifest" href="manifest.webmanifest">\n<meta name="theme-color" content="#1d3f8f">\n'
+            '<link rel="apple-touch-icon" href="icon-192.png">\n<meta name="apple-mobile-web-app-title" content="Citrello">\n'
+            '<script src="web.js"></script>\n')
     assert page.count("</head>") == 1
     page = page.replace("</head>", head + "</head>")
     with open(os.path.join(APP_OUT, "index.html"), "w", encoding="utf-8") as f:

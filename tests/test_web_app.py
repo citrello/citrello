@@ -840,3 +840,35 @@ def test_full_texts_correct_wrong_dois_first(browser_name, tmp_path):
         expect(page.locator("#papersMsg")).to_contain_text("1 DOI was corrected first")
         assert not errors, errors
         b.close()
+
+
+def test_web_app_installs_as_an_app():
+    """Citrello in the browser can be installed as an app (its own window and icon): Chrome finds nothing missing,
+    and Settings offers "Install Citrello as an app" when the browser does."""
+    from playwright.sync_api import expect, sync_playwright
+    with sync_playwright() as pw:
+        b = pw.chromium.launch()
+        page = b.new_page(viewport={"width": 1280, "height": 900})
+        errors = []
+        page.on("pageerror", lambda e: None if bridge_blip(e) else errors.append(str(e)))
+        page.goto(BASE.rstrip("/") + "/app/")
+        page.wait_for_selector("#webCover", state="detached", timeout=LOAD)
+        manifest = page.evaluate("fetch('manifest.webmanifest').then((r) => r.json())")
+        assert manifest["name"] == "Citrello" and manifest["display"] == "standalone" and manifest["start_url"] == "/app/"
+        for icon in manifest["icons"]:
+            assert page.evaluate("(u) => fetch(u).then((r) => r.ok && r.headers.get('content-type').startsWith('image/png'))", icon["src"])
+        cdp = page.context.new_cdp_session(page)
+        problems = cdp.send("Page.getInstallabilityErrors")["installabilityErrors"]
+        assert problems == [], problems
+        page.click("#wWebStart")
+        tab(page, "settings")
+        expect(page.locator("#webInstallBox")).to_be_hidden()  # only when the browser offers it
+        page.evaluate("""() => { const e = new Event('beforeinstallprompt'); window.__asked = 0;
+            e.prompt = () => { window.__asked++; }; e.userChoice = Promise.resolve({outcome: 'accepted'});
+            window.dispatchEvent(e); }""")
+        expect(page.locator("#webInstallBox")).to_be_visible()
+        page.click("#webInstall")
+        page.wait_for_function("window.__asked === 1")
+        expect(page.locator("#webInstallBox")).to_be_hidden()
+        assert not errors, errors
+        b.close()

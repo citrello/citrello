@@ -408,6 +408,27 @@
       box.appendChild(row);
     }
   }
+  // Installing Citrello as an app (the browser's own install; manifest.webmanifest): the button shows only when the
+  // browser offers it (Chrome, Edge), and goes once it's installed or when Citrello already runs as the app.
+  let installPrompt = null;
+  const installBox = () => document.getElementById("webInstallBox");
+  window.addEventListener("beforeinstallprompt", (e) => {
+    e.preventDefault();
+    installPrompt = e;
+    if (installBox()) installBox().classList.remove("hidden");
+  });
+  window.addEventListener("appinstalled", () => {
+    installPrompt = null;
+    if (installBox()) installBox().classList.add("hidden");
+    if (typeof toast === "function") toast("Citrello is installed: open it from your apps, Start menu or Dock");
+  });
+  document.addEventListener("click", async (e) => {
+    if (!e.target || e.target.id !== "webInstall" || !installPrompt) return;
+    installPrompt.prompt();
+    await installPrompt.userChoice.catch(() => null);
+    installPrompt = null;
+    if (installBox()) installBox().classList.add("hidden");
+  });
   // when the connection changes, the sidebar shows it straight away
   window.addEventListener("citrello-connection", () => {
     if (typeof renderSideConn === "function") fetch("/api/account").then((r) => r.json()).then(renderSideConn).catch(() => {});
