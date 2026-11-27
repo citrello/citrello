@@ -1,7 +1,7 @@
 {
   "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
   "name": "citrello",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "description": "Use your own Citrello reference library in ChatGPT: search, add and verify references, read your papers' full text, and cite in Word or LaTeX in 10,000+ styles.",
   "author": {
     "name": "Citrello",
@@ -101,7 +101,7 @@
             }
           ]
         },
-        "demo_recording_url": "",
+        "demo_recording_url": "https://youtu.be/yGFXrq08eZ0",
         "commerce": false,
         "commerce_description": "Citrello's plugin doesn't sell anything or process payments."
       },

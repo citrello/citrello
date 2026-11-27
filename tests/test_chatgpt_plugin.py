@@ -34,6 +34,7 @@ def test_check_catches_mistakes():
     plugin, mcp = b.load()
     plugin["extensions"]["com.openai"]["interface"]["shortDescription"] = "x" * 31
     plugin["extensions"]["com.openai"]["review"]["test_cases"]["negative"].pop()
+    plugin["extensions"]["com.openai"]["review"]["demo_recording_url"] = ""
     problems = b.check(plugin, mcp, need_demo=True)
     assert any("shortDescription" in p for p in problems) and any("exactly 5" in p for p in problems)
     assert any("demo_recording_url" in p for p in problems)
