@@ -65,9 +65,13 @@ async function grabPaper(expectDoi, kind, refTitle) {
     } catch (e) { return null; }  // elsewhere, and that site doesn't let this page fetch it: the extension tries
   }
   const challenge = () => {
-    const top = ((document.title || "") + " " + (document.body ? document.body.innerText.slice(0, 1500) : "")).toLowerCase();
-    return /just a moment|verify (that )?you are (a )?human|are you a robot|unusual traffic|attention required|press (and|&) hold|checking your browser|confirm you are human|i'?m not a robot|human verification|performing security verification|security check to access/.test(top) ||
-      !!document.querySelector('iframe[src*="captcha"], iframe[src*="challenges.cloudflare.com"], #challenge-form, .g-recaptcha, .h-captcha, #px-captcha');
+    const title = (document.title || "").toLowerCase(), text = document.body ? document.body.innerText : "";
+    const words = /just a moment|verify (that )?you are (a )?human|are you a robot|unusual traffic|attention required|press (and|&) hold|checking your browser|confirm you are human|i'?m not a robot|human verification|performing security verification|security check to access/;
+    const box = !!document.querySelector('iframe[src*="captcha"], iframe[src*="challenges.cloudflare.com"], #challenge-form, .g-recaptcha, .h-captcha, #px-captcha');
+    // the paper's own page has loaded (its citation details and real text): a CAPTCHA box or "verify you are human" in a
+    // sign-in, alerts or cookie box on it isn't a check standing in the way; a check page's title still is
+    const article = !!document.querySelector('meta[name="citation_title"], meta[name="dc.Title"], meta[name="DC.title"]') && text.length > 3000;
+    return words.test(title) || (!article && (words.test(text.slice(0, 1500).toLowerCase()) || box));
   };
 
   // the page itself is a PDF (the browser's PDF viewer)
@@ -213,7 +217,11 @@ function pageInfo() {
 
 // Is this page a security check ("Just a moment…", Cloudflare, a CAPTCHA)? Sent into the page on its own.
 function isChallenge() {
-  const top = ((document.title || "") + " " + (document.body ? document.body.innerText.slice(0, 1500) : "")).toLowerCase();
-  return /just a moment|verify (that )?you are (a )?human|are you a robot|unusual traffic|attention required|press (and|&) hold|checking your browser|confirm you are human|i'?m not a robot|human verification|performing security verification|security check to access/.test(top) ||
-    !!document.querySelector('iframe[src*="captcha"], iframe[src*="challenges.cloudflare.com"], #challenge-form, .g-recaptcha, .h-captcha, #px-captcha');
+  const title = (document.title || "").toLowerCase(), text = document.body ? document.body.innerText : "";
+  const words = /just a moment|verify (that )?you are (a )?human|are you a robot|unusual traffic|attention required|press (and|&) hold|checking your browser|confirm you are human|i'?m not a robot|human verification|performing security verification|security check to access/;
+  const box = !!document.querySelector('iframe[src*="captcha"], iframe[src*="challenges.cloudflare.com"], #challenge-form, .g-recaptcha, .h-captcha, #px-captcha');
+  // the paper's own page has loaded (its citation details and real text): a CAPTCHA box or "verify you are human" in a
+  // sign-in, alerts or cookie box on it isn't a check standing in the way; a check page's title still is
+  const article = !!document.querySelector('meta[name="citation_title"], meta[name="dc.Title"], meta[name="DC.title"]') && text.length > 3000;
+  return words.test(title) || (!article && (words.test(text.slice(0, 1500).toLowerCase()) || box));
 }

@@ -542,3 +542,29 @@ def test_extension_notices_a_paper_in_the_library_without_its_text(tmp_path):
             ctx.close()
     finally:
         srv.shutdown()
+
+
+def test_check_detection_ignores_captcha_boxes_on_the_article():
+    """science.org and other publishers keep a CAPTCHA box (sign-in, alerts, invisible Cloudflare) on the article's own
+    page: that's no "are you human?" check, so the extension takes the text. A real check page still counts."""
+    from playwright.sync_api import sync_playwright
+    grab = open(os.path.join(ROOT, "extension", "grab.js"), encoding="utf-8").read()
+    article_text = "".join(f"<p>Section {i}: offshore wind decommissioning costs and recycling of blades.</p>" for i in range(80))
+    meta = '<meta name="citation_title" content="Sustainable decommissioning">'
+    pages = {
+        "check page": ("<title>Just a moment...</title>", "<p>Verify you are human by completing the action below.</p>", True),
+        "check page with a box": ("<title>science.org</title>", '<iframe src="https://challenges.cloudflare.com/x"></iframe><p>One moment.</p>', True),
+        "article with a hidden Cloudflare box": (f"<title>Sustainable decommissioning | Science</title>{meta}",
+            '<iframe style="display:none" src="https://challenges.cloudflare.com/turnstile"></iframe>' + article_text, False),
+        "article with a sign-in box": (f"<title>Sustainable decommissioning | Science</title>{meta}",
+            '<div class="g-recaptcha"></div><p>Sign in. Verify you are human.</p>' + article_text, False),
+        "short page with a box": ("<title>Paper</title>" + meta, '<div class="g-recaptcha"></div><p>Abstract.</p>', True),
+    }
+    with sync_playwright() as pw:
+        b = pw.chromium.launch()
+        page = b.new_page()
+        for name, (head, body, expected) in pages.items():
+            page.set_content(f"<html><head>{head}</head><body>{body}</body></html>")
+            page.add_script_tag(content=grab)
+            assert page.evaluate("isChallenge()") is expected, name
+        b.close()
