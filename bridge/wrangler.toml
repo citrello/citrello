@@ -14,7 +14,7 @@ AI_MODEL = "claude-sonnet-5-5"
 AI_WEB_MODEL = "claude-haiku-5-5"
 # ChatGPT's plugin submission: the token its "Connect MCP server" step shows, served at
 # /.well-known/openai-apps-challenge (empty: that address answers 404)
-OPENAI_APPS_CHALLENGE = ""
+OPENAI_APPS_CHALLENGE = "JJKxqi4GhfS1qed9H8V0ayBMZ2CV4bbQaai-prtWiBU"
 
 [[d1_databases]]
 binding = "DB"
